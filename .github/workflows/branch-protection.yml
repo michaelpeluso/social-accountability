@@ -1,0 +1,87 @@
+name: Branch Protection
+
+# This workflow acts as a required status check gate for main branch
+# It must pass before any PR can be merged to main
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  # Gate job that depends on all required checks
+  protection-gate:
+    name: All checks must pass
+    runs-on: ubuntu-latest
+    needs: [type-check, lint, format-check, test]
+    steps:
+      - name: All required checks passed
+        run: echo "✅ All required checks passed. Safe to merge."
+
+  # Run all required checks
+  type-check:
+    name: TypeScript Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run type-check
+
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run lint
+
+  format-check:
+    name: Prettier Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run format:check
+
+  test:
+    name: Jest Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm test -- --coverage
+
+  # Block direct pushes to main (except from GitHub Actions)
+  block-direct-push:
+    name: Block Direct Push to Main
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
+    steps:
+      - name: Direct push detected
+        run: |
+          echo "❌ Direct pushes to main are not allowed!"
+          echo "Please create a branch and open a PR instead."
+          echo ""
+          echo "Quick fix:"
+          echo "  git reset --soft HEAD~1"
+          echo "  git checkout -b fix/my-changes"
+          echo "  git commit -m 'your message'"
+          echo "  git push -u origin fix/my-changes"
+          exit 1
