@@ -7,7 +7,7 @@ on:
     types: [opened]
 
 jobs:
-  # Auto-add new issues to project
+  # Auto-add new issues to project (requires PROJECT_TOKEN secret)
   add-to-project:
     runs-on: ubuntu-latest
     if: github.event_name == 'issues' && github.event.action == 'opened'
@@ -16,7 +16,7 @@ jobs:
         uses: actions/add-to-project@v0.5.0
         with:
           project-url: https://github.com/users/michaelpeluso/projects/3
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PROJECT_TOKEN }}
 
   # Auto-label based on file paths
   auto-label:
