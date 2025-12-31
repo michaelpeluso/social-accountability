@@ -6,8 +6,8 @@ Since branch protection rules require GitHub Pro or a public repository, here's 
 
 ✅ **main** is now the default branch
 ✅ **master** branch deleted
-✅ CI workflows run on pushes to main
-✅ **branch-protection.yml** workflow enforces all checks on PRs to main
+✅ CI workflows run on all pushes (lightweight checks: type-check, lint)
+✅ **branch-protection.yml** workflow runs heavy checks (format, tests) on PRs and provides the merge gate
 
 ## Manual Branch Protection Setup
 
@@ -45,12 +45,12 @@ Create a new ruleset:
 
 **Already implemented**: `.github/workflows/branch-protection.yml`
 
-This workflow:
+This workflow now:
 
-- ✅ Runs all required checks (type-check, lint, format, test) on every PR to main
-- ✅ Creates a single "All checks must pass" gate status
-- ✅ Warns on direct pushes to main (shows failure if you bypass PRs)
-- ✅ Provides visibility even without Pro features
+- ✅ Runs lightweight checks on **every push** (type-check, lint) for fast feedback (~30s)
+- ✅ Runs heavier checks on **PRs to main** (format, test) to keep push CI fast
+- ✅ Creates a single "All checks must pass" gate status on PRs
+- ✅ Blocks direct pushes to main in CI (pushes show failure if you bypass PRs)
 
 **How to use**:
 
@@ -92,8 +92,9 @@ You have multiple layers of protection:
 
 **What works now**:
 
-- All PRs show clear pass/fail status before merge
-- Direct pushes to main trigger warnings (visible in Actions tab)
+- All PRs show clear pass/fail status before merge (gate job)
+- Feature-branch pushes get early warnings via type-check + lint
+- Direct pushes to main fail the "Block Direct Push to Main" job
 - Pre-commit hooks catch most issues before push
 
 **What needs GitHub Pro or public repo**:
