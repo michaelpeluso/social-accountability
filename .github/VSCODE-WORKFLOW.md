@@ -5,17 +5,21 @@
 ### 1. Install GitHub CLI
 
 ```bash
-# Windows (Chocolatey)
-choco install gh
+# Windows (winget - built-in)
+winget install --id GitHub.cli -e
 
-# Or download from: https://cli.github.com/
+# Then close and reopen terminal
 ```
 
 ### 2. Authenticate
 
 ```bash
-gh auth login
+# Use PowerShell terminal in VSCode (gh doesn't work in bash by default)
+powershell -Command "gh auth login"
 # Follow prompts to authenticate with GitHub
+
+# Add project permissions
+powershell -Command "gh auth refresh -s project,read:project"
 ```
 
 ### 3. Install VSCode GitHub Extension
@@ -38,10 +42,14 @@ gh auth login
 6. Create
 ```
 
-**Or via terminal in VSCode:**
+**Or via terminal in VSCode (PowerShell):**
 
 ```bash
-gh issue create --title "Add habit creation form" --body "Implement M2 story 2.2" --label M2 --assignee @me
+# Windows: Use PowerShell for gh commands
+powershell -Command "gh issue create --title 'Add habit creation form' --body 'Implement M2 story 2.2' --label M2 --assignee '@me'"
+
+# Or open PowerShell terminal: Ctrl+Shift+P → "Terminal: Select Default Profile" → PowerShell
+# Then just: gh issue create --title "Add habit creation form" --body "Implement M2 story 2.2" --label M2 --assignee @me
 ```
 
 ### View Issues (VSCode Sidebar)
@@ -56,8 +64,9 @@ gh issue create --title "Add habit creation form" --body "Implement M2 story 2.2
 ### Create Branch from Issue (VSCode Terminal)
 
 ```bash
-# Creates branch named: feature/123-add-habit-form
-gh issue develop 123 --checkout
+# PowerShell (recommended)
+powershell -Command "gh issue develop 123 --checkout"
+git checkout 123-issue-title  # Switch to the created branch
 
 # Or manual:
 git checkout -b feat/habit-creation
@@ -84,10 +93,13 @@ git push
 4. Create
 ```
 
-**Or via terminal:**
+**Or via terminal (PowerShell):**
 
 ```bash
-gh pr create --title "feat: add habit creation form" --body "Closes #123" --assignee @me
+powershell -Command "gh pr create --title 'feat: add habit creation form' --body 'Closes #123' --assignee '@me'"
+
+# Or use --fill to auto-populate from commits:
+powershell -Command "gh pr create --fill --assignee '@me'"
 ```
 
 ### View CI Status (VSCode)
@@ -102,11 +114,11 @@ gh pr create --title "feat: add habit creation form" --body "Closes #123" --assi
 ### Merge PR (VSCode or CLI)
 
 ```bash
-# Check status
-gh pr status
+# Check status (PowerShell)
+powershell -Command "gh pr status"
 
 # Merge when ready
-gh pr merge --squash --delete-branch
+powershell -Command "gh pr merge --squash --delete-branch"
 
 # ✅ Automation: Issue auto-moves to "Done"
 # ✅ Automation: Issue auto-closes
