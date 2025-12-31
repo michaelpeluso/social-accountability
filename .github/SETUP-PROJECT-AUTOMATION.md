@@ -9,22 +9,19 @@
 
 ---
 
-## Step 1: Create Personal Access Token
+## Step 1: Create Personal Access Token (Classic)
 
-1. Go to: https://github.com/settings/tokens?type=beta
-2. Click **"Generate new token"** → **"Fine-grained token"**
-3. Configure:
-   - **Token name**: `Social Accountability Project Automation`
+**Note:** Fine-grained tokens don't support user projects yet, so we use Classic tokens.
+
+1. Go to: https://github.com/settings/tokens/new
+2. Configure:
+   - **Note**: `Social Accountability Project Automation`
    - **Expiration**: 90 days (or custom)
-   - **Repository access**: Only select repositories → `social-accountability`
-   - **Permissions**:
-     - Repository permissions:
-       - Issues: Read and write
-       - Pull requests: Read and write
-     - Account permissions:
-       - **Projects: Read and write** ← CRITICAL!
-4. Click **"Generate token"**
-5. **COPY THE TOKEN** (you'll only see it once)
+   - **Select scopes** - Check ONLY these 2:
+     - ✅ **repo** - Full control of private repositories
+     - ✅ **project** - Full control of projects
+3. Scroll down and click **"Generate token"**
+4. **COPY THE TOKEN** (you'll only see it once - starts with `ghp_`)
 
 ---
 
@@ -34,14 +31,14 @@
 
 ```powershell
 # Paste your token when prompted
-gh secret set PROJECT_TOKEN
+gh secret set SOCIAL_ACCOUNTABILITY_TOKEN
 ```
 
 ### Option B: Using GitHub Web Interface
 
 1. Go to: https://github.com/michaelpeluso/social-accountability/settings/secrets/actions
 2. Click **"New repository secret"**
-3. Name: `PROJECT_TOKEN`
+3. Name: `SOCIAL_ACCOUNTABILITY_TOKEN`
 4. Value: Paste your copied token
 5. Click **"Add secret"**
 
@@ -50,7 +47,7 @@ gh secret set PROJECT_TOKEN
 ## Step 3: Verify Secret is Set
 
 ```powershell
-# Should show PROJECT_TOKEN in the list
+# Should show SOCIAL_ACCOUNTABILITY_TOKEN in the list
 gh secret list
 ```
 

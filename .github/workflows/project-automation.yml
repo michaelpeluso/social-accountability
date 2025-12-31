@@ -16,7 +16,7 @@ jobs:
         uses: actions/add-to-project@v0.5.0
         with:
           project-url: https://github.com/users/michaelpeluso/projects/3
-          github-token: ${{ secrets.PROJECT_TOKEN }}
+          github-token: ${{ secrets.SOCIAL_ACCOUNTABILITY_TOKEN }}
 
   # Auto-label based on file paths
   auto-label:
