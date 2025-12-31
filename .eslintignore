@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+.expo/
+.expo-shared/
+
+# Build outputs
+dist/
+build/
+.next/
+
+# Coverage
+coverage/
+
+# iOS
+ios/
+
+# Android
+android/
+
+# Config files
+*.config.js
+jest.setup.js
