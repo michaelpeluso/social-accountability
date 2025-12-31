@@ -22,27 +22,6 @@ jobs:
             test
             chore
 
-  # Check PR has linked issue
-  check-linked-issue:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check for linked issue
-        uses: hattan/verify-linked-issue-action@v1.1.5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          # Allow PRs with "chore:" or "docs:" without linked issues
-          message: "Please link an issue to this PR using 'Closes #123' or 'Fixes #123'"
-
-  # Auto-assign reviewers (yourself for now, can add team later)
-  auto-assign:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Auto-assign PR to creator
-        uses: kentaro-m/auto-assign-action@v1.2.5
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
   # Add size label based on lines changed
   label-size:
     runs-on: ubuntu-latest
