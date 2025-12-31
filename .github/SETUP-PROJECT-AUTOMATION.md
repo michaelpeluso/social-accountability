@@ -31,14 +31,14 @@
 
 ```powershell
 # Paste your token when prompted
-gh secret set SOCIAL_ACCOUNTABILITY_TOKEN
+gh secret set PROJECT_TOKEN
 ```
 
 ### Option B: Using GitHub Web Interface
 
 1. Go to: https://github.com/michaelpeluso/social-accountability/settings/secrets/actions
 2. Click **"New repository secret"**
-3. Name: `SOCIAL_ACCOUNTABILITY_TOKEN`
+3. Name: `PROJECT_TOKEN`
 4. Value: Paste your copied token
 5. Click **"Add secret"**
 
@@ -47,7 +47,7 @@ gh secret set SOCIAL_ACCOUNTABILITY_TOKEN
 ## Step 3: Verify Secret is Set
 
 ```powershell
-# Should show SOCIAL_ACCOUNTABILITY_TOKEN in the list
+# Should show PROJECT_TOKEN in the list
 gh secret list
 ```
 
