@@ -7,7 +7,7 @@ on:
     types: [opened]
 
 jobs:
-  # Auto-add new issues to project (requires PROJECT_TOKEN secret)
+  # Auto-add new issues to project (requires SOCIAL_ACCOUNTABILITY_TOKEN secret)
   add-to-project:
     runs-on: ubuntu-latest
     if: github.event_name == 'issues' && github.event.action == 'opened'
