@@ -1,0 +1,70 @@
+name: Project Automation
+
+on:
+  issues:
+    types: [opened, reopened, closed]
+  pull_request:
+    types: [opened, ready_for_review, closed]
+  issue_comment:
+    types: [created]
+
+jobs:
+  # Auto-add new issues to project
+  add-to-project:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues' && github.event.action == 'opened'
+    steps:
+      - name: Add issue to project
+        uses: actions/add-to-project@v0.5.0
+        with:
+          project-url: https://github.com/users/${{ github.repository_owner }}/projects/1
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Move to "In Progress" when issue is assigned
+  move-to-in-progress:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues' && github.event.action == 'assigned'
+    steps:
+      - name: Move to In Progress
+        uses: alex-page/github-project-automation-plus@v0.9.0
+        with:
+          project: Social Accountability
+          column: In Progress
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Move to "Review" when PR is opened
+  move-to-review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'ready_for_review')
+    steps:
+      - name: Move linked issues to Review
+        uses: alex-page/github-project-automation-plus@v0.9.0
+        with:
+          project: Social Accountability
+          column: Review
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Move to "Done" when PR is merged
+  move-to-done:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    steps:
+      - name: Move linked issues to Done
+        uses: alex-page/github-project-automation-plus@v0.9.0
+        with:
+          project: Social Accountability
+          column: Done
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Close linked issues
+        uses: kin/gh-action-auto-close-issues@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Auto-label based on file paths
+  auto-label:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/labeler@v4
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}

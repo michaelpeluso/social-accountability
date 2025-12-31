@@ -37,3 +37,13 @@ jobs:
       - name: Upload coverage
         uses: codecov/codecov-action@v3
         if: always()
+      
+      # Comment PR with test results
+      - name: Comment test results
+        if: github.event_name == 'pull_request'
+        uses: dorny/test-reporter@v1
+        with:
+          name: Test Results
+          path: coverage/junit.xml
+          reporter: jest-junit
+          fail-on-error: false
