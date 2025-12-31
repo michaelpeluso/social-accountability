@@ -24,8 +24,6 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const ghContext = github.context;
-            
             // Extract issue numbers from PR body or commit message
             function extractIssueNumbers(text) {
               const matches = text.match(/#(\d+)/g) || [];
@@ -36,8 +34,8 @@ jobs:
             let action = null;
             
             // Handle PR events
-            if (ghContext.eventName === 'pull_request') {
-              const pr = ghContext.payload.pull_request;
+            if (context.eventName === 'pull_request') {
+              const pr = context.payload.pull_request;
               const prBody = pr.body || '';
               const prTitle = pr.title || '';
               
@@ -47,7 +45,7 @@ jobs:
               ];
               
               // PR opened/reopened: add "in-progress" label
-              if (['opened', 'reopened', 'ready_for_review'].includes(ghContext.payload.action)) {
+              if (['opened', 'reopened', 'ready_for_review'].includes(context.payload.action)) {
                 action = 'in-progress';
               }
               
@@ -58,8 +56,8 @@ jobs:
             }
             
             // Handle push events (commits)
-            if (ghContext.eventName === 'push') {
-              const commits = ghContext.payload.commits || [];
+            if (context.eventName === 'push') {
+              const commits = context.payload.commits || [];
               for (const commit of commits) {
                 const message = commit.message || '';
                 issueNumbers.push(...extractIssueNumbers(message));
@@ -86,15 +84,15 @@ jobs:
             for (const issueNumber of issueNumbers) {
               try {
                 const issue = await github.rest.issues.get({
-                  owner: ghContext.repo.owner,
-                  repo: ghContext.repo.repo,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
                   issue_number: issueNumber
                 });
                 
                 if (action === 'close' && issue.data.state === 'open') {
                   await github.rest.issues.update({
-                    owner: ghContext.repo.owner,
-                    repo: ghContext.repo.repo,
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
                     issue_number: issueNumber,
                     state: 'closed'
                   });
@@ -107,8 +105,8 @@ jobs:
                   // Add "in-progress" label if not already present
                   if (!labels.includes('in-progress')) {
                     await github.rest.issues.addLabels({
-                      owner: ghContext.repo.owner,
-                      repo: ghContext.repo.repo,
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
                       issue_number: issueNumber,
                       labels: ['in-progress']
                     });
