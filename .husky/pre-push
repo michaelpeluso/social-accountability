@@ -1,1 +1,26 @@
+# Get the current branch name
+current_branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+# Block direct pushes to main
+if [ "$current_branch" = "main" ]; then
+  echo ""
+  echo "❌ Direct pushes to 'main' branch are blocked!"
+  echo ""
+  echo "Please use a feature branch workflow:"
+  echo "  1. Create a branch:    git checkout -b feat/my-feature"
+  echo "  2. Make your changes:  git add . && git commit -m 'feat: add feature'"
+  echo "  3. Push branch:        git push -u origin feat/my-feature"
+  echo "  4. Create PR:          gh pr create --fill"
+  echo "  5. Merge when green:   gh pr merge --squash"
+  echo ""
+  echo "To move your current changes to a branch:"
+  echo "  git reset --soft HEAD~1"
+  echo "  git checkout -b feat/my-feature"
+  echo "  git commit -m 'your message'"
+  echo "  git push -u origin feat/my-feature"
+  echo ""
+  exit 1
+fi
+
+# Run type check before push (for non-main branches)
 npm run type-check
