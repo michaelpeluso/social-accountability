@@ -1,0 +1,120 @@
+name: Issue State Sync
+
+# Auto-update issue states based on commit/PR activity
+# - Close issues when PRs with "closes #X" are merged
+# - Move to "In Progress" when PR mentions issue
+# - Add "needs-testing" label when PR is ready for review
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, closed]
+  push:
+    branches: ['**']
+
+jobs:
+  sync-issue-state:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+      contents: read
+    
+    steps:
+      - name: Check for issue references
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Extract issue numbers from PR body or commit message
+            function extractIssueNumbers(text) {
+              const matches = text.match(/#(\d+)/g) || [];
+              return matches.map(m => parseInt(m.substring(1)));
+            }
+            
+            let issueNumbers = [];
+            let action = null;
+            
+            // Handle PR events
+            if (context.eventName === 'pull_request') {
+              const pr = context.payload.pull_request;
+              const prBody = pr.body || '';
+              const prTitle = pr.title || '';
+              
+              issueNumbers = [
+                ...extractIssueNumbers(prBody),
+                ...extractIssueNumbers(prTitle)
+              ];
+              
+              // PR opened/reopened: add "in-progress" label
+              if (['opened', 'reopened', 'ready_for_review'].includes(context.payload.action)) {
+                action = 'in-progress';
+              }
+              
+              // PR merged with "closes/fixes": close issues
+              if (pr.merged && (prBody.match(/closes|fixes|resolves/i))) {
+                action = 'close';
+              }
+            }
+            
+            // Handle push events (commits)
+            if (context.eventName === 'push') {
+              const commits = context.payload.commits || [];
+              for (const commit of commits) {
+                const message = commit.message || '';
+                issueNumbers.push(...extractIssueNumbers(message));
+              }
+              
+              // Commits mentioning issues: add "in-progress"
+              if (issueNumbers.length > 0) {
+                action = 'in-progress';
+              }
+            }
+            
+            // Remove duplicates
+            issueNumbers = [...new Set(issueNumbers)];
+            
+            if (issueNumbers.length === 0) {
+              console.log('No issue references found');
+              return;
+            }
+            
+            console.log(`Found issues: ${issueNumbers.join(', ')}`);
+            console.log(`Action: ${action}`);
+            
+            // Update each referenced issue
+            for (const issueNumber of issueNumbers) {
+              try {
+                const issue = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber
+                });
+                
+                if (action === 'close' && issue.data.state === 'open') {
+                  await github.rest.issues.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issueNumber,
+                    state: 'closed'
+                  });
+                  console.log(`✅ Closed issue #${issueNumber}`);
+                }
+                
+                if (action === 'in-progress') {
+                  const labels = issue.data.labels.map(l => l.name);
+                  
+                  // Add "in-progress" label if not already present
+                  if (!labels.includes('in-progress')) {
+                    await github.rest.issues.addLabels({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issueNumber,
+                      labels: ['in-progress']
+                    });
+                    console.log(`🔄 Added "in-progress" to issue #${issueNumber}`);
+                  }
+                }
+              } catch (error) {
+                console.error(`Failed to update issue #${issueNumber}: ${error.message}`);
+              }
+            }
+

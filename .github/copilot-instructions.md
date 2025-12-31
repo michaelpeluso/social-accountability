@@ -1,41 +1,10 @@
 # AI Agent Instructions
 
-## 🎯 Start Here
-
-**New to this project?** Read [../docs/QUICKSTART.md](../docs/QUICKSTART.md) for complete navigation.
-
-**This file provides:** Critical architecture patterns and development workflow context for GitHub Copilot.
-
----
-
 ## Project Overview
 
 **Social Accountability** is an automation-first iOS habit tracker that merges social accountability with self-improvement. The app minimizes user interaction by automatically gathering data through 3rd party integrations, generating visual insights, and sharing progress with friends.
 
 **Stack:** React Native + Expo (iOS-first), SQLite (local-first), Postgres (cloud sync), Apple Sign-In, TypeScript strict mode.
-
-**Current Status:** M0 (Foundation) - In progress: types, routing, auth stubs
-
----
-
-## Documentation Structure
-
-```
-docs/
-├── QUICKSTART.md              # Start here (AI-optimized navigation)
-├── CHEATSHEET.md              # One-page quick reference
-├── spec/
-│   ├── product/               # Core docs (vision, architecture, data-model, api-contracts, permissions)
-│   ├── milestones/            # M0-M5 feature specs
-│   ├── development/           # dev-guide, dev-tooling, integrations-guide
-│   └── INDEX.md
-└── rules/
-    ├── CODING-STANDARDS.md    # TypeScript + security patterns
-    ├── AI-AGENT-GUIDE.md      # How to read specs
-    └── INDEX.md
-```
-
-**All documentation lives in `docs/`** - Root only contains README.md
 
 ---
 
@@ -54,7 +23,7 @@ docs/
 - Every object has privacy: `SELF` | `FRIENDS` | `PUBLIC`
 - **Never trust client filters** - server must re-validate every query
 - Check viewer's relationship to owner (friend status, privacy level)
-- See [../docs/spec/product/architecture.md](../docs/spec/product/architecture.md#privacy-enforcement) for query patterns
+- See [spec/architecture.md](../spec/architecture.md#privacy-enforcement) for query patterns
 
 ### 3. Identity → Goal → Habit Hierarchy
 
@@ -62,7 +31,7 @@ docs/
 - **Goal** (M2/M3): "Proof I'm that person" - quantitative targets (Run 5K under 30min)
 - **Habit** (M2): "What I do daily" - recurring actions (Run 4x/month)
 - Goals CAN complete, Habits NEVER complete (recurring forever)
-- See [../docs/spec/product/data-model.md](../docs/spec/product/data-model.md#relationships-diagram)
+- See [spec/data-model.md](../spec/data-model.md#relationships-diagram)
 
 ### 4. Post vs Story Decoupling
 
@@ -98,9 +67,9 @@ npm run test:watch     # Jest watch mode
 ### Key Files for Each Milestone
 
 - **M0**: `src/types/`, `app/`, `.eslintrc.js`, `tsconfig.json`
-- **M1**: `services/auth.ts`, `storage/users.ts`, `docs/spec/milestones/M1-account-privacy.md`
-- **M2**: `storage/habits.ts`, `logic/streaks.ts`, `docs/spec/milestones/M2-habits-tracking.md`
-- **M3**: `storage/posts.ts`, `storage/stories.ts`, `docs/spec/milestones/M3-social.md`
+- **M1**: `services/auth.ts`, `storage/users.ts`, `spec/M1-account-privacy.md`
+- **M2**: `storage/habits.ts`, `logic/streaks.ts`, `spec/M2-habits-tracking.md`
+- **M3**: `storage/posts.ts`, `storage/stories.ts`, `spec/M3-social.md`
 
 ---
 
@@ -110,7 +79,7 @@ npm run test:watch     # Jest watch mode
 
 - **Strict mode** enabled - no implicit any
 - **Typed errors**: Use `AppError` from `src/lib/errors.ts` (never throw strings)
-- **Enums over unions**: `enum Privacy { SELF, FRIENDS, PUBLIC }` (see [data-model.md](../docs/spec/product/data-model.md))
+- **Enums over unions**: `enum Privacy { SELF, FRIENDS, PUBLIC }` (see data-model.md)
 - If `any` needed, add `// TODO: type this` comment
 
 ### Privacy Enforcement Example
@@ -161,18 +130,18 @@ throw new Error("Something went wrong"); // ❌ Not typed
 
 ### Read First
 
-1. [../docs/QUICKSTART.md](../docs/QUICKSTART.md) - Master navigation
-2. [../docs/spec/product/vision.md](../docs/spec/product/vision.md) - Product goals
-3. [../docs/spec/product/architecture.md](../docs/spec/product/architecture.md) - Technical patterns
-4. [../docs/spec/product/data-model.md](../docs/spec/product/data-model.md) - Complete schema
+1. [spec/INDEX.md](../spec/INDEX.md) - Master navigation
+2. [spec/vision.md](../spec/vision.md) - Product goals
+3. [spec/architecture.md](../spec/architecture.md) - Technical patterns
+4. [spec/data-model.md](../spec/data-model.md) - Complete schema
 
 ### When Implementing Features
 
-- **Authentication?** → [../docs/spec/milestones/M1-account-privacy.md](../docs/spec/milestones/M1-account-privacy.md)
-- **Habits/Goals?** → [../docs/spec/milestones/M2-habits-tracking.md](../docs/spec/milestones/M2-habits-tracking.md)
-- **Social/Feed?** → [../docs/spec/milestones/M3-social.md](../docs/spec/milestones/M3-social.md)
-- **Analytics?** → [../docs/spec/milestones/M4-identity-analytics.md](../docs/spec/milestones/M4-identity-analytics.md)
-- **API endpoints?** → [../docs/spec/product/api-contracts.md](../docs/spec/product/api-contracts.md)
+- **Authentication?** → [spec/M1-account-privacy.md](../spec/M1-account-privacy.md)
+- **Habits/Goals?** → [spec/M2-habits-tracking.md](../spec/M2-habits-tracking.md)
+- **Social/Feed?** → [spec/M3-social.md](../spec/M3-social.md)
+- **Analytics?** → [spec/M4-identity-analytics.md](../spec/M4-identity-analytics.md)
+- **API endpoints?** → [spec/api-contracts.md](../spec/api-contracts.md)
 
 ### Each Milestone File Contains
 
@@ -184,28 +153,15 @@ throw new Error("Something went wrong"); // ❌ Not typed
 
 ---
 
-## Quick Reference
-
-**For fast lookups:** [../docs/CHEATSHEET.md](../docs/CHEATSHEET.md)
-
-**Common patterns:**
-
-- Privacy enforcement → [CODING-STANDARDS.md](../docs/rules/CODING-STANDARDS.md#security)
-- Error handling → [CODING-STANDARDS.md](../docs/rules/CODING-STANDARDS.md#error-handling)
-- Logging → [CODING-STANDARDS.md](../docs/rules/CODING-STANDARDS.md#logging)
-- Device-first sync → [architecture.md](../docs/spec/product/architecture.md#device-first-offline-first)
-
----
-
 ## Critical Rules
 
-1. **Treat `/docs/spec` as source of truth** - Never invent new features, endpoints, or fields
+1. **Treat `/spec` as source of truth** - Never invent new features, endpoints, or fields
 2. **Privacy first** - All queries must validate viewer permissions server-side
 3. **Device-first** - Write to SQLite first, sync to cloud in background
 4. **Small diffs** - Prefer reviewable changes over large refactors
 5. **Test coverage** - Add/update tests for changed behavior
 6. **No bypassing auth/privacy** - Never skip security checks for convenience
-7. **M1-M3 only** - Don't implement M4/M5 features yet (see [../docs/spec/milestones/M5-future.md](../docs/spec/milestones/M5-future.md))
+7. **M1-M3 only** - Don't implement M4/M5 features yet (see [spec/M5-future.md](../spec/M5-future.md))
 
 ---
 
@@ -214,26 +170,4 @@ throw new Error("Something went wrong"); // ❌ Not typed
 - Leave `// TODO:` comment explaining the question
 - Write a failing test describing expected behavior
 - Reference specific spec files in questions: "According to M2-habits-tracking.md line 45..."
-- Check [../docs/rules/AI-AGENT-GUIDE.md](../docs/rules/AI-AGENT-GUIDE.md) for how to read specs
-- Use [../docs/QUICKSTART.md](../docs/QUICKSTART.md) to find what you need
-
----
-
-## File Locations Quick Map
-
-| I Need...          | File Path                                                                      |
-| ------------------ | ------------------------------------------------------------------------------ |
-| Navigation hub     | [../docs/QUICKSTART.md](../docs/QUICKSTART.md)                                 |
-| Quick reference    | [../docs/CHEATSHEET.md](../docs/CHEATSHEET.md)                                 |
-| Product vision     | [../docs/spec/product/vision.md](../docs/spec/product/vision.md)               |
-| Tech architecture  | [../docs/spec/product/architecture.md](../docs/spec/product/architecture.md)   |
-| Database schema    | [../docs/spec/product/data-model.md](../docs/spec/product/data-model.md)       |
-| API contracts      | [../docs/spec/product/api-contracts.md](../docs/spec/product/api-contracts.md) |
-| Milestone specs    | [../docs/spec/milestones/](../docs/spec/milestones/)                           |
-| Dev workflow       | [../docs/spec/development/dev-guide.md](../docs/spec/development/dev-guide.md) |
-| Coding standards   | [../docs/rules/CODING-STANDARDS.md](../docs/rules/CODING-STANDARDS.md)         |
-| Spec reading guide | [../docs/rules/AI-AGENT-GUIDE.md](../docs/rules/AI-AGENT-GUIDE.md)             |
-
----
-
-**Last Updated:** December 31, 2025
+- Check [rules/ai-agent-guide.md](../rules/ai-agent-guide.md) for AI-specific guidance

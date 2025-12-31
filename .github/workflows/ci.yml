@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: ['**'] # Run on all pushes for early feedback
 
 jobs:
   lint-and-test:
@@ -37,13 +37,5 @@ jobs:
       - name: Upload coverage
         uses: codecov/codecov-action@v3
         if: always()
-      
-      # Comment PR with test results
-      - name: Comment test results
-        if: github.event_name == 'pull_request'
-        uses: dorny/test-reporter@v1
         with:
-          name: Test Results
-          path: coverage/junit.xml
-          reporter: jest-junit
-          fail-on-error: false
+          files: ./coverage/lcov.info
