@@ -1,6 +1,6 @@
 # milestones (source of truth)
 
-**Note:** This file provides high-level milestone summaries. For detailed user stories, acceptance criteria, and technical requirements, see individual milestone files:
+**Note:** This file provides high-level milestone summaries. For detailed user stories, acceptance criteria, and technical requirements, see the individual milestone files:
 
 - [milestone-0-foundation.md](milestone-0-foundation.md) - M0 detailed spec
 - [milestone-1-account-privacy.md](milestone-1-account-privacy.md) - M1 detailed spec
