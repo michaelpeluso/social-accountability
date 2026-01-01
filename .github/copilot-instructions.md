@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Social Accountability** is an automation-first iOS habit tracker that merges social accountability with self-improvement. The app minimizes user interaction by automatically gathering data through 3rd party integrations, generating visual insights, and sharing progress with friends.
+**Social Accountability** is an automation-first iOS habit tracker that merges social accountability with self-improvement. The app minimizes user interactions by automatically gathering data through 3rd party integrations, generating visual insights, and sharing progress with friends.
 
 **Stack:** React Native + Expo (iOS-first), SQLite (local-first), Postgres (cloud sync), Apple Sign-In, TypeScript strict mode.
 
