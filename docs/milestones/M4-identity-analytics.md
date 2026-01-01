@@ -157,11 +157,55 @@ Response: { data: JournalEntry }
 
 **Cost:** $0 (text storage minimal)
 
+### 4.8 Journal Tracking
+
+**Story:** As a user, I want to write private journal entries so that I can reflect on my day.
+
+**Acceptance Criteria:**
+
+- [ ] Journal tab with list of entries (most recent first)
+- [ ] "New Entry" button opens editor:
+  - Title (optional, 100 chars)
+  - Body (required, 5000 chars max)
+  - Timestamp (defaults to now, can backdate)
+- [ ] Rich text editor: bold, italic, lists (Markdown preview)
+- [ ] Entry detail view: title, body, timestamp
+- [ ] Can edit/delete entries
+- [ ] Full-text search (SQLite FTS5)
+- [ ] Dashboard widget: "Last journaled 2 days ago"
+
+**API Contract:**
+
+```
+POST /journal
+Body: { title?: string, body: string, timestamp: string }
+Response: { data: JournalEntry }
+```
+
+**Technical Requirements:**
+
+- JournalEntry table: id, userId, title, body, timestamp, createdAt, updatedAt
+- SQLite FTS5 for full-text search (device-side)
+- react-native-markdown-display for rendering
+
+**Privacy Notes:**
+
+- Journal entries SELF-only by default (never shared)
+- Warn if changing to PUBLIC (journal can be very personal)
+- Never share journal content in analytics
+
+**Security Notes:**
+
+- Rate limit: 20 journal entries per day
+- Max 5000 chars (prevent abuse)
+
+**Cost:** $0 (text storage minimal)
+
 **Reference:** Original spec 2.4 (Manual Inputs - Journal)
 
 ---
 
-### 4.3 Mood Tracking
+### 4.9 Mood Tracking
 
 **Story:** As a user, I want to track my mood over time so that I can see patterns.
 
@@ -224,7 +268,253 @@ Response: { data: MoodEntry }
 
 ---
 
-### 4.4 Enhanced Dashboard - Correlations
+### 4.4 BUILD vs BREAK Habits
+
+**Story:** As a user, I want to track both positive habits I'm building and negative habits I'm breaking, so that I can improve all aspects of my life.
+
+**Acceptance Criteria:**
+
+- [ ] Habit creation form includes habitType selector: BUILD or BREAK
+- [ ] BUILD habits: Track completion (existing behavior)
+- [ ] BREAK habits: Track resistance and lapses
+  - Check-in options: RESISTED (positive) or LAPSED (neutral data)
+  - Intensity scale (1-5): How strong was the temptation?
+- [ ] Dashboard shows both types:
+  - BUILD: "Current streak: 7 days"
+  - BREAK: "7 days since last lapse" (recovery framing)
+- [ ] Both habit types support same features:
+  - Streaks, goals, social sharing (opt-in for BREAK)
+  - Habit stacking, intensity tracking, mini versions
+
+**Example BREAK Habits:**
+
+- "Smoke-free days" (track resistance to smoking)
+- "No social media doom-scrolling" (track focused time instead)
+- "Avoid junk food" (track healthy meal choices)
+
+**Privacy Notes:**
+
+- BREAK habits default to SELF privacy (more sensitive)
+- Warn before sharing: "This tracks sensitive behaviors. Share with close friends only?"
+- Social posts: Only share milestones ("7 days smoke-free!"), never lapses
+
+**API Contract:**
+
+```
+POST /habits
+Body: {
+  title: string,
+  habitType: 'BUILD' | 'BREAK',
+  pillar: Pillar,
+  privacy: Privacy
+}
+
+POST /habits/:id/checkins
+Body: {
+  occurredAt: string,
+  intensity?: number (1-5),
+  outcome?: 'COMPLETED' | 'RESISTED' | 'LAPSED'
+}
+```
+
+**Technical Requirements:**
+
+- Add HabitType enum: BUILD | BREAK
+- Add CheckInOutcome enum: COMPLETED | RESISTED | LAPSED
+- Update HabitCheckIn table with intensity and outcome fields
+- Streak calculation: For BREAK habits, count days since last LAPSED
+- UI: Different icons/colors for BUILD (green ✓) vs BREAK (blue shield 🛡️)
+
+**Security Notes:**
+
+- Rate limit: Same as BUILD habits (50 check-ins per day)
+- No special validation (treat equally)
+
+**Cost:** $0
+
+**Reference:** Atomic Habits philosophy - breaking bad habits is as important as building good ones
+
+---
+
+### 4.5 Habit Stacking & Strategy Tracking
+
+**Story:** As a user, I want the app to detect my habit patterns and suggest stacking opportunities, so that I can build stronger routines.
+
+**Acceptance Criteria:**
+
+- [ ] Device-side pattern detection:
+  - Analyze check-in timestamps (30-day window)
+  - Detect habits frequently done together (within 30 min)
+  - Calculate confidence score (% of times they co-occur)
+- [ ] Insight card shows detected patterns:
+  - "You meditate after making coffee 80% of the time"
+  - [Create Trigger] button (auto-creates HABIT_COMPLETED trigger for M5)
+  - [Dismiss] button
+- [ ] Habit detail screen shows:
+  - **Mini version:** "1 push-up", "Read 1 page" (user-editable)
+  - **Environmental cue:** "Shoes by door", "Phone in other room"
+  - **Best time:** "You workout best at 7am (avg intensity: 4.5)"
+  - **Habit stack:** "Usually done after 'Make coffee'"
+- [ ] Auto-populate fields from ML:
+  - bestTimeHour: Most frequent check-in hour
+  - bestTimeConfidence: Consistency score
+  - Habit stack suggestions (stored in HabitStack table)
+
+**Pattern Detection Algorithm (Device-Side):**
+
+```typescript
+// Run daily on-device
+function detectHabitStacks(userId: string) {
+  const sequences = db.query(
+    `
+    SELECT c1.habitId, c2.habitId, COUNT(*) as coOccurrences
+    FROM habit_checkins c1
+    JOIN habit_checkins c2 
+      ON c2.occurredAt BETWEEN c1.occurredAt AND c1.occurredAt + INTERVAL '30 minutes'
+    WHERE c1.userId = ? 
+      AND c1.habitId != c2.habitId
+      AND c1.occurredAt > NOW() - INTERVAL '30 days'
+    GROUP BY c1.habitId, c2.habitId
+    HAVING coOccurrences >= 5
+  `,
+    [userId]
+  );
+
+  for (const seq of sequences) {
+    const confidence = seq.coOccurrences / totalCheckIns;
+    if (confidence >= 0.7) {
+      // Auto-create HabitStack entry
+      insertHabitStack({
+        habitId: seq.c1.habitId,
+        linkedHabitId: seq.c2.habitId,
+        relationship: "AFTER",
+        confidence: confidence,
+      });
+
+      // Show suggestion to user
+      showInsight(`You usually do "${habit1.title}" after "${habit2.title}"`);
+    }
+  }
+}
+```
+
+**Intensity Analysis (Device-Side):**
+
+```typescript
+function detectOptimalTime(habitId: string) {
+  const byTime = db.query(
+    `
+    SELECT strftime('%H', occurredAt) as hour, AVG(intensity) as avgIntensity
+    FROM habit_checkins
+    WHERE habitId = ? AND intensity IS NOT NULL
+    GROUP BY hour
+    ORDER BY avgIntensity DESC
+    LIMIT 1
+  `,
+    [habitId]
+  );
+
+  // Surface: "You run best at 7am (intensity: 4.5 avg)"
+  updateHabit(habitId, {
+    bestTimeHour: byTime.hour,
+    bestTimeConfidence: byTime.avgIntensity / 5.0,
+  });
+}
+```
+
+**API Contract:**
+
+```
+PATCH /habits/:id
+Body: {
+  miniVersion?: string,
+  environmentalCue?: string,
+  bestTimeHour?: number,
+  bestTimeConfidence?: number
+}
+
+GET /habits/:id/stacks
+Response: {
+  data: [
+    { linkedHabit: Habit, relationship: 'AFTER', confidence: 0.8 }
+  ]
+}
+```
+
+**Technical Requirements:**
+
+- Add HabitStack table: id, habitId, linkedHabitId, relationship, confidence
+- Add Habit fields: miniVersion, environmentalCue, bestTimeHour, bestTimeConfidence
+- Background job: Run pattern detection daily (device-side)
+- Foreign key CASCADE DELETE (if habit deleted, stacks removed)
+- No API calls for detection (all device-side)
+
+**Privacy Notes:**
+
+- Habit stacks inherit source habit privacy (not separately configurable)
+- Never exposed in social features (internal optimization only)
+- Pattern detection runs locally (data never sent to server for analysis)
+
+**Security Notes:**
+
+- No additional endpoints needed (detection is local)
+- Rate limit on PATCH /habits: 100 per day
+
+**Cost:** $0 (all device-side computation)
+
+**Reference:** Atomic Habits by James Clear - habit stacking, 2-minute rule, environmental design
+
+---
+
+### 4.6 Intensity Tracking
+
+**Story:** As a user, I want to rate the intensity of my habits so that I can see patterns in my performance.
+
+**Acceptance Criteria:**
+
+- [ ] Check-in flow includes optional intensity slider (1-5 dots)
+- [ ] Defaults to 3 (neutral) if skipped (zero friction)
+- [ ] Intensity semantics:
+  - **BUILD habits:** How energized/committed (1=going through motions, 5=peak flow)
+  - **BREAK habits - RESISTED:** How strong the temptation (1=fleeting, 5=overwhelming)
+  - **BREAK habits - LAPSED:** How much you gave in (1=small slip, 5=full relapse)
+- [ ] Habit detail shows intensity trends:
+  - Average intensity this week
+  - Best time of day (highest avg intensity)
+  - Streak quality (avg intensity during current streak)
+- [ ] Dashboard insight: "Your morning workouts are 40% more intense than evening"
+
+**UI Design:**
+
+```
+┌─────────────────────────┐
+│ Logged Run at 7:15am    │
+│                         │
+│ How intense?            │
+│ ○ ○ ● ○ ○   (3/5)      │
+│ [Skip] [Save]           │
+└─────────────────────────┘
+```
+
+**Technical Requirements:**
+
+- Add intensity field to HabitCheckIn: number (1-5), nullable
+- Default: 3 if user skips (prevents blocking UX)
+- Device-side analytics (no API changes needed)
+- Chart library: Victory Native for line graphs
+
+**Privacy Notes:**
+
+- Intensity data follows habit privacy (not separately configurable)
+- Shared in posts/stories if user shares check-in
+
+**Cost:** $0
+
+**Reference:** Research-backed metric for habit quality, not just quantity
+
+---
+
+### 4.7 Enhanced Dashboard - Correlations
 
 **Story:** As a user, I want to see correlations between habits so that I understand what helps me succeed.
 
@@ -381,7 +671,7 @@ Response: { data: { summary, charts, csvUrl } }
 
 ---
 
-### 4.7 HealthKit Steps (Proof-of-Concept)
+### 4.11 HealthKit Steps (Proof-of-Concept)
 
 **Story:** As a user, I want to auto-log my daily steps so that I don't have to manually track walking.
 
@@ -459,7 +749,7 @@ Body: { occurredAt: string, source: 'INTEGRATION', evidenceRef: 'healthkit:steps
 
 ---
 
-### 4.8 Habit Challenges
+### 4.12 Habit Challenges
 
 **Story:** As a user, I want to challenge friends so that we can compete and support each other.
 

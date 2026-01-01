@@ -22,8 +22,11 @@ dependencies: architecture.md
 
 **Skip until M4:**
 
+- HabitStack (habit stacking detection)
 - Tag (rich metadata), BadgeEarned, JournalEntry, MoodEntry, Challenge
 - Habit/Goal suggestions from Identity
+- Intensity and outcome tracking in HabitCheckIn
+- Atomic Habits strategy fields in Habit
 
 **Skip until M5+:**
 
@@ -54,6 +57,25 @@ enum Pillar {
 enum CheckInSource {
   MANUAL = "MANUAL",
   INTEGRATION = "INTEGRATION", // M4+ (HealthKit, etc.)
+}
+
+// M2
+enum HabitType {
+  BUILD = "BUILD", // Positive habits to develop
+  BREAK = "BREAK", // Negative habits to overcome
+}
+
+// M4
+enum CheckInOutcome {
+  COMPLETED = "COMPLETED", // BUILD habits: completed the habit
+  RESISTED = "RESISTED", // BREAK habits: resisted temptation
+  LAPSED = "LAPSED", // BREAK habits: gave in to temptation
+}
+
+// M4
+enum StackRelationship {
+  BEFORE = "BEFORE", // Do this habit BEFORE the linked habit
+  AFTER = "AFTER", // Do this habit AFTER the linked habit
 }
 
 // M2/M3
@@ -108,25 +130,25 @@ const PRESET_IDENTITIES = [
   { name: "Athlete", pillar: "BODY", icon: "🏃" },
   { name: "Fitness Enthusiast", pillar: "BODY", icon: "💪" },
   { name: "Yogi", pillar: "BODY", icon: "🧘" },
-  { name: "Dancer", pillar: "BODY", icon: "💃" },
+  { name: "Healthy Eater", pillar: "BODY", icon: "🥗" },
 
   // MIND
   { name: "Student", pillar: "MIND", icon: "📚" },
-  { name: "Creative", pillar: "MIND", icon: "🎨" },
   { name: "Professional", pillar: "MIND", icon: "💼" },
   { name: "Learner", pillar: "MIND", icon: "🎓" },
+  { name: "Reader", pillar: "MIND", icon: "📖" },
 
   // HEART
   { name: "Friend", pillar: "HEART", icon: "🤝" },
   { name: "Partner", pillar: "HEART", icon: "❤️" },
   { name: "Parent", pillar: "HEART", icon: "👨‍👩‍👧" },
-  { name: "Community Builder", pillar: "HEART", icon: "🌍" },
+  { name: "Volunteer", pillar: "HEART", icon: "🌍" },
 
   // SOUL
+  { name: "Artist", pillar: "SOUL", icon: "🎭" },
   { name: "Spiritual Seeker", pillar: "SOUL", icon: "✨" },
   { name: "Meditator", pillar: "SOUL", icon: "🧘‍♂️" },
   { name: "Nature Lover", pillar: "SOUL", icon: "🌿" },
-  { name: "Artist", pillar: "SOUL", icon: "🎭" },
 ];
 ```
 
@@ -261,6 +283,7 @@ const PRESET_IDENTITIES = [
   userId: string
   title: string
   pillar: Pillar
+  habitType: HabitType              // BUILD or BREAK
   goalId?: string                   // Optional: contributes to goal progress
   identityId?: string               // Optional: supports this identity
   schedule: {
@@ -273,6 +296,13 @@ const PRESET_IDENTITIES = [
       minute: number                // 0-59
     }[]
   }
+
+  // M4: Atomic Habits strategies (auto-detected or user-set)
+  miniVersion?: string (100 chars)  // 2-minute rule: "1 push-up", "Read 1 page"
+  environmentalCue?: string (200 chars) // "Shoes by door", "Phone in other room"
+  bestTimeHour?: number (0-23)      // ML-detected optimal time
+  bestTimeConfidence?: number (0-1) // Confidence score for bestTimeHour
+
   privacy: Privacy
   archivedAt?: timestamp
   createdAt: timestamp
@@ -291,10 +321,14 @@ const PRESET_IDENTITIES = [
 **Notes:**
 
 - Habits NEVER complete (recurring actions, not one-time)
+- habitType: BUILD (develop good habits) vs BREAK (overcome bad habits)
 - Tags are simple strings (M2), rich Tag table in M4
 - timeSlotsOfDay allows "4pm Mon, 8am Fri" flexibility
 - archivedAt soft-deletes (keeps history)
 - goalId links habit progress to goal's metric.current
+- miniVersion: Implements James Clear's "2-minute rule" for habit formation
+- environmentalCue: Environmental design from Atomic Habits
+- bestTimeHour/Confidence: ML-detected from check-in patterns (M4)
 
 ---
 
@@ -309,6 +343,11 @@ const PRESET_IDENTITIES = [
   source: CheckInSource             // MANUAL or INTEGRATION
   evidenceRef?: string              // M4 - e.g., 'healthkit:steps:10543'
   note?: string                     // M4 - optional user note
+
+  // M4: Intensity and outcome tracking
+  intensity?: number (1-5)          // BUILD: how energized, BREAK: temptation strength
+  outcome?: CheckInOutcome          // BREAK habits only: COMPLETED/RESISTED/LAPSED
+
   createdAt: timestamp              // When check-in was logged
 }
 ```
@@ -324,6 +363,9 @@ const PRESET_IDENTITIES = [
 
 - occurredAt vs createdAt: allows backdating check-ins
 - evidenceRef stores integration metadata for debugging
+- intensity (M4): For BUILD habits = energy/commitment level, for BREAK habits = temptation strength
+- outcome (M4): Only for BREAK habits to track RESISTED vs LAPSED instances
+- Defaults: intensity=3 if skipped (zero friction), outcome=COMPLETED for BUILD habits
 
 ---
 
