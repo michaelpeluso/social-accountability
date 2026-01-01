@@ -1,9 +1,9 @@
 name: Issue State Sync
 
-# Auto-update issue states based on commit/PR activity
-# - Close issues when PRs with "closes #X" are merged
-# - Move to "In Progress" when PR mentions issue
-# - Add "needs-testing" label when PR is ready for review
+# Auto-update issue states and GitHub Projects status based on commit/PR activity
+# - Move to "In Progress" when branch is pushed or PR opened
+# - Move to "Done" and close issue when PR with "closes #X" merges
+# - Gracefully handles branches without associated issues
 
 on:
   pull_request:
@@ -20,12 +20,13 @@ jobs:
       contents: read
     
     steps:
-      - name: Check for issue references
+      - name: Update issue status
         uses: actions/github-script@v7
         with:
           script: |
-            // Extract issue numbers from PR body or commit message
+            // Extract issue numbers from text (PR body, title, or commit message)
             function extractIssueNumbers(text) {
+              if (!text) return [];
               const matches = text.match(/#(\d+)/g) || [];
               return matches.map(m => parseInt(m.substring(1)));
             }
@@ -44,27 +45,35 @@ jobs:
                 ...extractIssueNumbers(prTitle)
               ];
               
-              // PR opened/reopened: add "in-progress" label
+              // PR opened/reopened: move to "In Progress"
               if (['opened', 'reopened', 'ready_for_review'].includes(context.payload.action)) {
                 action = 'in-progress';
               }
               
-              // PR merged with "closes/fixes": close issues
-              if (pr.merged && (prBody.match(/closes|fixes|resolves/i))) {
-                action = 'close';
+              // PR merged with "closes/fixes/resolves": move to "Done" and close
+              if (pr.merged && (prBody.match(/closes|fixes|resolves/i) || prTitle.match(/closes|fixes|resolves/i))) {
+                action = 'done';
               }
             }
             
-            // Handle push events (commits)
+            // Handle push events (commits to feature branches)
             if (context.eventName === 'push') {
               const commits = context.payload.commits || [];
-              for (const commit of commits) {
-                const message = commit.message || '';
-                issueNumbers.push(...extractIssueNumbers(message));
+              const ref = context.payload.ref || '';
+              
+              // Extract issue from branch name (e.g., feat/123-add-form or 5-m0-01-project-setup)
+              const branchMatch = ref.match(/(\d+)/);
+              if (branchMatch) {
+                issueNumbers.push(parseInt(branchMatch[1]));
               }
               
-              // Commits mentioning issues: add "in-progress"
-              if (issueNumbers.length > 0) {
+              // Also check commit messages
+              for (const commit of commits) {
+                issueNumbers.push(...extractIssueNumbers(commit.message));
+              }
+              
+              // Pushes to feature branches: move to "In Progress"
+              if (issueNumbers.length > 0 && !ref.includes('main') && !ref.includes('master')) {
                 action = 'in-progress';
               }
             }
@@ -73,23 +82,25 @@ jobs:
             issueNumbers = [...new Set(issueNumbers)];
             
             if (issueNumbers.length === 0) {
-              console.log('No issue references found');
+              console.log('ℹ️ No issue references found (this is OK for branches without issues)');
               return;
             }
             
-            console.log(`Found issues: ${issueNumbers.join(', ')}`);
-            console.log(`Action: ${action}`);
+            console.log(`📋 Found issues: ${issueNumbers.join(', ')}`);
+            console.log(`🎯 Action: ${action || 'none'}`);
             
             // Update each referenced issue
             for (const issueNumber of issueNumbers) {
               try {
+                // Verify issue exists
                 const issue = await github.rest.issues.get({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: issueNumber
                 });
                 
-                if (action === 'close' && issue.data.state === 'open') {
+                // Action: Mark as done and close issue
+                if (action === 'done' && issue.data.state === 'open') {
                   await github.rest.issues.update({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
@@ -99,10 +110,10 @@ jobs:
                   console.log(`✅ Closed issue #${issueNumber}`);
                 }
                 
+                // Action: Add in-progress label
                 if (action === 'in-progress') {
                   const labels = issue.data.labels.map(l => l.name);
                   
-                  // Add "in-progress" label if not already present
                   if (!labels.includes('in-progress')) {
                     await github.rest.issues.addLabels({
                       owner: context.repo.owner,
@@ -110,11 +121,17 @@ jobs:
                       issue_number: issueNumber,
                       labels: ['in-progress']
                     });
-                    console.log(`🔄 Added "in-progress" to issue #${issueNumber}`);
+                    console.log(`🏃 Added "in-progress" label to #${issueNumber}`);
                   }
                 }
+                
               } catch (error) {
-                console.error(`Failed to update issue #${issueNumber}: ${error.message}`);
+                // Issue doesn't exist - this is OK, not all branches have issues
+                if (error.status === 404) {
+                  console.log(`ℹ️ Issue #${issueNumber} not found (branch may not have an associated issue)`);
+                } else {
+                  console.error(`❌ Failed to update issue #${issueNumber}: ${error.message}`);
+                }
               }
             }
 
