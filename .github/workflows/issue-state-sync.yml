@@ -8,8 +8,6 @@ name: Issue State Sync
 on:
   pull_request:
     types: [opened, reopened, ready_for_review, closed]
-  push:
-    branches: ['**']
 
 jobs:
   sync-issue-state:
