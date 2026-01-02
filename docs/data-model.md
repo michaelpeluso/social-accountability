@@ -78,6 +78,17 @@ enum StackRelationship {
   AFTER = "AFTER", // Do this habit AFTER the linked habit
 }
 
+// M6
+enum DriftType {
+  AVOIDANCE = "AVOIDANCE", // Momentum loss, skipping habits
+  OVERCONSUMPTION = "OVERCONSUMPTION", // Time/usage above typical levels
+  IMBALANCE = "IMBALANCE", // Over-optimizing one pillar
+  COMPARISON = "COMPARISON", // Feed engagement vs habit consistency
+  VOLATILITY = "VOLATILITY", // Emotional spikes affecting patterns
+  IMPULSIVITY = "IMPULSIVITY", // Unplanned breaks in routine
+  DEFENSIVENESS = "DEFENSIVENESS", // Avoiding logging after slips
+}
+
 // M2/M3
 enum MetricType {
   COUNT = "COUNT", // "50 workouts"
@@ -180,6 +191,27 @@ const PRESET_IDENTITIES = [
     HEART: number (0-1),
     SOUL: number (0-1)
   }
+
+  // M6: Auto-Post Controls - granular privacy for every auto-generated post type
+  autoPostSettings?: {
+    weeklyPatterns: { enabled: boolean, privacy: Privacy },      // Weekly drift summaries
+    milestones: { enabled: boolean, privacy: Privacy },          // Goal completions
+    streaks: { enabled: boolean, privacy: Privacy },             // Streak achievements
+    badges: { enabled: boolean, privacy: Privacy },              // Badge unlocks
+    challenges: { enabled: boolean, privacy: Privacy },          // Challenge completions
+    recovery: { enabled: boolean, privacy: Privacy },            // Recovery milestones
+    newHabits: { enabled: boolean, privacy: Privacy }            // New habits started
+  }
+
+  // M6: Behavioral Drift Settings
+  driftSettings?: {
+    shareWeeklyPatterns: boolean,        // Auto-post weekly summaries (opt-in)
+    allowFriendSupport: boolean,         // Friends can offer help
+    patternVisibility: Privacy,          // Who can see drift patterns
+    showDetailedMetrics: boolean,        // Show performance numbers (with warning)
+    autoShareRecovery: boolean           // Celebrate comebacks publicly
+  }
+
   createdAt: timestamp
   updatedAt: timestamp
 }
@@ -366,6 +398,80 @@ const PRESET_IDENTITIES = [
 - intensity (M4): For BUILD habits = energy/commitment level, for BREAK habits = temptation strength
 - outcome (M4): Only for BREAK habits to track RESISTED vs LAPSED instances
 - Defaults: intensity=3 if skipped (zero friction), outcome=COMPLETED for BUILD habits
+
+---
+
+### HabitStack (M5)
+
+```typescript
+{
+  id: string(uuid);
+  habitId: string; // The "trigger" habit
+  linkedHabitId: string; // The habit that follows
+  relationship: StackRelationship; // BEFORE or AFTER
+  confidence: number(0 - 1); // ML-detected (30-day window, 30-min co-occurrence)
+  userId: string; // Denormalized for queries
+  createdAt: timestamp;
+}
+```
+
+**Indexes:**
+
+- PRIMARY KEY (id)
+- INDEX (habitId, confidence DESC) - for stack suggestions
+- INDEX (userId, habitId) - for user habit chains
+- UNIQUE (habitId, linkedHabitId) - prevent duplicates
+
+**Notes:**
+
+- Implements James Clear's "habit stacking" from Atomic Habits
+- Detected device-side: when 2 habits occur within 30 min, 70%+ of time over 30 days
+- CASCADE DELETE when either habit is deleted
+- confidence score determines UI priority (higher = show first)
+
+---
+
+### BehavioralDrift (M6)
+
+```typescript
+{
+  id: string (uuid)
+  userId: string
+  habitId?: string                  // Optional - pattern may span multiple habits
+  driftType: DriftType              // AVOIDANCE, OVERCONSUMPTION, etc.
+  confidence: number (0-1)          // Detection confidence
+
+  // Aggregate metrics (never raw sensor data)
+  metrics: {
+    completionRateCurrent: number   // This week's %
+    completionRatePrevious: number  // Last 4 weeks avg %
+    missedCount?: number            // For AVOIDANCE
+    overageMinutes?: number         // For OVERCONSUMPTION
+    pillarSkew?: object             // For IMBALANCE: { fitness: 80%, career: 20% }
+    volatilityScore?: number        // For VOLATILITY: std deviation of check-ins
+  }
+
+  sharedWith?: Privacy              // null = SELF only, or CLOSE_FRIENDS/FRIENDS/PUBLIC
+  detectedAt: timestamp             // When pattern was identified
+  resolvedAt?: timestamp            // null until user marks resolved
+}
+```
+
+**Indexes:**
+
+- PRIMARY KEY (id)
+- INDEX (userId, driftType, detectedAt DESC) - for pattern history
+- INDEX (userId, resolvedAt IS NULL) - for active patterns
+- INDEX (habitId, driftType) - when linked to specific habit
+
+**Notes:**
+
+- Detected device-side weekly (every Sunday 9am local time)
+- metrics contains ONLY aggregates, never raw 3rd party data
+- Defaults to SELF privacy until user explicitly shares
+- Auto-expires after 4 weeks if not marked resolved
+- habitId nullable because patterns like IMBALANCE span multiple habits
+- Synced to cloud unlike temp-idea.md proposal (visible analytics are the goal)
 
 ---
 

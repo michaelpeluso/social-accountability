@@ -25,6 +25,92 @@ M7+ features require additional permissions, ML infrastructure, or are higher ri
 
 ## User Stories
 
+### 8.0 Plant Visual Representation
+
+**Story:** As a user, I want a visual plant that represents my consistency score so that I can see my progress at a glance and share it with friends.
+
+**Acceptance Criteria:**
+
+- [ ] Plant visual displays on dashboard (home screen)
+- [ ] Plant appearance maps to consistency score (0-100) with 5 stages:
+  - **0-20:** Seedling (small sprout, 1-2 tiny leaves, pale green)
+  - **21-40:** Sprout (short stem, 3-4 leaves, light green)
+  - **41-60:** Growing (medium stem, 5-6 leaves, healthy green)
+  - **61-80:** Blooming (tall stem, full leaves, small flowers, vibrant)
+  - **81-100:** Thriving (large plant, lush leaves, many flowers, glowing)
+- [ ] Plant animates smoothly when transitioning between stages
+- [ ] Recency bonus triggers "perk" animation (leaf unfurl) after check-in
+- [ ] Tap plant to see numeric score + breakdown
+- [ ] Privacy settings: Share plant with FRIENDS/PUBLIC/SELF
+- [ ] Friend profiles show their plant (if shared)
+- [ ] Friend feed can optionally display small plant thumbnails
+
+**Visual Cues:**
+
+- Height increases with score
+- Leaf count increases
+- Color saturation increases (pale → vibrant)
+- Flowers appear at 61+ score
+- Glow effect at 81+ (thriving state)
+
+**Why Plant Metaphor:**
+
+- Growth mindset: plants grow with consistent care (like habits)
+- Natural cycles: plants can wilt and recover (like users)
+- Non-judgmental: "needs attention" not "you failed"
+- Universal: plants transcend cultural contexts
+- Visual: instantly readable state without numbers
+
+**Implementation (Post-M4):**
+
+```typescript
+// Map score to plant stage
+function getPlantStage(score: number): PlantStage {
+  if (score >= 81) return 'thriving';
+  if (score >= 61) return 'blooming';
+  if (score >= 41) return 'growing';
+  if (score >= 21) return 'sprout';
+  return 'seedling';
+}
+
+// Component
+<PlantDisplay
+  score={user.consistencyScore}
+  stage={getPlantStage(user.consistencyScore)}
+  showAnimation={justCheckedIn}
+  size="large" // or "small" for friend thumbnails
+  onPress={() => showScoreBreakdown()}
+/>
+```
+
+**Assets Needed:**
+
+- 5 SVG files: `plant-seedling.svg`, `plant-sprout.svg`, `plant-growing.svg`, `plant-blooming.svg`, `plant-thriving.svg`
+- Lottie animations: `plant-perk.json` (recency bonus), `plant-transition.json` (stage change)
+- Colors: Base green `#7ED321`, thriving glow `#FFD700` (gold)
+
+**Social Features:**
+
+- Friend grid shows small plants (if privacy = FRIENDS or PUBLIC)
+- Plant state visible but not numeric score (unless user shares explicitly)
+- No plant comparisons or leaderboards (anti-competitive)
+- "Send water" metaphor for encouragement when friend's plant is wilted
+
+**Privacy Notes:**
+
+- Plant visual privacy: Defaults to FRIENDS
+- Numeric score privacy: Defaults to SELF (tap to reveal)
+- Can hide plant entirely (fallback to initials/photo)
+- Plant data stored locally, synced only if user opts in
+
+**Cost:** $0 (static SVG assets + device-side rendering)
+
+**Dependencies:** M4 (consistency score calculation must exist)
+
+**Reference:** Brainstorming session Jan 2026 on visual character representation
+
+---
+
 ### 8.1 Calendar Integration
 
 **Story:** As a user, I want the app to detect my calendar events and suggest relevant habit check-ins.

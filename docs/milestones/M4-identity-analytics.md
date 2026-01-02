@@ -237,7 +237,151 @@ Response: { data: MoodEntry }
 
 ---
 
-### 4.4 Dashboard Correlations
+### 4.4 Consistency Score
+
+**Story:** As a user, I want a single score that represents my overall habit consistency so that I can track my progress holistically.
+
+**Acceptance Criteria:**
+
+- [ ] Dashboard displays consistency score (0-100)
+- [ ] Score calculated from 4 weighted factors:
+  - Consistency (40%): Check-ins completed vs expected (last 60 days, weighted)
+  - Pillar Balance (25%): Are all 4 pillars getting attention?
+  - Social Engagement (20%): Posts, reactions, nudges given
+  - Momentum (15%): Active streaks across habits
+- [ ] Score uses exponential-weighted moving average (EWMA) with 60-day window
+- [ ] Recent check-ins boost score immediately (recency bonus)
+- [ ] Score updates daily at midnight + instantly after check-ins
+- [ ] Tap score to see breakdown by factor
+- [ ] Score stored locally, synced to server for friend visibility (M8+)
+
+**Why 60 Days:** Aligns with habit formation research (Atomic Habits: ~60 days to form habit)
+
+**Why These Weights:**
+
+- **Consistency (40%):** Core metric but not overwhelming
+- **Pillar Balance (25%):** Reflects identity system; prevents "one-pillar" users
+- **Social Engagement (20%):** Social accountability is the product (sharing, supporting friends)
+- **Momentum (15%):** Rewards streaks without toxic "don't break chain" pressure
+
+**Formula (Exponential-Weighted 60-Day Window):**
+
+```typescript
+// Base score: EWMA over 60 days (stability)
+function calculateBaseScore(userId: string): number {
+  const halfLife = 20; // Days
+  const window = 60;
+
+  // 1. Consistency (40%)
+  let consistencyScore = 0;
+  let totalWeight = 0;
+  for (let d = 0; d < window; d++) {
+    const weight = Math.pow(0.5, d / halfLife);
+    const completed = getCheckInsForDay(userId, d);
+    const expected = getExpectedCheckInsForDay(userId, d);
+    consistencyScore += weight * (completed / Math.max(expected, 1));
+    totalWeight += weight;
+  }
+  consistencyScore = (consistencyScore / totalWeight) * 40;
+
+  // 2. Pillar Balance (25%)
+  const checkIns = getCheckInsLastNDays(userId, window);
+  const activePillars = new Set(checkIns.map((c) => c.habit.pillar)).size;
+  const balanceScore = (activePillars / 4) * 25;
+
+  // 3. Social Engagement (20%)
+  const socialActions = getSocialActionsLastNDays(userId, window); // posts + reactions + nudges
+  const socialScore = Math.min(socialActions / 30, 1) * 20; // Target: ~30 actions in 60 days
+
+  // 4. Momentum (15%)
+  const habits = getUserHabits(userId);
+  const activeStreaks = habits.filter((h) => h.currentStreak >= 3).length;
+  const momentumScore = (activeStreaks / Math.max(habits.length, 1)) * 15;
+
+  return Math.round(consistencyScore + balanceScore + socialScore + momentumScore);
+}
+
+// Recency boost: immediate feedback after check-in
+function applyRecencyBonus(baseScore: number, userId: string): number {
+  const checkedInToday = hasCheckInToday(userId);
+  const currentStreak = getLongestActiveStreak(userId);
+
+  let recencyFactor = 0;
+  if (checkedInToday) {
+    recencyFactor += 0.1; // +10% for today's check-in
+    recencyFactor += Math.min(0.05 * (currentStreak - 1), 0.15); // +5% per streak day, cap at +15%
+  }
+
+  return Math.round(Math.min(100, baseScore * (1 + recencyFactor)));
+}
+
+// Final score shown to user
+const finalScore = applyRecencyBonus(calculateBaseScore(userId), userId);
+```
+
+**Storage (Device-First):**
+
+```typescript
+// User table addition
+interface User {
+  // ... existing fields
+  consistencyScore: number; // 0-100 (final score)
+  baseScore: number; // EWMA without recency bonus
+  lastScoreUpdate: Date;
+}
+
+// Optional: Daily aggregate for faster calculation
+interface DailyAggregate {
+  id: string;
+  userId: string;
+  date: Date;
+  checkInsCount: number;
+  expectedCount: number;
+  activePillars: Pillar[]; // Which pillars had check-ins
+  socialActionsCount: number; // Posts + reactions + nudges
+}
+```
+
+**Implementation Notes:**
+
+- **Daily cron:** Recalculate all users' base scores at midnight
+- **Real-time update:** After check-in, increment score immediately (optimistic)
+- **Grace period:** First 24h of inactivity shows no decay (avoids anxiety)
+- **Floor protection:** Score never drops below 10
+- **All device-side:** No API calls, instant UX
+- **Sync to cloud:** For friend visibility (M8+, opt-in)
+
+**UI Display:**
+
+```
+┌─────────────────────────────┐
+│  Consistency Score          │
+│                             │
+│         ╔═══════╗           │
+│         ║  78   ║           │
+│         ╚═══════╝           │
+│                             │
+│  Tap to see breakdown       │
+└─────────────────────────────┘
+
+// Breakdown view:
+Consistency:     32/40  ████████░░
+Pillar Balance:  19/25  ████████░░
+Social:          14/20  ███████░░░
+Momentum:        13/15  █████████░
+```
+
+**Privacy Notes:**
+
+- Score calculation device-only (M4)
+- M8+ may add opt-in sharing with friends (plant visualization)
+- Breakdown never shared, only final score
+
+**Cost:** $0 (all device-side)
+
+---
+
+### 4.5 Dashboard Correlations
 
 **Story:** As a user, I want to see correlations between habits so that I understand what helps me succeed.
 
@@ -303,7 +447,7 @@ function calculateCorrelation(habit1Id: string, habit2Id: string) {
 
 ---
 
-### 4.5 Time-of-Day Heatmap
+### 4.6 Time of Day Heatmap
 
 **Story:** As a user, I want to see when I'm most productive so that I can schedule habits accordingly.
 
@@ -359,7 +503,7 @@ function calculateCorrelation(habit1Id: string, habit2Id: string) {
 
 ---
 
-### 4.6 Close Friends Feature
+### 4.7 Close Friends Feature
 
 **Story:** As a user, I want to mark certain friends as "close friends" so that I can share more privately with my inner circle.
 
@@ -450,7 +594,7 @@ Response: { data: Friendship }
 
 ---
 
-### 4.7 Dashboard Export Reports
+### 4.8 Dashboard Export Reports
 
 **Story:** As a user, I want to export reports so that I can analyze my data externally or share with a coach.
 
