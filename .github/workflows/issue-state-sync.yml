@@ -23,8 +23,9 @@ jobs:
       - name: Update issue status
         uses: actions/github-script@v7
         env:
-          PROJECT_TOKEN: ${{ secrets.SOCIAL_ACCOUNTABILITY_TOKEN }}
+          GH_TOKEN: ${{ secrets.SOCIAL_ACCOUNTABILITY_TOKEN }}
         with:
+          github-token: ${{ secrets.SOCIAL_ACCOUNTABILITY_TOKEN }}
           script: |
             // Extract issue numbers from text (PR body, title, or commit message)
             function extractIssueNumbers(text) {
@@ -63,7 +64,7 @@ jobs:
               const commits = context.payload.commits || [];
               const ref = context.payload.ref || '';
               
-              // Extract issue from branch name (e.g., feat/123-add-form)
+              // Extract issue from branch name (e.g., feat/123-add-form or 5-m0-01-project-setup)
               const branchMatch = ref.match(/(\d+)/);
               if (branchMatch) {
                 issueNumbers.push(parseInt(branchMatch[1]));
@@ -110,6 +111,53 @@ jobs:
                     state: 'closed'
                   });
                   console.log(`✅ Closed issue #${issueNumber}`);
+                  
+                  // Move to "Done" on project board
+                  try {
+                    const projectItems = await github.graphql(`
+                      query($issueId: ID!) {
+                        node(id: $issueId) {
+                          ... on Issue {
+                            projectItems(first: 10) {
+                              nodes {
+                                id
+                                project {
+                                  id
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    `, { issueId: issue.data.node_id });
+                    
+                    const projectItem = projectItems.node.projectItems.nodes.find(
+                      item => item.project.id === 'PVT_kwHOBZ18Zs4BLqdH'
+                    );
+                    
+                    if (projectItem) {
+                      await github.graphql(`
+                        mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $valueId: String!) {
+                          updateProjectV2ItemFieldValue(input: {
+                            projectId: $projectId
+                            itemId: $itemId
+                            fieldId: $fieldId
+                            value: { singleSelectOptionId: $valueId }
+                          }) {
+                            projectV2Item { id }
+                          }
+                        }
+                      `, {
+                        projectId: 'PVT_kwHOBZ18Zs4BLqdH',
+                        itemId: projectItem.id,
+                        fieldId: 'PVTSSF_lAHOBZ18Zs4BLqdHzg7K3SQ',
+                        valueId: '98236657'
+                      });
+                      console.log(`📊 Moved #${issueNumber} to "Done" on project board`);
+                    }
+                  } catch (projectError) {
+                    console.log(`⚠️ Could not update project status: ${projectError.message}`);
+                  }
                 }
                 
                 // Action: Add in-progress label
@@ -124,6 +172,53 @@ jobs:
                       labels: ['in-progress']
                     });
                     console.log(`🏃 Added "in-progress" label to #${issueNumber}`);
+                  }
+                  
+                  // Move to "In Progress" on project board
+                  try {
+                    const projectItems = await github.graphql(`
+                      query($issueId: ID!) {
+                        node(id: $issueId) {
+                          ... on Issue {
+                            projectItems(first: 10) {
+                              nodes {
+                                id
+                                project {
+                                  id
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    `, { issueId: issue.data.node_id });
+                    
+                    const projectItem = projectItems.node.projectItems.nodes.find(
+                      item => item.project.id === 'PVT_kwHOBZ18Zs4BLqdH'
+                    );
+                    
+                    if (projectItem) {
+                      await github.graphql(`
+                        mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $valueId: String!) {
+                          updateProjectV2ItemFieldValue(input: {
+                            projectId: $projectId
+                            itemId: $itemId
+                            fieldId: $fieldId
+                            value: { singleSelectOptionId: $valueId }
+                          }) {
+                            projectV2Item { id }
+                          }
+                        }
+                      `, {
+                        projectId: 'PVT_kwHOBZ18Zs4BLqdH',
+                        itemId: projectItem.id,
+                        fieldId: 'PVTSSF_lAHOBZ18Zs4BLqdHzg7K3SQ',
+                        valueId: '47fc9ee4'
+                      });
+                      console.log(`📊 Moved #${issueNumber} to "In Progress" on project board`);
+                    }
+                  } catch (projectError) {
+                    console.log(`⚠️ Could not update project status: ${projectError.message}`);
                   }
                 }
                 

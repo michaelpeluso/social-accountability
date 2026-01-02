@@ -4,13 +4,15 @@
  * Generate GitHub issues from milestone spec files
  * 
  * Usage:
- *   node scripts/generate-issues.js [milestone]
+ *   node scripts/generate-issues.js [milestone] [options]
  *   
  * Examples:
- *   node scripts/generate-issues.js M1          # Generate M1 issues only
- *   node scripts/generate-issues.js --all       # Generate all milestone issues
- *   node scripts/generate-issues.js --dry-run   # Preview without creating
- *   node scripts/generate-issues.js M1 --force  # Update existing issues in-place
+ *   node scripts/generate-issues.js M1                    # Generate M1 issues only
+ *   node scripts/generate-issues.js --all                 # Generate all milestone issues
+ *   node scripts/generate-issues.js --dry-run             # Preview without creating
+ *   node scripts/generate-issues.js M1 --force            # Update existing issues in-place
+ *   node scripts/generate-issues.js --all --cleanup       # Close orphaned issues
+ *   node scripts/generate-issues.js --all --cleanup --dry-run  # Preview cleanup
  */
 
 const fs = require('fs');
@@ -19,29 +21,80 @@ const os = require('os');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
 
-const MILESTONES = ['M0', 'M1', 'M2', 'M3', 'M4', 'M5'];
 const SPEC_DIR = path.join(__dirname, '../docs/milestones');
-const LABEL_DEFINITIONS = {
-  'user-story': {
-    color: '0E8A16',
-    description: 'Auto-generated user story from milestone spec'
-  },
-  m0: { color: '1F77B4', description: 'Milestone M0: Foundation' },
-  m1: { color: 'FF7F0E', description: 'Milestone M1: Account & Privacy' },
-  m2: { color: '2CA02C', description: 'Milestone M2: Habits & Tracking' },
-  m3: { color: 'D62728', description: 'Milestone M3: Social' },
-  m4: { color: '9467BD', description: 'Milestone M4: Identity & Analytics' },
-  m5: { color: '8C564B', description: 'Milestone M5: Future' }
-};
 
-const MILESTONE_METADATA = {
-  M0: { title: 'M0 - Foundation', description: 'Milestone M0: Foundation scope' },
-  M1: { title: 'M1 - Account & Privacy', description: 'Milestone M1: Account setup, friends, privacy' },
-  M2: { title: 'M2 - Habits & Tracking', description: 'Milestone M2: Goals, habits, streaks, dashboard' },
-  M3: { title: 'M3 - Social', description: 'Milestone M3: Feed, posts, reactions, nudges' },
-  M4: { title: 'M4 - Identity & Analytics', description: 'Milestone M4: Identities, journal, analytics' },
-  M5: { title: 'M5 - Future', description: 'Milestone M5: Future roadmap experiments' }
-};
+// Predefined colors for consistent milestone branding
+const MILESTONE_COLORS = [
+  '1F77B4', 'FF7F0E', '2CA02C', 'D62728', '9467BD',
+  '8C564B', 'E377C2', 'BCBD22', '17BECF', 'AEC7E8'
+];
+
+/**
+ * Dynamically discover milestone files and extract metadata
+ */
+function discoverMilestones() {
+  const files = fs.readdirSync(SPEC_DIR);
+  const milestoneFiles = files.filter(f => /^M\d+-.+\.md$/i.test(f));
+  
+  const milestones = [];
+  const labelDefs = {
+    'user-story': {
+      color: '0E8A16',
+      description: 'Auto-generated user story from milestone spec'
+    }
+  };
+  const milestoneMeta = {};
+  
+  milestoneFiles.forEach((fileName, index) => {
+    const match = fileName.match(/^(M\d+)-(.+)\.md$/i);
+    if (!match) return;
+    
+    const milestone = match[1].toUpperCase();
+    const slug = match[2];
+    milestones.push(milestone);
+    
+    // Read file to extract title from first heading
+    const filePath = path.join(SPEC_DIR, fileName);
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.split('\n');
+    let title = `${milestone} - ${slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}`;
+    
+    // Try to extract title from first # heading
+    for (const line of lines) {
+      const headingMatch = line.match(/^#\s+Milestone\s+\d+[+:]?\s+(.+)$/i);
+      if (headingMatch) {
+        title = `${milestone} - ${headingMatch[1].replace(/\(.*?\)/, '').trim()}`;
+        break;
+      }
+    }
+    
+    // Generate label and milestone metadata
+    const labelKey = milestone.toLowerCase();
+    const colorIndex = index % MILESTONE_COLORS.length;
+    const shortTitle = title.replace(/^M\d+\s+-\s+/, '');
+    
+    labelDefs[labelKey] = {
+      color: MILESTONE_COLORS[colorIndex],
+      description: `Milestone ${milestone}: ${shortTitle}`
+    };
+    
+    milestoneMeta[milestone] = {
+      title: title,
+      description: `Milestone ${milestone}: ${shortTitle}`
+    };
+  });
+  
+  // Sort milestones numerically
+  milestones.sort((a, b) => {
+    const numA = parseInt(a.substring(1));
+    const numB = parseInt(b.substring(1));
+    return numA - numB;
+  });
+  
+  return { milestones, labelDefs, milestoneMeta };
+}
+
+const { milestones: MILESTONES, labelDefs: LABEL_DEFINITIONS, milestoneMeta: MILESTONE_METADATA } = discoverMilestones();
 
 function ensureDirectoryExists(dirPath) {
   if (!fs.existsSync(dirPath)) {
@@ -265,7 +318,7 @@ function parseMilestoneFile(filePath) {
   let inSecurityNotes = false;
   
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    const line = lines[i].trim(); // Trim to handle Windows line endings
     
     // Match user story headers: ### X.Y Story Title
     const storyMatch = line.match(/^### (\d+\.\d+) (.+)$/);
@@ -513,6 +566,7 @@ async function main() {
   const dryRun = args.includes('--dry-run');
   const generateAll = args.includes('--all');
   const forceUpdate = args.includes('--force');
+  const cleanup = args.includes('--cleanup');
   const targetMilestone = args.find(arg => !arg.startsWith('--'));
 
   // Determine which milestones to process
@@ -529,11 +583,14 @@ async function main() {
       process.exit(1);
     }
   } else {
-    console.log('Usage: node scripts/generate-issues.js [milestone|--all] [--dry-run]');
+    console.log('Usage: node scripts/generate-issues.js [milestone|--all] [--dry-run] [--force] [--cleanup]');
     console.log('\nExamples:');
     console.log('  node scripts/generate-issues.js M1          # Generate M1 issues');
     console.log('  node scripts/generate-issues.js --all       # Generate all issues');
     console.log('  node scripts/generate-issues.js M2 --dry-run  # Preview M2 issues');
+    console.log('  node scripts/generate-issues.js --all --force # Update all existing issues');
+    console.log('  node scripts/generate-issues.js --all --cleanup # Close orphaned issues');
+    console.log('  node scripts/generate-issues.js --all --cleanup --force # # Combine to update existing AND cleanup');
     process.exit(0);
   }
 
@@ -560,8 +617,13 @@ async function main() {
     skipped: 0,
     errors: 0,
     previewCreate: 0,
-    previewUpdate: 0
+    previewUpdate: 0,
+    cleaned: 0,
+    previewClean: 0
   };
+  
+  // Track all story IDs from spec files
+  const validStoryIds = new Set();
   
   for (const milestone of milestonesToProcess) {
     const files = fs.readdirSync(SPEC_DIR);
@@ -583,6 +645,7 @@ async function main() {
     console.log(`   Found ${stories.length} user stories\n`);
     
     for (const story of stories) {
+      validStoryIds.add(story.id.toUpperCase());
       const status = createIssue(story, { dryRun, forceUpdate, existingIssues, milestoneNumbers });
       if (dryRun) {
         if (status === 'would-create') {
@@ -599,15 +662,45 @@ async function main() {
     }
   }
   
+  // Cleanup orphaned issues
+  if (cleanup) {
+    console.log(`\n${dryRun ? 'Checking for' : 'Cleaning up'} orphaned issues...`);
+    for (const [storyId, issueInfo] of existingIssues.entries()) {
+      if (!validStoryIds.has(storyId)) {
+        if (dryRun) {
+          console.log(`Would close orphaned issue #${issueInfo.number}: ${issueInfo.title}`);
+          stats.previewClean++;
+        } else {
+          try {
+            execSync(
+              `gh issue close ${issueInfo.number} --comment "Closing orphaned issue - story removed from milestone specs"`,
+              { stdio: 'inherit' }
+            );
+            console.log(`Closed orphaned issue #${issueInfo.number}: ${issueInfo.title}`);
+            stats.cleaned++;
+          } catch (error) {
+            console.error(`Failed to close issue #${issueInfo.number}: ${error.message}`);
+          }
+        }
+      }
+    }
+  }
+  
   console.log(`\nSummary:`);
   if (dryRun) {
     console.log(`   Would create ${stats.previewCreate} new issues`);
     console.log(`   Would update ${stats.previewUpdate} existing issues`);
+    if (cleanup) {
+      console.log(`   Would close ${stats.previewClean} orphaned issues`);
+    }
     console.log('   Run without --dry-run to apply changes');
   } else {
     console.log(`   Created ${stats.created} new issues`);
     console.log(`   Updated ${stats.updated} existing issues`);
     console.log(`   Skipped ${stats.skipped} duplicates (use --force to update)`);
+    if (cleanup) {
+      console.log(`   Cleaned up ${stats.cleaned} orphaned issues`);
+    }
     console.log(`   Errors: ${stats.errors}`);
     console.log('   Issues will be auto-added to Project #3 by project-automation.yml');
   }

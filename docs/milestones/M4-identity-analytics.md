@@ -1,15 +1,15 @@
 # Milestone 4: Identity, Analytics & Engagement
 
-**Goal:** Add identity system, journal/mood tracking, enhanced analytics, and social challenges.
+**Goal:** Add identity system, journal/mood tracking, enhanced analytics, close friends feature, and report exports.
 **Timeline:** 3-4 weeks
-**Cost Target:** $0 (all device-side compute + HealthKit proof-of-concept)
+**Cost Target:** $0-5 (all device-side compute + optional PDF export)
 **Dependencies:** M3 complete (social features working)
 
 ---
 
 ## Overview
 
-M4 enriches the tracking experience with identities (Student, Athlete, Parent, etc.) that map to pillars, manual journal/mood entries, deeper analytics (all device-side), and social challenges. Also includes first integration: HealthKit steps (proof-of-concept for M5 expansion).
+M4 enriches the tracking experience with identities (Student, Athlete, Parent, etc.) that map to pillars, manual journal/mood entries for self-reflection, deeper analytics (correlations, time-of-day patterns), close friends privacy tier, and report exports. All analytics calculated device-side for zero cost.
 
 ---
 
@@ -18,10 +18,10 @@ M4 enriches the tracking experience with identities (Student, Athlete, Parent, e
 1. **Identity-Driven:** Habits can link to identities, dashboard shows per-identity contributions
 2. **Manual First:** Journal and mood are manual inputs (no ML sentiment analysis yet)
 3. **Device-Side Analytics:** All correlations, trends, patterns calculated on device (free)
-4. **Privacy-Safe Integration:** HealthKit steps only, explicit consent, can disable anytime
-5. **Positive Challenges:** Compete with friends on habits (no shame, celebrate together)
+4. **Privacy-First:** Identities and journal entries default to SELF-only
+5. **Granular Privacy:** Close friends tier for selective sharing with inner circle
 
-**Reference:** Original spec sections restored (2.1, 2.4 partial, 2.6 expanded)
+**Reference:** Original spec sections expanded with close friends model and export features
 
 ---
 
@@ -34,15 +34,15 @@ M4 enriches the tracking experience with identities (Student, Athlete, Parent, e
 **Acceptance Criteria:**
 
 - [ ] Identity setup screen (onboarding + settings)
-- [ ] User can add identities:
+- [ ] User can add identities from preset list:
   - Name (e.g., "Student", "Athlete", "Parent", "Artist")
   - Pillar assignment (each identity maps to ONE pillar: MIND/BODY/HEART/SOUL)
-  - Icon (choose from preset list)
-- [ ] Habits can link to identity (optional field)
+  - Icon (emoji from preset list)
+- [ ] Habits can link to identity (optional field in habit creation)
 - [ ] Dashboard shows per-identity breakdown:
   - Habits count per identity
   - Check-ins count per identity
-  - Pillar contribution (how much each identity contributes to its pillar score)
+  - Pillar contribution percentage
 - [ ] Can edit/delete identities (habits remain, link removed)
 
 **Example Identities:**
@@ -84,9 +84,9 @@ Response: { data: Habit }
 
 **Technical Requirements:**
 
-- Identity table: id, userId, name, pillar, icon, createdAt
+- Identity table: id, userId, name, pillar, icon, preset (boolean), createdAt
 - Habit.identityId foreign key (optional)
-- Dashboard query: GROUP BY identityId, count check-ins
+- Dashboard query: GROUP BY identityId, COUNT check-ins
 - Device-side calculation (no API calls)
 
 **Privacy Notes:**
@@ -96,68 +96,67 @@ Response: { data: Habit }
 
 **Security Notes:**
 
-- Max 20 identities per user (prevent abuse)
+- Max 20 identities per user
 - Rate limit: 50 identity operations per day
 
 **Cost:** $0
 
-**Reference:** Original spec 2.1 (Identity & Pillar Assignment)
-
 ---
 
-### 4.2 Journal Entries
+### 4.2 Journal Tracking
 
-**Story:** As a user, I want to write journal entries so that I can reflect on my day and tag them to pillars.
+**Story:** As a user, I want to write private journal entries so that I can reflect on my day.
 
 **Acceptance Criteria:**
 
-- [ ] "New Journal Entry" button
-- [ ] Entry form:
-  - Body text (required, 5000 chars max)
-  - Pillar tags (multi-select: can tag multiple pillars)
-  - Mood (optional, emoji scale: 😞 😐 🙂 😊 😄)
-  - Privacy (required, defaults to SELF)
-  - Date (defaults to today, can backdate up to 7 days)
-- [ ] Save stores locally, syncs in background
-- [ ] Journal list shows entries chronologically
-- [ ] Search/filter by pillar, mood, date range
-- [ ] Can edit/delete entries
+- [ ] Journal tab with list of entries (most recent first)
+- [ ] "New Entry" button opens editor:
+  - Title (optional, 100 chars)
+  - Body (required, 5000 chars max)
+  - Timestamp (defaults to now, can backdate up to 7 days)
+- [ ] Markdown support: bold, italic, lists
+- [ ] Entry detail view with edit/delete options
+- [ ] Full-text search (SQLite FTS5 on device)
+- [ ] Dashboard widget: "Last journaled X days ago"
+
+**Example Entry:**
+
+```typescript
+{
+  title: "Great workout today",
+  body: "Finally hit my PR on deadlifts! 💪\n\nFeeling accomplished but also tired. Need to focus on recovery tomorrow.\n\n**Key wins:**\n- Deadlift PR: 315lbs\n- Stayed hydrated\n- Good sleep last night (7.5hrs)",
+  timestamp: "2026-01-01T18:30:00Z",
+  privacy: "SELF"
+}
+```
+
+**Why:** Journaling promotes self-reflection and helps users process their habit journey. Private by default to encourage honest writing.
 
 **API Contract:**
 
 ```
 POST /journal
-Body: {
-  bodyText: string,
-  pillars: Pillar[],
-  mood?: number,
-  privacy: Privacy,
-  entryDate: string
-}
+Body: { title?: string, body: string, timestamp: string, privacy: Privacy }
 Response: { data: JournalEntry }
 ```
 
 **Technical Requirements:**
 
-- JournalEntry table: id, userId, bodyText, pillars (JSON array), mood (1-5), privacy, entryDate, createdAt
-- SQLite full-text search on bodyText
-- Mood: 1 = 😞, 2 = 😐, 3 = 🙂, 4 = 😊, 5 = 😄
-- Sync queue with retry
+- JournalEntry table: id, userId, title, body, privacy, timestamp, createdAt, updatedAt
+- SQLite FTS5 for full-text search (device-side)
+- react-native-markdown-display for rendering
 
 **Privacy Notes:**
 
-- Default privacy: SELF (most sensitive)
-- Warn if changing to PUBLIC (journal can be very personal)
-- Never share journal content in analytics
+- Journal entries default to SELF-only
+- Warn before changing to PUBLIC: "Journal entries can be very personal"
 
 **Security Notes:**
 
 - Rate limit: 20 journal entries per day
-- Max 5000 chars (prevent abuse)
+- Max 5000 chars
 
-**Cost:** $0 (text storage minimal)
-
-**Reference:** Original spec 2.4 (Manual Inputs - Journal)
+**Cost:** $0
 
 ---
 
@@ -167,31 +166,51 @@ Response: { data: JournalEntry }
 
 **Acceptance Criteria:**
 
-- [ ] Quick mood log (separate from journal):
-  - Emoji scale: 😞 😐 🙂 😊 😄
+- [ ] Quick mood log from dashboard:
+  - Emoji scale: 😞 😐 🙂 😊 😄 (1-5)
   - Optional note (100 chars)
   - Timestamp (defaults to now)
-- [ ] Mood history: line chart showing mood over time (7/30/90 days)
+- [ ] Mood history: line chart (7/30/90 days view)
 - [ ] Mood insights (device-side):
   - Average mood this week vs last week
-  - Best/worst day of week (e.g., "Mondays are tough")
-  - Time of day patterns (e.g., "Mornings are best")
+  - Best/worst day of week
+  - Time of day patterns
 - [ ] Dashboard widget: mood trend line
+
+**Example Mood Data:**
+
+```typescript
+[
+  { value: 5, note: "Crushed my workout! 💪", timestamp: "2026-01-01T07:00:00Z" },
+  { value: 3, note: "Stressful work meeting", timestamp: "2026-01-01T14:00:00Z" },
+  { value: 4, note: "Good evening with family", timestamp: "2026-01-01T20:00:00Z" }
+]
+
+// Insights:
+{
+  avgThisWeek: 4.2,
+  avgLastWeek: 3.8,
+  trend: "↑ Improving",
+  bestDay: "Saturday",
+  worstDay: "Monday"
+}
+```
+
+**Why:** Mood tracking helps users identify triggers and patterns. Simple emoji scale reduces friction (no complex questionnaires).
 
 **Calculation (Device-Side):**
 
 ```typescript
-function calculateMoodTrends(moods: MoodEntry[]): MoodInsights {
+function calculateMoodInsights(moods: MoodEntry[]) {
   const thisWeek = moods.filter((m) => isThisWeek(m.timestamp));
-  const avgThisWeek = average(thisWeek.map((m) => m.value));
-
   const lastWeek = moods.filter((m) => isLastWeek(m.timestamp));
-  const avgLastWeek = average(lastWeek.map((m) => m.value));
 
-  const byDayOfWeek = groupBy(moods, (m) => getDayOfWeek(m.timestamp));
-  const bestDay = maxBy(byDayOfWeek, (day, entries) => average(entries.map((e) => e.value)));
-
-  return { avgThisWeek, avgLastWeek, bestDay };
+  return {
+    avgThisWeek: average(thisWeek.map((m) => m.value)),
+    avgLastWeek: average(lastWeek.map((m) => m.value)),
+    bestDay: maxBy(groupBy(moods, "dayOfWeek"), avg),
+    worstDay: minBy(groupBy(moods, "dayOfWeek"), avg),
+  };
 }
 ```
 
@@ -199,90 +218,236 @@ function calculateMoodTrends(moods: MoodEntry[]): MoodInsights {
 
 ```
 POST /moods
-Body: { value: number, note?: string, timestamp: string }
+Body: { value: number (1-5), note?: string, timestamp: string }
 Response: { data: MoodEntry }
 ```
 
 **Technical Requirements:**
 
 - MoodEntry table: id, userId, value (1-5), note, timestamp, createdAt
-- Chart library: Victory Native or react-native-svg-charts
+- Victory Native for charts
 - Calculate insights on device (no API calls)
 
 **Privacy Notes:**
 
 - Mood data SELF-only (never shared)
-- Optional: share mood trends in feed (aggregated, not individual entries)
-
-**Security Notes:**
-
-- Rate limit: 50 mood logs per day
+- Can optionally share aggregated trends in posts (e.g., "Feeling better this week ☀️")
 
 **Cost:** $0
 
-**Reference:** Original spec 2.4 (Mood logging)
+---
+
+### 4.4 Consistency Score
+
+**Story:** As a user, I want a single score that represents my overall habit consistency so that I can track my progress holistically.
+
+**Acceptance Criteria:**
+
+- [ ] Dashboard displays consistency score (0-100)
+- [ ] Score calculated from 4 weighted factors:
+  - Consistency (40%): Check-ins completed vs expected (last 60 days, weighted)
+  - Pillar Balance (25%): Are all 4 pillars getting attention?
+  - Social Engagement (20%): Posts, reactions, nudges given
+  - Momentum (15%): Active streaks across habits
+- [ ] Score uses exponential-weighted moving average (EWMA) with 60-day window
+- [ ] Recent check-ins boost score immediately (recency bonus)
+- [ ] Score updates daily at midnight + instantly after check-ins
+- [ ] Tap score to see breakdown by factor
+- [ ] Score stored locally, synced to server for friend visibility (M8+)
+
+**Why 60 Days:** Aligns with habit formation research (Atomic Habits: ~60 days to form habit)
+
+**Why These Weights:**
+
+- **Consistency (40%):** Core metric but not overwhelming
+- **Pillar Balance (25%):** Reflects identity system; prevents "one-pillar" users
+- **Social Engagement (20%):** Social accountability is the product (sharing, supporting friends)
+- **Momentum (15%):** Rewards streaks without toxic "don't break chain" pressure
+
+**Formula (Exponential-Weighted 60-Day Window):**
+
+```typescript
+// Base score: EWMA over 60 days (stability)
+function calculateBaseScore(userId: string): number {
+  const halfLife = 20; // Days
+  const window = 60;
+
+  // 1. Consistency (40%)
+  let consistencyScore = 0;
+  let totalWeight = 0;
+  for (let d = 0; d < window; d++) {
+    const weight = Math.pow(0.5, d / halfLife);
+    const completed = getCheckInsForDay(userId, d);
+    const expected = getExpectedCheckInsForDay(userId, d);
+    consistencyScore += weight * (completed / Math.max(expected, 1));
+    totalWeight += weight;
+  }
+  consistencyScore = (consistencyScore / totalWeight) * 40;
+
+  // 2. Pillar Balance (25%)
+  const checkIns = getCheckInsLastNDays(userId, window);
+  const activePillars = new Set(checkIns.map((c) => c.habit.pillar)).size;
+  const balanceScore = (activePillars / 4) * 25;
+
+  // 3. Social Engagement (20%)
+  const socialActions = getSocialActionsLastNDays(userId, window); // posts + reactions + nudges
+  const socialScore = Math.min(socialActions / 30, 1) * 20; // Target: ~30 actions in 60 days
+
+  // 4. Momentum (15%)
+  const habits = getUserHabits(userId);
+  const activeStreaks = habits.filter((h) => h.currentStreak >= 3).length;
+  const momentumScore = (activeStreaks / Math.max(habits.length, 1)) * 15;
+
+  return Math.round(consistencyScore + balanceScore + socialScore + momentumScore);
+}
+
+// Recency boost: immediate feedback after check-in
+function applyRecencyBonus(baseScore: number, userId: string): number {
+  const checkedInToday = hasCheckInToday(userId);
+  const currentStreak = getLongestActiveStreak(userId);
+
+  let recencyFactor = 0;
+  if (checkedInToday) {
+    recencyFactor += 0.1; // +10% for today's check-in
+    recencyFactor += Math.min(0.05 * (currentStreak - 1), 0.15); // +5% per streak day, cap at +15%
+  }
+
+  return Math.round(Math.min(100, baseScore * (1 + recencyFactor)));
+}
+
+// Final score shown to user
+const finalScore = applyRecencyBonus(calculateBaseScore(userId), userId);
+```
+
+**Storage (Device-First):**
+
+```typescript
+// User table addition
+interface User {
+  // ... existing fields
+  consistencyScore: number; // 0-100 (final score)
+  baseScore: number; // EWMA without recency bonus
+  lastScoreUpdate: Date;
+}
+
+// Optional: Daily aggregate for faster calculation
+interface DailyAggregate {
+  id: string;
+  userId: string;
+  date: Date;
+  checkInsCount: number;
+  expectedCount: number;
+  activePillars: Pillar[]; // Which pillars had check-ins
+  socialActionsCount: number; // Posts + reactions + nudges
+}
+```
+
+**Implementation Notes:**
+
+- **Daily cron:** Recalculate all users' base scores at midnight
+- **Real-time update:** After check-in, increment score immediately (optimistic)
+- **Grace period:** First 24h of inactivity shows no decay (avoids anxiety)
+- **Floor protection:** Score never drops below 10
+- **All device-side:** No API calls, instant UX
+- **Sync to cloud:** For friend visibility (M8+, opt-in)
+
+**UI Display:**
+
+```
+┌─────────────────────────────┐
+│  Consistency Score          │
+│                             │
+│         ╔═══════╗           │
+│         ║  78   ║           │
+│         ╚═══════╝           │
+│                             │
+│  Tap to see breakdown       │
+└─────────────────────────────┘
+
+// Breakdown view:
+Consistency:     32/40  ████████░░
+Pillar Balance:  19/25  ████████░░
+Social:          14/20  ███████░░░
+Momentum:        13/15  █████████░
+```
+
+**Privacy Notes:**
+
+- Score calculation device-only (M4)
+- M8+ may add opt-in sharing with friends (plant visualization)
+- Breakdown never shared, only final score
+
+**Cost:** $0 (all device-side)
 
 ---
 
-### 4.4 Enhanced Dashboard - Correlations
+### 4.5 Dashboard Correlations
 
 **Story:** As a user, I want to see correlations between habits so that I understand what helps me succeed.
 
 **Acceptance Criteria:**
 
-- [ ] Dashboard tab: "Insights"
-- [ ] Correlation matrix:
-  - User selects 2 habits (e.g., "Sleep 8 hours" vs "Morning workout")
-  - Chart shows correlation over time
-  - Insight: "You're 80% more likely to workout after good sleep"
-- [ ] Preset correlations (if data available):
-  - Sleep vs mood
-  - Exercise vs energy (if journaled)
-  - Social habits vs mood
-- [ ] Device-side calculation (simple statistical correlation)
+- [ ] Dashboard "Insights" tab
+- [ ] User selects 2 habits from dropdowns
+- [ ] Chart shows correlation over last 30 days
+- [ ] Insight card: "You're 80% more likely to workout after good sleep"
+- [ ] Minimum 14 days of data required
+
+**Example Correlations:**
+
+```typescript
+// User selects: "Morning meditation" + "Productive work day"
+{
+  habit1: "Morning meditation",
+  habit2: "Productive work day",
+  correlation: 0.85, // 85% correlation
+  insight: "You completed 'Productive work day' on 17 of 20 days when you meditated (85%)",
+  recommendation: "Try meditating before work to boost focus"
+}
+
+// Another example: "Late night snacking" + "Poor sleep"
+{
+  correlation: -0.72, // Negative correlation
+  insight: "You slept poorly on 13 of 18 days after late night snacking (72%)",
+  recommendation: "Consider eating dinner earlier for better sleep"
+}
+```
+
+**Why:** Users discover which habits unlock others (keystone habits) or which negatively impact performance.
 
 **Calculation (Device-Side):**
 
 ```typescript
-function calculateCorrelation(habit1: Habit, habit2: Habit, checkIns: HabitCheckIn[]): number {
+function calculateCorrelation(habit1Id: string, habit2Id: string) {
   const days = last30Days();
-
   const data = days.map((day) => ({
-    habit1Completed: checkIns.some((c) => c.habitId === habit1.id && isSameDay(c.occurredAt, day)),
-    habit2Completed: checkIns.some((c) => c.habitId === habit2.id && isSameDay(c.occurredAt, day)),
+    habit1Done: checkIns.some((c) => c.habitId === habit1Id && isSameDay(c.occurredAt, day)),
+    habit2Done: checkIns.some((c) => c.habitId === habit2Id && isSameDay(c.occurredAt, day)),
   }));
 
-  // Simple correlation: % of days both completed
-  const bothCompleted = data.filter((d) => d.habit1Completed && d.habit2Completed).length;
-  const habit1Completed = data.filter((d) => d.habit1Completed).length;
+  const bothDone = data.filter((d) => d.habit1Done && d.habit2Done).length;
+  const habit1Done = data.filter((d) => d.habit1Done).length;
 
-  return habit1Completed > 0 ? (bothCompleted / habit1Completed) * 100 : 0;
+  return habit1Done > 0 ? (bothDone / habit1Done) * 100 : 0;
 }
 ```
 
 **Technical Requirements:**
 
-- UI: select 2 habits from dropdown
+- UI: two dropdowns for habit selection
 - Chart: scatter plot or line chart
-- Calculate on device (no API call)
-- Min 14 days data required for insight
+- All calculations on-device
+- Min 14 days data for accuracy
 
 **Privacy Notes:**
 
-- Correlations never leave device
-- User owns their patterns
-
-**Security Notes:**
-
-- N/A (device-only)
+- Correlations never leave device (pure client-side)
 
 **Cost:** $0
 
-**Reference:** Original spec 2.6 (Dashboard - Correlations)
-
 ---
 
-### 4.5 Enhanced Dashboard - Time-of-Day Heatmap
+### 4.6 Time of Day Heatmap
 
 **Story:** As a user, I want to see when I'm most productive so that I can schedule habits accordingly.
 
@@ -291,50 +456,145 @@ function calculateCorrelation(habit1: Habit, habit2: Habit, checkIns: HabitCheck
 - [ ] Dashboard shows heatmap:
   - X-axis: day of week (Mon-Sun)
   - Y-axis: hour of day (0-23)
-  - Color intensity: # of check-ins at that time
+  - Color intensity: number of check-ins
 - [ ] Insight: "You're most active Tue/Thu 7-9am"
-- [ ] Tap cell: see which habits completed at that time
+- [ ] Tap cell to see which habits were completed
 - [ ] Device-side calculation
 
-**Calculation (Device-Side):**
+**Example Heatmap:**
 
 ```typescript
-function calculateHeatmap(checkIns: HabitCheckIn[]): number[][] {
-  const heatmap = Array(7)
-    .fill(0)
-    .map(() => Array(24).fill(0));
+// Heatmap data structure
+[
+  { day: "Mon", hour: 7, count: 5, habits: ["Workout", "Meditation"] },
+  { day: "Mon", hour: 19, count: 3, habits: ["Read"] },
+  { day: "Tue", hour: 7, count: 4, habits: ["Workout", "Journal"] },
+  // ... more cells
+];
 
-  checkIns.forEach((c) => {
-    const day = getDayOfWeek(c.occurredAt); // 0-6
-    const hour = getHour(c.occurredAt); // 0-23
-    heatmap[day][hour]++;
-  });
-
-  return heatmap;
-}
+// Generated insight:
+("You're most productive on Tuesday and Thursday mornings (7-9am) with an average of 4.5 check-ins. Consider scheduling important habits during this time.");
 ```
+
+**Visual Example:**
+
+```
+        Mon  Tue  Wed  Thu  Fri  Sat  Sun
+6am     ░░   ░░   ░    ░░   ░    ▓▓   ▓▓
+7am     ▓▓▓  ▓▓▓  ▓▓   ▓▓▓  ▓▓   ▓▓▓  ░
+8am     ▓▓   ▓▓   ░    ▓▓   ░    ░    ░
+...
+7pm     ▓    ▓▓   ▓▓▓  ▓    ░    ▓▓   ▓▓
+```
+
+**Why:** Helps users identify their peak performance windows and schedule important habits when they're most likely to succeed.
 
 **Technical Requirements:**
 
-- Chart: custom grid (react-native-svg)
-- Query SQLite: SELECT dayOfWeek, hour, COUNT(\*) FROM check_ins GROUP BY dayOfWeek, hour
+- Custom grid with react-native-svg
+- Query: `SELECT dayOfWeek, hour, COUNT(*) FROM check_ins GROUP BY dayOfWeek, hour`
 - Device-side calculation
 
 **Privacy Notes:**
 
-- Heatmap never shared (SELF-only)
-
-**Security Notes:**
-
-- N/A (device-only)
+- Heatmap is SELF-only (never shared)
 
 **Cost:** $0
 
-**Reference:** Original spec 2.6 (Dashboard - Time Patterns)
+---
+
+### 4.7 Close Friends Feature
+
+**Story:** As a user, I want to mark certain friends as "close friends" so that I can share more privately with my inner circle.
+
+**Acceptance Criteria:**
+
+- [ ] Friends list shows "Mark as Close Friend" toggle per friend
+- [ ] Close friends get ⭐ badge next to name
+- [ ] New privacy level: CLOSE_FRIENDS (between SELF and FRIENDS)
+- [ ] Privacy levels now: SELF → CLOSE_FRIENDS → FRIENDS → PUBLIC
+- [ ] Posts/habits with CLOSE_FRIENDS privacy only visible to:
+  - User themselves
+  - Friends they've marked as close friends
+- [ ] Settings: default privacy can be set to CLOSE_FRIENDS
+
+**Example Privacy Flow:**
+
+```typescript
+// User has 50 friends, marks 5 as close friends:
+const closeFriends = [
+  { id: "user_123", name: "Sarah", isCloseFriend: true },
+  { id: "user_456", name: "Mike", isCloseFriend: true },
+  { id: "user_789", name: "Lisa", isCloseFriend: true },
+  // ... 47 more regular friends
+];
+
+// Creates post about struggling with anxiety:
+{
+  content: "Having a tough week with anxiety. Working through it.",
+  privacy: "CLOSE_FRIENDS" // Only Sarah, Mike, Lisa see this
+}
+
+// Creates post about workout PR:
+{
+  content: "New deadlift PR! 💪",
+  privacy: "FRIENDS" // All 50 friends see this
+}
+```
+
+**Privacy Enforcement Example:**
+
+```typescript
+function canViewPost(viewerId: string, post: Post, friendships: Friendship[]) {
+  if (post.userId === viewerId) return true; // Own posts always visible
+  if (post.privacy === "PUBLIC") return true;
+
+  const friendship = friendships.find(
+    (f) =>
+      (f.userId === post.userId && f.friendId === viewerId) ||
+      (f.friendId === post.userId && f.userId === viewerId)
+  );
+
+  if (!friendship || friendship.status !== "ACCEPTED") return false;
+
+  if (post.privacy === "FRIENDS") return true;
+  if (post.privacy === "CLOSE_FRIENDS") {
+    // Check if viewer is marked as close friend by post author
+    return friendship.userId === post.userId && friendship.isCloseFriend;
+  }
+
+  return false;
+}
+```
+
+**Why:** Instagram Close Friends model - users need intermediate privacy between "all friends" and "just me" for vulnerable sharing.
+
+**API Contract:**
+
+```
+PATCH /friendships/:id
+Body: { isCloseFriend: boolean }
+Response: { data: Friendship }
+```
+
+**Technical Requirements:**
+
+- Add Friendship.isCloseFriend field (boolean, defaults to false)
+- Update privacy enforcement logic across all queries
+- Update all privacy dropdowns
+- Update feed/story filtering
+
+**Privacy Notes:**
+
+- Close friends designation is private (others can't see who you marked)
+- One-way designation (A marks B doesn't mean B marks A)
+- Marking/unmarking doesn't notify the friend
+
+**Cost:** $0
 
 ---
 
-### 4.6 Enhanced Dashboard - Export Reports
+### 4.8 Dashboard Export Reports
 
 **Story:** As a user, I want to export reports so that I can analyze my data externally or share with a coach.
 
@@ -352,6 +612,53 @@ function calculateHeatmap(checkIns: HabitCheckIn[]): number[][] {
   - Mood trends (if tracked)
   - Identity contributions
 - [ ] Download or share via email
+
+**Example Report Structure:**
+
+```typescript
+// Weekly Summary Report
+{
+  period: "Dec 25 - Dec 31, 2025",
+  summary: {
+    totalCheckIns: 42,
+    habitsTracked: 8,
+    longestStreak: 14,
+    pillarScores: {
+      MIND: 85,
+      BODY: 92,
+      HEART: 78,
+      SOUL: 88
+    }
+  },
+  habitBreakdown: [
+    { name: "Morning run", completionRate: 100, checkIns: 7 },
+    { name: "Meditation", completionRate: 86, checkIns: 6 },
+    { name: "Read 30min", completionRate: 71, checkIns: 5 }
+  ],
+  moodTrend: {
+    average: 4.1,
+    trend: "↑ +0.3 from last week",
+    bestDay: "Saturday",
+    worstDay: "Monday"
+  },
+  identityContributions: [
+    { name: "Athlete", pillar: "BODY", checkIns: 15, percentage: 35.7 },
+    { name: "Student", pillar: "MIND", checkIns: 12, percentage: 28.6 }
+  ]
+}
+```
+
+**CSV Format Example:**
+
+```
+Date,Habit,Completed,Mood,Notes
+2025-12-25,Morning run,Yes,4,"Great start to the day"
+2025-12-25,Meditation,Yes,4,""
+2025-12-25,Read 30min,No,3,"Too tired"
+...
+```
+
+**Why:** Users want to share progress with coaches/therapists, or analyze in external tools (Excel, data science notebooks). Export empowers data ownership.
 
 **API Contract:**
 
@@ -377,278 +684,52 @@ Response: { data: { summary, charts, csvUrl } }
 
 **Cost:** $0 (if client-side) or $5/month (if server-side PDF generation via Lambda)
 
-**Reference:** Original spec 2.6 (Dashboard - Historical Metrics)
-
----
-
-### 4.7 HealthKit Steps (Proof-of-Concept)
-
-**Story:** As a user, I want to auto-log my daily steps so that I don't have to manually track walking.
-
-**Acceptance Criteria:**
-
-- [ ] "Enable Steps Tracking" button in settings
-- [ ] Clear consent screen:
-  - "We'll access your steps count from Apple Health"
-  - "You can disable anytime"
-  - "Data stays on device, only syncs if you choose"
-- [ ] Request HealthKit permission (steps only)
-- [ ] If granted:
-  - Create "Daily Steps" habit automatically (10k target)
-  - Query HealthKit daily for steps count
-  - Auto-log check-in if >= 10k steps
-  - Dashboard shows steps trend
-- [ ] Can disable in settings (stops querying, keeps history)
-
-**HealthKit Setup:**
-
-```typescript
-import * as HealthKit from "expo-health-kit";
-
-async function enableStepsTracking() {
-  const granted = await HealthKit.requestPermissions([
-    { type: "quantity", identifier: "stepCount" },
-  ]);
-
-  if (granted) {
-    // Query steps daily (cron job or on app open)
-    const steps = await HealthKit.queryQuantity({
-      identifier: "stepCount",
-      unit: "count",
-      startDate: startOfDay(),
-      endDate: endOfDay(),
-    });
-
-    if (steps >= 10000) {
-      await createCheckIn(stepsHabitId, { source: "INTEGRATION" });
-    }
-  }
-}
-```
-
-**API Contract:**
-
-```
-POST /habits/:id/checkins
-Body: { occurredAt: string, source: 'INTEGRATION', evidenceRef: 'healthkit:steps:10543' }
-```
-
-**Technical Requirements:**
-
-- expo-health-kit or react-native-health
-- Query once per day (background task or on app open)
-- Store permission state in SQLite
-- Can revoke anytime (deletes permission, stops querying)
-
-**Privacy Notes:**
-
-- Steps only (no heart rate, sleep, location)
-- Explicit consent required
-- User can disable anytime
-- Data stays on device unless user syncs
-- Clear UI: "Steps: 10,543 (from Apple Health)"
-
-**Security Notes:**
-
-- Never query HealthKit without permission
-- Log permission grants/revokes
-
-**Cost:** $0 (HealthKit is free)
-
-**Reference:** spec/permissions.md#L12, original spec 2.2 (limited to steps only)
-
----
-
-### 4.8 Habit Challenges
-
-**Story:** As a user, I want to challenge friends so that we can compete and support each other.
-
-**Acceptance Criteria:**
-
-- [ ] "Create Challenge" button
-- [ ] Challenge form:
-  - Name (e.g., "30-Day Workout Challenge")
-  - Habit (select from user's habits)
-  - Duration (7/14/30 days)
-  - Invites (select friends from circles)
-- [ ] Invitees see challenge invite, can Accept/Decline
-- [ ] Challenge detail shows:
-  - Leaderboard (ranked by check-in count or streak)
-  - Each participant's progress
-  - Days remaining
-  - Celebration when someone completes
-- [ ] Challenge ends after duration:
-  - Winner announced (most check-ins or longest streak)
-  - Badge awarded to all participants (bronze/silver/gold)
-- [ ] Can leave challenge anytime (no penalty)
-
-**Challenge Types:**
-
-- Completion: who completes most check-ins?
-- Streak: who maintains longest streak?
-- Together: everyone aims to complete (not competitive)
-
-**API Contract:**
-
-```
-POST /challenges
-Body: {
-  name: string,
-  habitId: string,
-  durationDays: number,
-  type: "completion" | "streak" | "together",
-  inviteeIds: string[]
-}
-Response: { data: Challenge }
-
-POST /challenges/:id/join
-Response: { data: { message: "Joined challenge" } }
-```
-
-**Technical Requirements:**
-
-- Challenge table: id, creatorId, name, habitId, type, startDate, endDate, createdAt
-- ChallengeParticipant table: challengeId, userId, joinedAt, checkInsCount, currentStreak
-- Leaderboard: device-side query (ORDER BY checkInsCount DESC)
-- Update leaderboard on every check-in (background)
-
-**Privacy Notes:**
-
-- Challenges FRIENDS-only (must be friends to join)
-- Cannot challenge PUBLIC (prevents spam)
-- Leaderboard visible to participants only
-
-**Security Notes:**
-
-- Max 50 participants per challenge
-- Rate limit: 10 challenges per user per week
-
-**Cost:** $0
-
-**Reference:** Original spec M3 (productive competitions), now M4
-
----
-
-### 4.9 Close Friends Feature
-
-**Story:** As a user, I want to mark certain friends as "close friends" so that I can share more privately with my inner circle.
-
-**Acceptance Criteria:**
-
-- [ ] Friends list shows "Mark as Close Friend" toggle
-- [ ] Close friends badge (⭐) next to their name
-- [ ] New privacy option: CLOSE_FRIENDS
-- [ ] Privacy levels now: SELF / CLOSE_FRIENDS / FRIENDS / PUBLIC
-- [ ] Posts/habits with CLOSE_FRIENDS privacy only visible to:
-  - User themselves
-  - Friends marked as "close friends"
-- [ ] Settings: default privacy can be CLOSE_FRIENDS
-- [ ] Close friends count shown in profile (optional)
-
-**Why:** Users want an intermediate privacy level between "just me" and "all friends" (Instagram Close Friends model)
-
-**API Contract:**
-
-```
-PATCH /friends/:friendshipId
-Body: { isCloseFriend: boolean }
-Response: { data: Friendship }
-
-Privacy enum now includes: SELF | CLOSE_FRIENDS | FRIENDS | PUBLIC
-```
-
-**Technical Requirements:**
-
-- Add isCloseFriend field to Friendship table (defaults to false)
-- Update privacy enforcement:
-  - CLOSE_FRIENDS checks: user is friend AND isCloseFriend = true
-- Update all privacy dropdowns to include CLOSE_FRIENDS
-- Update feed filtering logic
-
-**Privacy Notes:**
-
-- Close friends designation is private (others can't see who you marked)
-- Marking/unmarking doesn't notify the friend
-- One-way designation (A marks B as close, doesn't mean B marks A)
-
-**Security Notes:**
-
-- No limit on close friends count
-- Cannot see who marked you as close friend
-
-**Cost:** $0
-
-**Reference:** Instagram Close Friends, simplified privacy model for M4
-
 ---
 
 ## Validation Checklist
 
-Before moving to M5:
-
-- [ ] Identity system works (create, link to habits, dashboard breakdown)
-- [ ] Journal entries created, searched, filtered
-- [ ] Mood tracking with trend visualization
-- [ ] Dashboard shows correlations, heatmaps
+- [ ] Identities created and linked to habits
+- [ ] Dashboard shows per-identity breakdown
+- [ ] Journal entries created, searched, displayed
+- [ ] Mood tracking with charts working
+- [ ] Correlations calculated correctly (min 14 days data)
+- [ ] Heatmap displays check-in patterns
+- [ ] Close friends marked and privacy enforced
+- [ ] All privacy levels work: SELF/CLOSE_FRIENDS/FRIENDS/PUBLIC
 - [ ] Reports export to PDF/CSV
-- [ ] HealthKit steps tracking (proof-of-concept)
-- [ ] Challenges created, joined, leaderboard updates
-- [ ] Close friends feature works (mark/unmark, CLOSE_FRIENDS privacy enforced)
-- [ ] Tests pass:
-  - [ ] Correlation calculation
-  - [ ] Heatmap generation
-  - [ ] HealthKit permission handling
-  - [ ] Challenge leaderboard ranking
-  - [ ] Close friends privacy filtering
 
 ---
 
-## What NOT to Build in M4
+## What NOT to Build
 
-❌ NO full ML/auto-logging (steps only, manual everything else)
-❌ NO calendar integration (M5)
-❌ NO sentiment analysis on journal (M5)
-❌ NO predictive suggestions (M5)
-❌ NO more HealthKit metrics beyond steps (M5)
-❌ NO direct messaging (M5+)
-❌ NO monetization (M5+)
+❌ NO BUILD/BREAK habits (M5)
+❌ NO habit stacking (M5)
+❌ NO intensity tracking (M5)
+❌ NO HealthKit integration (M5)
+❌ NO challenges (M5)
+❌ NO behavioral drift (M6)
+❌ NO ML/automation (M7)
 
 ---
 
 ## Cost & Privacy Summary
 
-**Monthly Cost (1000 users):** $0-5
+**Monthly Cost:** $0-5 (1000 users)
 
-- HealthKit: free
-- All analytics on device: free
+- All analytics on device: $0
 - PDF generation: $0 (client-side) or $5 (Lambda)
 
 **Privacy Compliance:**
 
-- ✅ HealthKit steps only, explicit consent
-- ✅ Journal entries SELF-only by default
-- ✅ Mood data never shared
-- ✅ All analytics on device (no cloud compute)
-- ✅ Challenges CIRCLE-only (no public leaderboards)
+- ✅ Journal SELF-only by default
+- ✅ Mood never shared (SELF-only)
+- ✅ Correlations device-only
+- ✅ Close friends private designation
+- ✅ Reports contain user's own data only
 
 ---
 
-## Dependencies
+## Reference
 
-**Before M4:**
-
-- M3 complete (social features working)
-- Mac day scheduled (for HealthKit integration testing)
-
-**After M4:**
-
-- M5 can start (more integrations, ML, monetization)
-
----
-
-## Reference Documents
-
-- Original spec sections 2.1, 2.4, 2.6 (restored in M4)
-- [spec/permissions.md](spec/permissions.md#L12) - HealthKit steps approval
-- [spec/startup_guide.md](spec/startup_guide.md#L133-L146) - First integrations phase
-- [spec/data-model.md](spec/data-model.md) - New tables: Identity, JournalEntry, MoodEntry, Challenge
+- [data-model.md](../data-model.md) - Identity, JournalEntry, MoodEntry tables
+- [architecture.md](../architecture.md#privacy-enforcement) - Privacy model
