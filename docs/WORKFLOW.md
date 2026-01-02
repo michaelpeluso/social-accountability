@@ -26,6 +26,39 @@ npm start              # Expo dev server (scan QR with Expo Go)
 
 ## Daily Development Cycle
 
+### Terminal Two-Command Workflow
+
+For a fast terminal-first workflow (no GitHub UI), use two commands:
+
+- View open stories for a milestone or all:
+
+```bash
+# View stories for a specific milestone
+bash scripts/list-stories.sh M1
+
+# View all open stories
+bash scripts/list-stories.sh --all
+```
+
+- Start working on a story (creates branch, sets issue to "In Progress", checks out branch):
+
+```bash
+bash scripts/start-story.sh <issue-number>
+```
+
+What this does:
+
+- Creates a branch named `<issue-number>-<slug>` (example: `42-add-user-authentication`)
+- Adds the label `status: in-progress` to the issue (if label exists)
+- Switches your local Git checkout to the new branch
+
+Branch naming convention:
+
+- Format: `<issue-number>-<slug>`
+- Keeping the issue number at the front allows automation to detect and update issue state from branch / commit activity
+
+Commit message format and PR practices still follow Conventional Commits (see "Commit Message Format" below).
+
 ### 1. Start Feature Branch
 
 ```bash

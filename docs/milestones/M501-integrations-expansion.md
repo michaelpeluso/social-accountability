@@ -1,4 +1,4 @@
-# Milestone 5+: Future Expansion (Post-v1)
+# Milestone 5.01: Future Expansion (Post-v1)
 
 **Status:** Future roadmap (not in v1 scope)
 **Timeline:** TBD after M1-M4 shipped and validated
