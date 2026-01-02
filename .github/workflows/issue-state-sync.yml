@@ -64,7 +64,7 @@ jobs:
               const commits = context.payload.commits || [];
               const ref = context.payload.ref || '';
               
-              // Extract issue from branch name (e.g., feat/123-add-form or 5-m0-01-project-setup)
+              // Extract issue from branch name (e.g., 123-add-form or 5-m0-01-project-setup)
               const branchMatch = ref.match(/(\d+)/);
               if (branchMatch) {
                 issueNumbers.push(parseInt(branchMatch[1]));
@@ -89,8 +89,8 @@ jobs:
               return;
             }
             
-            console.log(`📋 Found issues: ${issueNumbers.join(', ')}`);
-            console.log(`🎯 Action: ${action || 'none'}`);
+            console.log(`Found issues: ${issueNumbers.join(', ')}`);
+            console.log(`Action: ${action || 'none'}`);
             
             // Update each referenced issue
             for (const issueNumber of issueNumbers) {
@@ -110,7 +110,7 @@ jobs:
                     issue_number: issueNumber,
                     state: 'closed'
                   });
-                  console.log(`✅ Closed issue #${issueNumber}`);
+                    console.log(`Closed issue #${issueNumber}`);
                   
                   // Move to "Done" on project board
                   try {
