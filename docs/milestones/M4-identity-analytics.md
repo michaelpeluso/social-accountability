@@ -84,6 +84,9 @@ Response: { data: Habit }
 
 **Technical Requirements:**
 
+- Identity table: id, userId, name, pillar, icon, createdAt
+- Habit.identityId foreign key (optional)
+- Dashboard query: GROUP BY identityId, count check-ins
 - Identity table: id, userId, name, pillar, icon, preset (boolean), createdAt
 - Habit.identityId foreign key (optional)
 - Dashboard query: GROUP BY identityId, COUNT check-ins
