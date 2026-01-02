@@ -137,7 +137,7 @@ function getRepoSlug() {
 
 function loadExistingIssues() {
   try {
-    const output = execSync('gh issue list --state all --label user-story --limit 500 --json number,title', {
+    const output = execSync('gh issue list --state all --limit 500 --json number,title', {
       encoding: 'utf-8'
     });
     const issues = JSON.parse(output);
@@ -527,7 +527,7 @@ function createIssue(story, { dryRun = false, forceUpdate = false, existingIssue
       }
 
       withTempBodyFile(body, bodyFile => {
-        let command = `gh issue edit ${existingIssue.number} --title "${title}" --body-file "${bodyFile}" --add-label "${labels}"`;
+        let command = `gh issue edit ${existingIssue.number} --title "${title}" --body-file "${bodyFile}"`;
         if (milestoneInfo) {
           command += ` --milestone "${milestoneInfo.title}"`;
         }
@@ -539,7 +539,7 @@ function createIssue(story, { dryRun = false, forceUpdate = false, existingIssue
 
     let issueUrl = '';
     withTempBodyFile(body, bodyFile => {
-      let command = `gh issue create --title "${title}" --body-file "${bodyFile}" --label "${labels}"`;
+      let command = `gh issue create --title "${title}" --body-file "${bodyFile}"`;
       if (milestoneInfo) {
         command += ` --milestone "${milestoneInfo.title}"`;
       }
@@ -662,11 +662,19 @@ async function main() {
     }
   }
   
-  // Cleanup orphaned issues
+  // Cleanup orphaned issues (only within processed milestones)
   if (cleanup) {
     console.log(`\n${dryRun ? 'Checking for' : 'Cleaning up'} orphaned issues...`);
     for (const [storyId, issueInfo] of existingIssues.entries()) {
-      if (!validStoryIds.has(storyId)) {
+      // Extract milestone from story ID (e.g., "M5-5.1" -> "M5")
+      const issueMilestone = storyId.split('-')[0].toUpperCase();
+      
+      // Only check issues that belong to milestones we're processing
+      const isInProcessedMilestone = milestonesToProcess.some(
+        m => m.toUpperCase() === issueMilestone
+      );
+      
+      if (isInProcessedMilestone && !validStoryIds.has(storyId)) {
         if (dryRun) {
           console.log(`Would close orphaned issue #${issueInfo.number}: ${issueInfo.title}`);
           stats.previewClean++;

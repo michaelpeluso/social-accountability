@@ -14,6 +14,18 @@ M0 is infrastructure-only. NO user-facing features, NO backend deployment, NO da
 
 ## User Stories
 
+### 0.0 Test Issue
+
+**Story:** This is a test story.
+
+**Acceptance Criteria:** None
+**Technical Requirements:** None
+**Files to Create:** None
+**Privacy Note:** None
+**Cost Note:** None
+
+---
+
 ### 0.1 Project Setup
 
 **Story:** As a developer, I want a fully configured TypeScript project so that I can write type-safe code with automated quality checks.
