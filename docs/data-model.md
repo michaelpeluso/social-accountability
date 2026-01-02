@@ -22,8 +22,11 @@ dependencies: architecture.md
 
 **Skip until M4:**
 
+- HabitStack (habit stacking detection)
 - Tag (rich metadata), BadgeEarned, JournalEntry, MoodEntry, Challenge
 - Habit/Goal suggestions from Identity
+- Intensity and outcome tracking in HabitCheckIn
+- Atomic Habits strategy fields in Habit
 
 **Skip until M5+:**
 
@@ -54,6 +57,36 @@ enum Pillar {
 enum CheckInSource {
   MANUAL = "MANUAL",
   INTEGRATION = "INTEGRATION", // M4+ (HealthKit, etc.)
+}
+
+// M2
+enum HabitType {
+  BUILD = "BUILD", // Positive habits to develop
+  BREAK = "BREAK", // Negative habits to overcome
+}
+
+// M4
+enum CheckInOutcome {
+  COMPLETED = "COMPLETED", // BUILD habits: completed the habit
+  RESISTED = "RESISTED", // BREAK habits: resisted temptation
+  LAPSED = "LAPSED", // BREAK habits: gave in to temptation
+}
+
+// M4
+enum StackRelationship {
+  BEFORE = "BEFORE", // Do this habit BEFORE the linked habit
+  AFTER = "AFTER", // Do this habit AFTER the linked habit
+}
+
+// M6
+enum DriftType {
+  AVOIDANCE = "AVOIDANCE", // Momentum loss, skipping habits
+  OVERCONSUMPTION = "OVERCONSUMPTION", // Time/usage above typical levels
+  IMBALANCE = "IMBALANCE", // Over-optimizing one pillar
+  COMPARISON = "COMPARISON", // Feed engagement vs habit consistency
+  VOLATILITY = "VOLATILITY", // Emotional spikes affecting patterns
+  IMPULSIVITY = "IMPULSIVITY", // Unplanned breaks in routine
+  DEFENSIVENESS = "DEFENSIVENESS", // Avoiding logging after slips
 }
 
 // M2/M3
@@ -108,25 +141,25 @@ const PRESET_IDENTITIES = [
   { name: "Athlete", pillar: "BODY", icon: "🏃" },
   { name: "Fitness Enthusiast", pillar: "BODY", icon: "💪" },
   { name: "Yogi", pillar: "BODY", icon: "🧘" },
-  { name: "Dancer", pillar: "BODY", icon: "💃" },
+  { name: "Healthy Eater", pillar: "BODY", icon: "🥗" },
 
   // MIND
   { name: "Student", pillar: "MIND", icon: "📚" },
-  { name: "Creative", pillar: "MIND", icon: "🎨" },
   { name: "Professional", pillar: "MIND", icon: "💼" },
   { name: "Learner", pillar: "MIND", icon: "🎓" },
+  { name: "Reader", pillar: "MIND", icon: "📖" },
 
   // HEART
   { name: "Friend", pillar: "HEART", icon: "🤝" },
   { name: "Partner", pillar: "HEART", icon: "❤️" },
   { name: "Parent", pillar: "HEART", icon: "👨‍👩‍👧" },
-  { name: "Community Builder", pillar: "HEART", icon: "🌍" },
+  { name: "Volunteer", pillar: "HEART", icon: "🌍" },
 
   // SOUL
+  { name: "Artist", pillar: "SOUL", icon: "🎭" },
   { name: "Spiritual Seeker", pillar: "SOUL", icon: "✨" },
   { name: "Meditator", pillar: "SOUL", icon: "🧘‍♂️" },
   { name: "Nature Lover", pillar: "SOUL", icon: "🌿" },
-  { name: "Artist", pillar: "SOUL", icon: "🎭" },
 ];
 ```
 
@@ -158,6 +191,27 @@ const PRESET_IDENTITIES = [
     HEART: number (0-1),
     SOUL: number (0-1)
   }
+
+  // M6: Auto-Post Controls - granular privacy for every auto-generated post type
+  autoPostSettings?: {
+    weeklyPatterns: { enabled: boolean, privacy: Privacy },      // Weekly drift summaries
+    milestones: { enabled: boolean, privacy: Privacy },          // Goal completions
+    streaks: { enabled: boolean, privacy: Privacy },             // Streak achievements
+    badges: { enabled: boolean, privacy: Privacy },              // Badge unlocks
+    challenges: { enabled: boolean, privacy: Privacy },          // Challenge completions
+    recovery: { enabled: boolean, privacy: Privacy },            // Recovery milestones
+    newHabits: { enabled: boolean, privacy: Privacy }            // New habits started
+  }
+
+  // M6: Behavioral Drift Settings
+  driftSettings?: {
+    shareWeeklyPatterns: boolean,        // Auto-post weekly summaries (opt-in)
+    allowFriendSupport: boolean,         // Friends can offer help
+    patternVisibility: Privacy,          // Who can see drift patterns
+    showDetailedMetrics: boolean,        // Show performance numbers (with warning)
+    autoShareRecovery: boolean           // Celebrate comebacks publicly
+  }
+
   createdAt: timestamp
   updatedAt: timestamp
 }
@@ -261,6 +315,7 @@ const PRESET_IDENTITIES = [
   userId: string
   title: string
   pillar: Pillar
+  habitType: HabitType              // BUILD or BREAK
   goalId?: string                   // Optional: contributes to goal progress
   identityId?: string               // Optional: supports this identity
   schedule: {
@@ -273,6 +328,13 @@ const PRESET_IDENTITIES = [
       minute: number                // 0-59
     }[]
   }
+
+  // M4: Atomic Habits strategies (auto-detected or user-set)
+  miniVersion?: string (100 chars)  // 2-minute rule: "1 push-up", "Read 1 page"
+  environmentalCue?: string (200 chars) // "Shoes by door", "Phone in other room"
+  bestTimeHour?: number (0-23)      // ML-detected optimal time
+  bestTimeConfidence?: number (0-1) // Confidence score for bestTimeHour
+
   privacy: Privacy
   archivedAt?: timestamp
   createdAt: timestamp
@@ -291,10 +353,14 @@ const PRESET_IDENTITIES = [
 **Notes:**
 
 - Habits NEVER complete (recurring actions, not one-time)
+- habitType: BUILD (develop good habits) vs BREAK (overcome bad habits)
 - Tags are simple strings (M2), rich Tag table in M4
 - timeSlotsOfDay allows "4pm Mon, 8am Fri" flexibility
 - archivedAt soft-deletes (keeps history)
 - goalId links habit progress to goal's metric.current
+- miniVersion: Implements James Clear's "2-minute rule" for habit formation
+- environmentalCue: Environmental design from Atomic Habits
+- bestTimeHour/Confidence: ML-detected from check-in patterns (M4)
 
 ---
 
@@ -309,6 +375,11 @@ const PRESET_IDENTITIES = [
   source: CheckInSource             // MANUAL or INTEGRATION
   evidenceRef?: string              // M4 - e.g., 'healthkit:steps:10543'
   note?: string                     // M4 - optional user note
+
+  // M4: Intensity and outcome tracking
+  intensity?: number (1-5)          // BUILD: how energized, BREAK: temptation strength
+  outcome?: CheckInOutcome          // BREAK habits only: COMPLETED/RESISTED/LAPSED
+
   createdAt: timestamp              // When check-in was logged
 }
 ```
@@ -324,6 +395,83 @@ const PRESET_IDENTITIES = [
 
 - occurredAt vs createdAt: allows backdating check-ins
 - evidenceRef stores integration metadata for debugging
+- intensity (M4): For BUILD habits = energy/commitment level, for BREAK habits = temptation strength
+- outcome (M4): Only for BREAK habits to track RESISTED vs LAPSED instances
+- Defaults: intensity=3 if skipped (zero friction), outcome=COMPLETED for BUILD habits
+
+---
+
+### HabitStack (M5)
+
+```typescript
+{
+  id: string(uuid);
+  habitId: string; // The "trigger" habit
+  linkedHabitId: string; // The habit that follows
+  relationship: StackRelationship; // BEFORE or AFTER
+  confidence: number(0 - 1); // ML-detected (30-day window, 30-min co-occurrence)
+  userId: string; // Denormalized for queries
+  createdAt: timestamp;
+}
+```
+
+**Indexes:**
+
+- PRIMARY KEY (id)
+- INDEX (habitId, confidence DESC) - for stack suggestions
+- INDEX (userId, habitId) - for user habit chains
+- UNIQUE (habitId, linkedHabitId) - prevent duplicates
+
+**Notes:**
+
+- Implements James Clear's "habit stacking" from Atomic Habits
+- Detected device-side: when 2 habits occur within 30 min, 70%+ of time over 30 days
+- CASCADE DELETE when either habit is deleted
+- confidence score determines UI priority (higher = show first)
+
+---
+
+### BehavioralDrift (M6)
+
+```typescript
+{
+  id: string (uuid)
+  userId: string
+  habitId?: string                  // Optional - pattern may span multiple habits
+  driftType: DriftType              // AVOIDANCE, OVERCONSUMPTION, etc.
+  confidence: number (0-1)          // Detection confidence
+
+  // Aggregate metrics (never raw sensor data)
+  metrics: {
+    completionRateCurrent: number   // This week's %
+    completionRatePrevious: number  // Last 4 weeks avg %
+    missedCount?: number            // For AVOIDANCE
+    overageMinutes?: number         // For OVERCONSUMPTION
+    pillarSkew?: object             // For IMBALANCE: { fitness: 80%, career: 20% }
+    volatilityScore?: number        // For VOLATILITY: std deviation of check-ins
+  }
+
+  sharedWith?: Privacy              // null = SELF only, or CLOSE_FRIENDS/FRIENDS/PUBLIC
+  detectedAt: timestamp             // When pattern was identified
+  resolvedAt?: timestamp            // null until user marks resolved
+}
+```
+
+**Indexes:**
+
+- PRIMARY KEY (id)
+- INDEX (userId, driftType, detectedAt DESC) - for pattern history
+- INDEX (userId, resolvedAt IS NULL) - for active patterns
+- INDEX (habitId, driftType) - when linked to specific habit
+
+**Notes:**
+
+- Detected device-side weekly (every Sunday 9am local time)
+- metrics contains ONLY aggregates, never raw 3rd party data
+- Defaults to SELF privacy until user explicitly shares
+- Auto-expires after 4 weeks if not marked resolved
+- habitId nullable because patterns like IMBALANCE span multiple habits
+- Synced to cloud unlike temp-idea.md proposal (visible analytics are the goal)
 
 ---
 

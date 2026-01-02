@@ -501,6 +501,194 @@ Before moving to M4:
 
 ---
 
+### 3.7 Habit Joining
+
+**Story:** As a user, I want to invite friends to join my habits or request to join theirs, so we can build accountability together.
+
+**Acceptance Criteria:**
+
+- [ ] Habit detail page shows "Invite Friends" button (habit owner only)
+- [ ] Habit detail page shows "Request to Join" button (for friends' habits visible to user)
+- [ ] Invite flow:
+  - Select friends from list (only accepted friends)
+  - Add optional message (100 chars)
+  - Send invite (creates HabitInvite record)
+  - Friends receive notification
+- [ ] Request flow:
+  - User sees friend's habit (if privacy allows)
+  - Taps "Request to Join"
+  - Add optional message (100 chars)
+  - Owner receives notification with approve/deny
+- [ ] Joined habits show participant list (privacy-respecting)
+- [ ] Joined members see shared progress view:
+  - Each member's streak visible
+  - Shared check-in count: "You and 3 friends completed this today"
+  - Optional: mini leaderboard (opt-in per habit)
+- [ ] Owner can remove participants anytime
+- [ ] Participants can leave habit anytime
+
+**Example Invite Flow:**
+
+```
+User: Opens "Morning Meditation" habit
+  ↓
+Taps "Invite Friends"
+  ↓
+Selects: Sarah, Mike
+Message: "Join me for daily meditation! 🧘"
+  ↓
+[Send Invites]
+  ↓
+Sarah & Mike receive notification:
+  "John invited you to join 'Morning Meditation'"
+  [Accept] [Decline]
+  ↓
+Sarah accepts → Added to habit participants
+  ↓
+Sarah's habit list now shows "Morning Meditation (with John)"
+```
+
+**Example Request Flow:**
+
+```
+User: Browsing Sarah's profile
+  ↓
+Sees habit: "Evening Workout 💪" (privacy: FRIENDS)
+  ↓
+Taps "Request to Join"
+  ↓
+Message: "This looks great! Can I join?"
+  ↓
+[Send Request]
+  ↓
+Sarah receives notification:
+  "Mike wants to join your 'Evening Workout' habit"
+  [Approve] [Deny]
+  ↓
+Sarah approves → Mike added as participant
+```
+
+**Shared Progress View:**
+
+```
+Morning Meditation (with Sarah, Mike)
+
+Your streak: 12 days 🔥
+Sarah's streak: 8 days
+Mike's streak: 5 days
+
+Today's check-ins: 2/3
+✓ You (7:15am)
+✓ Sarah (7:30am)
+⏳ Mike (pending)
+
+This Week: 18 total check-ins
+```
+
+**Privacy & Visibility Rules:**
+
+- Only habits with privacy = FRIENDS or PUBLIC can be joined
+- SELF habits cannot receive join requests (private by design)
+- Participants see only what habit privacy allows:
+  - FRIENDS: all participants see each other's streaks/check-ins
+  - PUBLIC: anyone can see, but must join to participate
+- Habit owner controls who can join (approve/deny requests)
+- Owner can set habit to "Open" (auto-accept requests) or "Approval Required" (default)
+
+**Notifications:**
+
+```typescript
+// Invite sent
+{
+  type: "HABIT_INVITE",
+  from: { userId: "user_123", name: "John" },
+  habit: { id: "habit_456", name: "Morning Meditation" },
+  message: "Join me for daily meditation! 🧘",
+  actions: ["Accept", "Decline"]
+}
+
+// Request received
+{
+  type: "HABIT_JOIN_REQUEST",
+  from: { userId: "user_789", name: "Mike" },
+  habit: { id: "habit_456", name: "Evening Workout" },
+  message: "This looks great! Can I join?",
+  actions: ["Approve", "Deny"]
+}
+
+// Accepted notification
+{
+  type: "HABIT_JOIN_ACCEPTED",
+  habit: { id: "habit_456", name: "Morning Meditation" },
+  message: "Sarah accepted your invite to Morning Meditation"
+}
+
+// Friend joined notification
+{
+  type: "HABIT_MEMBER_JOINED",
+  user: { userId: "user_789", name: "Mike" },
+  habit: { id: "habit_456", name: "Morning Meditation" },
+  message: "Mike joined your Morning Meditation habit"
+}
+```
+
+**API Contract:**
+
+```
+POST /habits/:id/invite
+Body: { friendIds: string[], message?: string }
+Response: { data: HabitInvite[] }
+
+POST /habits/:id/request-join
+Body: { message?: string }
+Response: { data: HabitJoinRequest }
+
+POST /habit-invites/:id/accept
+Response: { data: HabitParticipant }
+
+POST /habit-invites/:id/decline
+Response: { success: true }
+
+POST /habit-join-requests/:id/approve
+Response: { data: HabitParticipant }
+
+POST /habit-join-requests/:id/deny
+Response: { success: true }
+
+DELETE /habits/:id/participants/:userId
+Response: { success: true }
+
+GET /habits/:id/participants
+Response: { data: HabitParticipant[] }
+```
+
+**Technical Requirements:**
+
+- HabitInvites table: id, habitId, fromUserId, toUserId, message, status (PENDING/ACCEPTED/DECLINED), createdAt
+- HabitJoinRequests table: id, habitId, fromUserId, message, status (PENDING/APPROVED/DENIED), createdAt
+- HabitParticipants table: id, habitId, userId, joinedAt, role (OWNER/MEMBER)
+- Query joined habits: `WHERE habitId IN (SELECT habitId FROM habit_participants WHERE userId = ?)`
+- Shared progress: aggregate check-ins across all participants (device-side calculation)
+
+**Privacy Notes:**
+
+- Participants list visible only to other participants (SELF habits exception: owner only)
+- Check-in details respect individual privacy settings
+- Owner can make habit participants list PUBLIC (opt-in)
+
+**Security Notes:**
+
+- Rate limit: 50 invites per user per day
+- Rate limit: 20 join requests per user per day
+- Max 50 participants per habit (prevent spam)
+- Owner can disable invites/requests per habit
+
+**Cost:** $0 (database records only)
+
+**Why:** Habit joining enables peer accountability and social support. Seeing friends' progress on shared habits motivates consistency. Invite/request flow balances openness with owner control.
+
+---
+
 ## What NOT to Build in M3
 
 ❌ NO challenges/competitions (M4)

@@ -109,9 +109,58 @@ function enforcePrivacy(object, currentUserId) {
 
 **Critical:** NEVER trust client privacy filters. Server MUST re-validate every query.
 
-### 3. Cost Optimization
+### 3. Data Model & Cloud Sync: Ephemeral 3rd Party, Persistent App Data
 
-**Goal: $0/month for 1000 users (M0-M4)**
+**Pattern: Query → Process → Delete → Sync**
+
+**3rd Party Data (EPHEMERAL):**
+
+- ScreenTime API → App usage logs (discarded after aggregation)
+- Location Services → GPS coordinates (discarded after geofence detection)
+- Calendar API → Event details (discarded after pattern detection)
+- HealthKit → Raw health data (discarded after metric calculation)
+
+**App Data (PERSISTENT):**
+
+- User-created: Habits, goals, journal entries, posts
+- Calculated metrics: Completion rates, streaks, behavioral patterns
+- Processed aggregates: "Social media usage: 90 min", "Steps: 10,543", "Visited gym: yes"
+
+**Data Flow:**
+
+```typescript
+// Example: ScreenTime integration
+async function processScreenTime() {
+  // 1. Query iOS API (requires user permission)
+  const rawData = await ScreenTime.getTodayUsage();
+  // rawData = [{ app: "Instagram", seconds: 7200 }, ...]
+
+  // 2. Calculate aggregate on-device
+  const aggregate = {
+    totalMinutes: 120,
+    categoryBreakdown: { social: 90, productivity: 30 },
+    // NO app-specific data
+  };
+
+  // 3. Delete raw data immediately
+  rawData = null;
+
+  // 4. Sync processed aggregate to cloud
+  await syncQueue.enqueue({ type: "POST", endpoint: "/metrics", body: aggregate });
+}
+```
+
+**Privacy Guarantees:**
+
+- Cloud receives ONLY user-meaningful aggregates
+- No raw sensor data ever leaves device
+- Coordinates encrypted at rest (M7), never in posts/stories
+- 3rd party APIs queried on-demand, data deleted after processing
+- See [data-model.md](data-model.md#privacy-model) for schema-level enforcement
+
+### 4. Cost Optimization
+
+**Goal: $0/month for 1000 users (M0-M5)**
 
 **Strategy:**
 

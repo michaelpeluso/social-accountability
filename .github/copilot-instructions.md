@@ -40,6 +40,27 @@
 - Both can link to HabitCheckIn (atomic post + check-in)
 - Stories auto-deleted after `expiresAt`
 
+### 5. Social-First Philosophy
+
+- **Core principle:** Users should never feel like they're working on themselves alone
+- Friends are involved in both wins AND struggles (with user consent)
+- Behavioral patterns (momentum loss, overconsumption) are shareable states, not shameful secrets
+- Auto-posts describe user state qualitatively: "I slowed down this week", "Working through a rough patch"
+- Social features prioritize **supportive presence** over performance metrics
+- Visual analytics show patterns to user AND optionally to close friends (transparency builds accountability)
+- See [spec/architecture.md](../spec/architecture.md#social-accountability-model) for sharing patterns
+
+### 6. Data Model & Cloud Sync: Ephemeral 3rd Party, Persistent App Data
+
+- **3rd party data (ScreenTime, Location, Calendar) is EPHEMERAL**: Query → Process → Delete immediately
+- **App data (habits, metrics, patterns) is PERSISTENT**: All synced to Postgres cloud replica
+- Pattern: `[Query iOS API] → [Calculate Aggregate] → [Delete Raw Data] → [Sync Processed Metric]`
+- Example: ScreenTime returns app usage → Calculate "social media: 90 min" → Delete app-specific logs → Sync aggregate
+- **Never store raw sensor data** - only user-meaningful aggregates (steps count, usage minutes, visit boolean)
+- **Zero additional personal data** - cloud only receives what user explicitly created or app calculated
+- Coordinates encrypted at rest if stored, never in posts/stories (M7 feature)
+- See [spec/architecture.md](../spec/architecture.md#data-sync-model) for detailed flow
+
 ---
 
 ## Development Workflow
