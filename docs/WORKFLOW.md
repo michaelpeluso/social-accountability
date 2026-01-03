@@ -13,7 +13,7 @@ cd social-accountability
 npm install
 
 # Start development
-npm start              # Expo dev server (scan QR with Expo Go)
+npm run dev           # Starts server with pre-flight checks
 ```
 
 **On iPhone:**
@@ -21,6 +21,123 @@ npm start              # Expo dev server (scan QR with Expo Go)
 1. Install Expo Go from App Store
 2. Scan QR code from terminal
 3. Confirm hot reload works
+
+---
+
+## Essential Scripts
+
+The project uses **6 core scripts** for daily development:
+
+| Script        | Command             | Purpose                      | When to Use                     |
+| ------------- | ------------------- | ---------------------------- | ------------------------------- |
+| **dev**       | `npm run dev`       | Start dev server with checks | Every morning, daily coding     |
+| **check**     | `npm run check`     | Run all quality gates        | Before committing code          |
+| **clean**     | `npm run clean`     | Nuclear reinstall            | Dependency issues, weird errors |
+| **workflow**  | `npm run workflow`  | Interactive menu             | When unsure what to do          |
+| **doctor**    | `npm run doctor`    | System diagnostics           | Troubleshooting problems        |
+| **kill-port** | `npm run kill-port` | Kill process on 8081         | "Port in use" errors            |
+
+### Script Details
+
+#### `npm run dev` - Daily Development
+
+- ✅ Kills any process on port 8081
+- ✅ Runs TypeScript type check
+- ✅ Runs ESLint
+- ✅ Starts Expo dev server
+- ✅ Shows iPhone connection instructions
+
+**Use this every morning to start coding.**
+
+#### `npm run check` - Pre-Commit Quality
+
+- ✅ TypeScript strict check
+- ✅ ESLint (must pass)
+- ✅ Jest tests
+- ✅ Prettier format check
+
+**Run before every `git commit`.**
+
+#### `npm run clean` - Nuclear Option
+
+- 🗑️ Deletes node_modules/
+- 🗑️ Deletes package-lock.json
+- 🔄 Fresh npm install
+- ✅ Runs post-install checks
+
+**Use when dependencies are broken or npm acting weird.**
+
+#### `npm run workflow` - Interactive Helper
+
+Displays a menu:
+
+1. 🚀 Start Dev Server
+2. ✅ Quality Checks
+3. 🧹 Clean Reinstall
+4. 🩺 Run Diagnostics
+5. 🔪 Kill Port 8081
+6. ❌ Exit
+
+**Use when you forget commands or want guided workflow.**
+
+#### `npm run doctor` - Diagnostics
+
+Checks:
+
+- Node.js version (≥18)
+- npm version
+- Network connectivity
+- Port 8081 availability
+- Dependencies installed
+- .env file exists
+- TypeScript compiles
+
+**Use when troubleshooting any issues.**
+
+#### `npm run kill-port` - Port Killer
+
+- Finds process on port 8081
+- Kills it forcefully
+- Confirms port is free
+
+**Use when you see "Port 8081 is already in use".**
+
+---
+
+## Git Workflow Scripts
+
+For working with GitHub issues:
+
+| Script              | Command                               | Purpose                            |
+| ------------------- | ------------------------------------- | ---------------------------------- |
+| **start-story**     | `bash scripts/start-story.sh <issue>` | Start working on an issue          |
+| **create-pr**       | `bash scripts/create-pr.sh`           | Create pull request                |
+| **generate-issues** | `node scripts/generate-issues.js`     | Bulk create issues from milestones |
+
+### Example Issue Workflow
+
+```bash
+# 1. Start working on issue #42
+bash scripts/start-story.sh 42
+
+# Creates branch: 42-add-user-authentication
+# Marks issue as "In Progress"
+# Checks out the branch
+
+# 2. Write code...
+# ... make changes ...
+
+# 3. Check quality before commit
+npm run check
+
+# 4. Commit
+git add .
+git commit -m "feat: add user authentication"
+
+# 5. Push and create PR
+git push -u origin 42-add-user-authentication
+bash scripts/create-pr.sh
+```
 
 ---
 
@@ -312,24 +429,25 @@ const steps = await healthSensor.getSteps(new Date());
 ## Common Commands
 
 ```bash
+# Core Workflow
+npm run dev            # Start dev server (use this daily)
+npm run check          # Quality checks before commit
+npm run workflow       # Interactive menu
+
 # Development
-npm start              # Expo dev server
-npm run ios            # iOS simulator (Mac only)
-npm run android        # Android emulator
-
-# Quality Checks
-npm run type-check     # TypeScript
-npm run lint           # ESLint
-npm run lint:fix       # Auto-fix linting
-npm run format         # Prettier auto-fix
-npm run format:check   # Check formatting
-
-# Testing
-npm test               # Run all tests
+npm start              # Start without pre-flight checks
+npm run type-check     # TypeScript only
+npm run lint           # ESLint only
+npm run format         # Auto-fix formatting
+npm test               # Run tests
 npm run test:watch     # Watch mode
-npm test -- --coverage # Coverage report
 
-# Build
+# Troubleshooting
+npm run doctor         # Run diagnostics
+npm run clean          # Nuclear reinstall
+npm run kill-port      # Kill process on 8081
+
+# Build (future)
 npm run prebuild       # Generate native code (Mac)
 ```
 

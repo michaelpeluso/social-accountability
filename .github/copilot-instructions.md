@@ -125,6 +125,15 @@ function getHabits(viewerId: string, scope: "mine" | "friends" | "public") {
 }
 ```
 
+### Commenting Style
+
+- **DO NOT use emojis in comments or terminal logs**
+- Use standard prefixes (`// TODO:`, `// FIXME:`, `// NOTE:`) only when they add clarity; prefer self-documenting code
+- No comments for self-explanatory obvious code
+- Do not use block comments for large explanations; keep comments concise
+- Keep comments up-to-date with code changes
+- Don't overuse or oversaturate with comments; prefer clear code
+
 ### Logging Pattern
 
 ```typescript

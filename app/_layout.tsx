@@ -1,10 +1,11 @@
-import { Stack } from "expo-router";
+import { Slot } from "expo-router";
+import React from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 export default function RootLayout() {
   return (
-    <Stack>
-      <Stack.Screen name="index" options={{ title: "Home" }} />
-      <Stack.Screen name="auth/signin" options={{ title: "Sign In" }} />
-    </Stack>
+    <SafeAreaProvider>
+      <Slot />
+    </SafeAreaProvider>
   );
 }
