@@ -15,7 +15,6 @@
     "type-check": "tsc --noEmit",
     "prepare": "husky",
     "dev": "bash scripts/dev.sh",
-    "check": "bash scripts/check.sh",
     "clean": "bash scripts/clean-install.sh",
     "workflow": "bash scripts/workflow.sh",
     "doctor": "bash scripts/doctor.sh",

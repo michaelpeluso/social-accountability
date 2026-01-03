@@ -8,16 +8,15 @@ clear
 echo "Choose your workflow:"
 echo ""
 echo "  1) Start Dev Server (daily workflow)"
-echo "  2) Quality Checks (before commit)"
-echo "  3) Clean Reinstall (fix dependency issues)"
-echo "  4) Run Diagnostics (troubleshoot problems)"
-echo "  5) Kill Port 8081 (server won't start)"
-echo "  6) Start Story (select & start working on a story)"
-echo "  7) Create PR (run PR validator and create)"
-echo "  8) Generate Issues from Milestones"
-echo "  9) Exit"
+echo "  2) Clean Reinstall (fix dependency issues)"
+echo "  3) Run Diagnostics (troubleshoot problems)"
+echo "  4) Kill Port 8081 (server won't start)"
+echo "  5) Start Story (select & start working on a story)"
+echo "  6) Create PR (run PR validator and create)"
+echo "  7) Generate Issues from Milestones"
+echo "  8) Exit"
 echo ""
-read -p "Enter choice [1-9]: " choice
+read -p "Enter choice [1-8]: " choice
 
 case $choice in
     1)
@@ -26,31 +25,27 @@ case $choice in
         ;;
     2)
         echo ""
-        bash scripts/check.sh
+        bash scripts/clean-install.sh
         ;;
     3)
         echo ""
-        bash scripts/clean-install.sh
-        ;;
-    4)
-        echo ""
         bash scripts/doctor.sh
         ;;
-    5)
+    4)
         echo ""
         bash scripts/kill-port.sh
         echo ""
         echo "Port cleared. Run 'npm run dev' to start server."
         ;;
-    6)
+    5)
         echo ""
         bash scripts/start-story.sh
         ;;
-    7)
+    6)
         echo ""
         bash scripts/create-pr.sh
         ;;
-    8)
+    7)
         echo ""
         echo "Generate issues helper"
         echo "  1) Dry run (preview changes)"
@@ -79,7 +74,7 @@ case $choice in
             ;;
         esac
         ;;
-    9)
+    8)
         echo "Goodbye."
         exit 0
         ;;

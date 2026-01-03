@@ -26,12 +26,11 @@ npm run dev           # Starts server with pre-flight checks
 
 ## Essential Scripts
 
-The project uses **6 core scripts** for daily development:
+The project uses **5 core scripts** for daily development:
 
 | Script        | Command             | Purpose                      | When to Use                     |
 | ------------- | ------------------- | ---------------------------- | ------------------------------- |
 | **dev**       | `npm run dev`       | Start dev server with checks | Every morning, daily coding     |
-| **check**     | `npm run check`     | Run all quality gates        | Before committing code          |
 | **clean**     | `npm run clean`     | Nuclear reinstall            | Dependency issues, weird errors |
 | **workflow**  | `npm run workflow`  | Interactive menu             | When unsure what to do          |
 | **doctor**    | `npm run doctor`    | System diagnostics           | Troubleshooting problems        |
@@ -49,21 +48,24 @@ The project uses **6 core scripts** for daily development:
 
 **Use this every morning to start coding.**
 
-#### `npm run check` - Pre-Commit Quality
+#### Automated Quality Gates
 
-- ✅ TypeScript strict check
-- ✅ ESLint (must pass)
-- ✅ Jest tests
-- ✅ Prettier format check
+The repository uses Git hooks to provide fast local feedback while avoiding redundant full checks on every commit.
 
-**Run before every `git commit`.**
+| Hook         | Runs                            | When         | Speed |
+| ------------ | ------------------------------- | ------------ | ----- |
+| `pre-commit` | Format + lint staged files      | Every commit | ~1-2s |
+| `commit-msg` | Conventional Commits validation | Every commit | <1s   |
+| `pre-push`   | Type-check + tests + lint       | Every push   | ~10s  |
+
+Run `git commit` to get fast staged-file formatting and linting. Full project checks run on `git push` to avoid repeated expensive runs while you iterate.
 
 #### `npm run clean` - Nuclear Option
 
-- 🗑️ Deletes node_modules/
-- 🗑️ Deletes package-lock.json
-- 🔄 Fresh npm install
-- ✅ Runs post-install checks
+- Deletes node_modules/
+- Deletes package-lock.json
+- Fresh npm install
+- Runs post-install checks
 
 **Use when dependencies are broken or npm acting weird.**
 
@@ -71,12 +73,14 @@ The project uses **6 core scripts** for daily development:
 
 Displays a menu:
 
-1. 🚀 Start Dev Server
-2. ✅ Quality Checks
-3. 🧹 Clean Reinstall
-4. 🩺 Run Diagnostics
-5. 🔪 Kill Port 8081
-6. ❌ Exit
+1. Start Dev Server
+2. Clean Reinstall
+3. Run Diagnostics
+4. Kill Port 8081
+5. Start Story (select & work on GitHub issue)
+6. Create PR
+7. Generate Issues from Milestones
+8. Exit
 
 **Use when you forget commands or want guided workflow.**
 
@@ -124,24 +128,57 @@ bash scripts/start-story.sh 42
 # Marks issue as "In Progress"
 # Checks out the branch
 
-# 2. Write code...
-# ... make changes ...
-
-# 3. Check quality before commit
-npm run check
-
-# 4. Commit
+# 2. Write code and commit (hooks run automatically)
 git add .
 git commit -m "feat: add user authentication"
+# pre-commit runs: format + lint staged files (~1-2s)
 
-# 5. Push and create PR
+git commit -m "test: add auth tests"
+# Fast commits for quick iteration
+
+# 3. Push when ready (comprehensive checks run)
 git push -u origin 42-add-user-authentication
+# pre-push runs: type-check + tests + lint (~10s)
+
+# 4. Create PR
 bash scripts/create-pr.sh
+# CI runs automatically on GitHub
 ```
 
 ---
 
 ## Daily Development Cycle
+
+### Your Optimal Workflow
+
+**Goal:** Fast commits for quick iteration, comprehensive validation before push, CI as safety net.
+
+```bash
+# Morning: Start coding
+npm run dev              # Start server
+
+# Iteration: Fast commits
+git add .
+git commit -m "feat: xyz"   # ~1-2s (lint-staged auto-fixes)
+git commit -m "fix: abc"    # ~1-2s (only checks staged files)
+git commit -m "refactor: 123" # ~1-2s
+
+# Ready to share: Push
+git push                 # ~10s (type-check + tests + lint)
+                        # Aborts if checks fail
+
+# Open PR
+gh pr create --fill      # CI runs automatically
+```
+
+**What happens automatically:**
+
+- **Every commit:** Format + lint staged files (pre-commit hook)
+- **Every commit:** Validate message format (commit-msg hook)
+- **Every push:** Type-check + tests + lint full project (pre-push hook)
+- **Every PR:** CI runs same checks + build validation
+
+**Result:** You code normally with fast commits. System catches issues before push. No manual script running needed.
 
 ### Terminal Two-Command Workflow
 
@@ -186,38 +223,17 @@ git checkout -b feature/your-feature-name
 
 ### 2. Write Code
 
-**Pattern:**
+Write documentation...
+Fix bugs...
+Add features...
 
-```
-1. Update types (src/types/index.ts)
-2. Write logic (logic/ or services/)
-3. Add UI (app/ or components/)
-4. Write tests (tests/)
-5. Test on iPhone (npm start)
-```
-
-**File by Feature:**
-
-- Auth → `services/auth.ts`, `tests/services/auth.test.ts`
-- Habits → `storage/habits.ts`, `logic/streaks.ts`
-- UI → `components/habit-card.tsx`
-
-### 3. Test Before Commit
-
-```bash
-npm run type-check     # TypeScript validation
-npm run lint           # ESLint (must pass)
-npm test               # Jest tests
-npm run format         # Auto-fix formatting
-```
-
-**All checks MUST pass before commit.**
-
-### 4. Commit
+### 3. Commit (Hooks Run Automatically)
 
 ```bash
 git add .
 git commit -m "feat: add habit creation"
+# pre-commit hook runs: format + lint staged files (~1-2s)
+# commit-msg hook validates: Conventional Commits format
 ```
 
 **Commit Message Format:**
@@ -229,11 +245,28 @@ git commit -m "feat: add habit creation"
 - `docs:` - Documentation
 - `chore:` - Config/tooling
 
-### 5. Push & Open PR
+**Fast iteration:**
+
+```bash
+git commit -m "feat: add UI components"
+git commit -m "test: add unit tests"
+git commit -m "refactor: extract helper"
+# Each commit takes ~1-2s (only checks staged files)
+```
+
+### 4. Push (Comprehensive Checks Run)
 
 ```bash
 git push -u origin feature/your-feature-name
+# pre-push hook runs: type-check + tests + lint (~10s)
+# Push aborts if any check fails
+```
+
+### 5. Create PR
+
+```bash
 gh pr create --title "Add habit creation" --body "Implements M2 story 2.2"
+# CI runs automatically on GitHub
 ```
 
 **PR Requirements:**
@@ -431,13 +464,12 @@ const steps = await healthSensor.getSteps(new Date());
 ```bash
 # Core Workflow
 npm run dev            # Start dev server (use this daily)
-npm run check          # Quality checks before commit
 npm run workflow       # Interactive menu
 
 # Development
 npm start              # Start without pre-flight checks
-npm run type-check     # TypeScript only
-npm run lint           # ESLint only
+npm run type-check     # TypeScript validation
+npm run lint           # ESLint
 npm run format         # Auto-fix formatting
 npm test               # Run tests
 npm run test:watch     # Watch mode
@@ -446,6 +478,10 @@ npm run test:watch     # Watch mode
 npm run doctor         # Run diagnostics
 npm run clean          # Nuclear reinstall
 npm run kill-port      # Kill process on 8081
+
+# Manual Quality Checks (if needed)
+npm run type-check && npm run lint && npm test
+# Note: pre-push hook runs these automatically
 
 # Build (future)
 npm run prebuild       # Generate native code (Mac)
@@ -459,21 +495,24 @@ npm run prebuild       # Generate native code (Mac)
 # 1. Create branch
 git checkout -b feature/name
 
-# 2. Make changes
-# ... write code ...
-
-# 3. Check quality
-npm run type-check && npm run lint && npm test
-
-# 4. Commit
+# 2. Write code and commit (fast iteration)
 git add .
-git commit -m "feat: description"
+git commit -m "feat: add feature"
+# pre-commit: format + lint staged files (~1-2s)
 
-# 5. Push & PR
+git commit -m "test: add tests"
+# Fast commits for quick iteration
+
+# 3. Push when ready
 git push -u origin feature/name
-gh pr create
+# pre-push: type-check + tests + lint (~10s)
+# Push aborts if checks fail
 
-# 6. Merge (after approval)
+# 4. Create PR
+gh pr create --fill
+# CI runs automatically
+
+# 5. Merge (after approval + CI passes)
 # PR auto-merges via GitHub
 ```
 
@@ -481,17 +520,19 @@ gh pr create
 
 ## PR Checklist
 
-Before requesting review:
+Hooks automatically verify most items, but confirm:
 
-- [ ] `npm run type-check` passes
-- [ ] `npm run lint` passes (no warnings)
-- [ ] `npm test` passes
+- [ ] All commits follow Conventional Commits format (commit-msg hook)
+- [ ] Code formatted and linted (pre-commit hook)
+- [ ] Type-check passes (pre-push hook)
+- [ ] Tests pass (pre-push hook)
 - [ ] Tests added for new features
 - [ ] No `any` types (or marked with `// TODO: type this`)
 - [ ] No PII in logs (emails, names, content)
 - [ ] Privacy checks added (if applicable)
 - [ ] Works offline (tested in airplane mode)
 - [ ] Hot reload works (tested on iPhone)
+- [ ] CI passed (type-check + lint + tests + build)
 
 ---
 
@@ -513,12 +554,55 @@ Before requesting review:
 
 ## Troubleshooting
 
+### Pre-commit hook failing
+
+```bash
+# See what lint-staged is checking
+npx lint-staged --debug
+
+# Manually run formatters
+npm run format
+npm run lint
+
+# Try commit again
+git add .
+git commit -m "your message"
+```
+
+### Pre-push hook failing
+
+```bash
+# Run checks manually to see errors
+npm run type-check     # See type errors
+npm test               # See test failures
+npm run lint           # See lint errors
+
+# Fix errors, then push again
+git push
+```
+
+### Skip hooks (emergency only)
+
+```bash
+# Skip pre-commit
+git commit --no-verify -m "emergency fix"
+
+# Skip pre-push
+git push --no-verify
+```
+
+**Use `--no-verify` only for:**
+
+- Hotfix deployments
+- Reverting broken commits
+- Documentation-only changes (if blocked)
+
 ### "Module not found"
 
 ```bash
 npm install
-rm -rf node_modules
-npm install
+# or use nuclear option
+npm run clean
 ```
 
 ### "Type error" after git pull
@@ -538,8 +622,23 @@ npm test
 ### Expo Go won't connect
 
 1. Ensure phone & computer on same WiFi
-2. Restart Expo dev server
+2. Restart Expo dev server (`npm run dev`)
 3. Rescan QR code
+
+### CI failing but local passes
+
+```bash
+# Ensure dependencies match CI
+npm ci
+
+# Run same checks as CI
+npm run type-check
+npm run lint
+npm test -- --ci
+
+# Check Node version matches CI (18.x)
+node --version
+```
 
 ---
 
