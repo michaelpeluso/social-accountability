@@ -8,8 +8,6 @@ concurrency:
 on:
   issues:
     types: [opened]
-  pull_request:
-    types: [opened]
     paths-ignore: ['docs/**', 'design/**']
 
 jobs:
@@ -23,12 +21,3 @@ jobs:
         with:
           project-url: https://github.com/users/michaelpeluso/projects/3
           github-token: ${{ secrets.SOCIAL_ACCOUNTABILITY_TOKEN }}
-
-  # Auto-label based on file paths
-  auto-label:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/labeler@v5
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
