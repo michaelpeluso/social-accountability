@@ -8,7 +8,6 @@ concurrency:
 on:
   issues:
     types: [opened]
-    paths-ignore: ['docs/**', 'design/**']
 
 jobs:
   # Auto-add new issues to project (requires SOCIAL_ACCOUNTABILITY_TOKEN secret)
