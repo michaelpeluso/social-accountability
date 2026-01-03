@@ -547,6 +547,12 @@ Hooks automatically verify most items, but confirm:
 4. Jest tests (with coverage)
 ```
 
+**Optimizations:**
+
+- Skips when commits only touch `docs/**` or `design/**`
+- Cancels in-progress runs when you push again to the same branch
+- Combines related checks to reduce overhead
+
 **Must pass before merge.**
 
 ---
