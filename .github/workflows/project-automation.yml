@@ -1,10 +1,16 @@
 name: Project Automation
 
+# Cancel older runs for same branch to save CI minutes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   issues:
     types: [opened]
   pull_request:
     types: [opened]
+    paths-ignore: ['docs/**', 'design/**']
 
 jobs:
   # Auto-add new issues to project (requires SOCIAL_ACCOUNTABILITY_TOKEN secret)

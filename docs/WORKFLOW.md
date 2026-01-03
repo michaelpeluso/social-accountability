@@ -538,14 +538,13 @@ Hooks automatically verify most items, but confirm:
 
 ## CI/CD Pipeline
 
-**GitHub Actions (runs on every PR):**
+**GitHub Actions run only on PRs and main branch:**
 
 ```yaml
 1. Install dependencies
 2. TypeScript type-check
-3. ESLint
-4. Jest tests
-5. Build check
+3. Code quality (ESLint + Prettier)
+4. Jest tests (with coverage)
 ```
 
 **Must pass before merge.**
