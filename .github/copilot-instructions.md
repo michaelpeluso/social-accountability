@@ -125,6 +125,15 @@ function getHabits(viewerId: string, scope: "mine" | "friends" | "public") {
 }
 ```
 
+### Commenting Style
+
+- **DO NOT use emojis in comments or terminal logs**
+- Use standard prefixes (`// TODO:`, `// FIXME:`, `// NOTE:`) only when they add clarity; prefer self-documenting code
+- No comments for self-explanatory obvious code
+- Do not use block comments for large explanations; keep comments concise
+- Keep comments up-to-date with code changes
+- Don't overuse or oversaturate with comments; prefer clear code
+
 ### Logging Pattern
 
 ```typescript
@@ -212,6 +221,7 @@ These rules are for any autonomous or assistant agent (including CI bots or LLM-
 - **Use automation scripts:** The `scripts/` directory contains automation helpers (issue generation, PR creation). Use these when available instead of reinventing workflows.
 - **Run checks before commits/PRs:** Run `npm run type-check`, `npm test`, `npm run lint` and fix failures. Include test results or CI links in the PR description.
 - **Small, reviewable diffs:** Keep changes focused and limited in scope; prefer multiple small PRs to one large change. Add or update tests for behaviour changes.
+- **Add tests for new implementations:** When adding a new feature or changing behavior, add unit and/or integration tests that cover expected behavior and edge cases before opening a PR.
 - **Secrets handling:** Never write secrets or `.p8` keys into the repo. Use CI secret stores (GitHub Actions secrets, EAS secrets) and document required secret names in `docs/`.
 - **Progress updates & cadence:** After significant work (3–5 tool calls or editing/creating >3 files), post a concise progress update summarizing completed steps, remaining tasks, and the next action.
 - **Ask clarifying questions:** If a requirement is ambiguous, leave a `// TODO:` and ask the owner rather than guessing. Create a failing test that codifies the assumption when helpful.

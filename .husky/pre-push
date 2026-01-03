@@ -4,23 +4,36 @@ current_branch=$(git symbolic-ref --short HEAD 2>/dev/null)
 # Block direct pushes to main
 if [ "$current_branch" = "main" ]; then
   echo ""
-  echo "❌ Direct pushes to 'main' branch are blocked!"
-  echo ""
-  echo "Please use a feature branch workflow:"
+  echo "Direct pushes to 'main' branch are blocked."
+  echo "Use a feature branch workflow:"
   echo "  1. Create a branch:    git checkout -b feat/my-feature"
   echo "  2. Make your changes:  git add . && git commit -m 'feat: add feature'"
   echo "  3. Push branch:        git push -u origin feat/my-feature"
   echo "  4. Create PR:          gh pr create --fill"
-  echo "  5. Merge when green:   gh pr merge --squash"
-  echo ""
-  echo "To move your current changes to a branch:"
-  echo "  git reset --soft HEAD~1"
-  echo "  git checkout -b feat/my-feature"
-  echo "  git commit -m 'your message'"
-  echo "  git push -u origin feat/my-feature"
   echo ""
   exit 1
 fi
 
-# Run type check before push (for non-main branches)
-npm run type-check
+echo ""
+echo "Running pre-push checks..."
+echo ""
+echo "1/3 Type checking..."
+if ! npm run type-check --silent; then
+  echo "\nType check failed. Fix errors before pushing."
+  exit 1
+fi
+
+echo "2/3 Running tests..."
+if ! npm test -- --passWithNoTests --bail --silent; then
+  echo "\nTests failed. Fix failing tests before pushing."
+  exit 1
+fi
+
+echo "3/3 Linting..."
+if ! npm run lint --silent; then
+  echo "\nLint check failed. Run 'npm run lint' to see errors."
+  exit 1
+fi
+
+echo ""
+echo "All pre-push checks passed!"

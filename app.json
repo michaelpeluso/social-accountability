@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "social-accountability",
+    "slug": "social-accountability",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "social-accountability",
+    "jsEngine": "hermes",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pelsos.socialaccountability"
+    },
+    "android": {
+      "package": "com.pelsos.socialaccountability"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b9365fb4-3622-4bb0-b44d-6e99eb17f996"
+      }
+    },
+    "owner": "pelsos-org",
+    "plugins": ["expo-router"]
+  }
+}
