@@ -1,8 +1,14 @@
 name: PR Status Check
 
+# Cancel older runs for same branch to save CI minutes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths-ignore: ['docs/**', 'design/**']
 
 jobs:
   # Check PR title follows conventional commits

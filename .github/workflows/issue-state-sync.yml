@@ -1,5 +1,10 @@
 name: Issue State Sync
 
+# Cancel older runs for same branch to save CI minutes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # Auto-update issue states and GitHub Projects status based on commit/PR activity
 # - Move to "In Progress" when branch is pushed or PR opened
 # - Move to "Done" and close issue when PR with "closes #X" merges
@@ -8,6 +13,7 @@ name: Issue State Sync
 on:
   pull_request:
     types: [opened, reopened, ready_for_review, closed]
+    paths-ignore: ['docs/**', 'design/**']
 
 jobs:
   sync-issue-state:
