@@ -156,6 +156,12 @@ throw new Error("Something went wrong"); // ❌ Not typed
 3. [spec/architecture.md](../spec/architecture.md) - Technical patterns
 4. [spec/data-model.md](../spec/data-model.md) - Complete schema
 
+## Docs & Milestones location
+
+- Milestones and milestone docs: `docs/milestones/` (files like `M0-foundation.md`, `M1-account-privacy.md`)
+- Core docs: `docs/architecture.md`, `docs/api-contracts.md`, `docs/data-model.md`, `docs/WORKFLOW.md`, `docs/access-request-checklist.md`, `user-interface.md`
+- Implementation notes and specs live under `docs/` — prefer these paths when opening issues or drafting PR descriptions.
+
 ### When Implementing Features
 
 - **Authentication?** → [spec/M1-account-privacy.md](../spec/M1-account-privacy.md)
@@ -192,3 +198,24 @@ throw new Error("Something went wrong"); // ❌ Not typed
 - Write a failing test describing expected behavior
 - Reference specific spec files in questions: "According to M2-habits-tracking.md line 45..."
 - Check [rules/ai-agent-guide.md](../rules/ai-agent-guide.md) for AI-specific guidance
+
+---
+
+## AI Agent / Autonomous Developer Guidelines
+
+These rules are for any autonomous or assistant agent (including CI bots or LLM-based coders like Claude Sonnet and Opus) that will work on this repository. Agents must follow the project's milestones, privacy rules and the owner's approval process.
+
+- **Follow the milestone plan:** Always implement features aligned to M0→M5 and treat `/spec` as the single source of truth. Do not add or change feature scope without opening an issue and getting owner approval.
+- **Maintain a TODO list:** Use the repository's task/tracking mechanism (or the provided manage_todo_list tool) to create, update and complete small, reviewable steps. Mark tasks complete before opening a PR.
+- **Never spend or enroll without explicit approval:** Do not enroll accounts (Apple Developer purchase) or procure paid services without explicit owner confirmation. Ask for approval first and provide cost and impact summary.
+- **Use mocks & feature flags for native integrations:** Keep `ENABLE_APPLE_AUTH=false` and `ENABLE_HEALTHKIT=false` until the owner authorizes native testing. Prefer mocked implementations in `services/` for early milestones.
+- **Use automation scripts:** The `scripts/` directory contains automation helpers (issue generation, PR creation). Use these when available instead of reinventing workflows.
+- **Run checks before commits/PRs:** Run `npm run type-check`, `npm test`, `npm run lint` and fix failures. Include test results or CI links in the PR description.
+- **Small, reviewable diffs:** Keep changes focused and limited in scope; prefer multiple small PRs to one large change. Add or update tests for behaviour changes.
+- **Secrets handling:** Never write secrets or `.p8` keys into the repo. Use CI secret stores (GitHub Actions secrets, EAS secrets) and document required secret names in `docs/`.
+- **Progress updates & cadence:** After significant work (3–5 tool calls or editing/creating >3 files), post a concise progress update summarizing completed steps, remaining tasks, and the next action.
+- **Ask clarifying questions:** If a requirement is ambiguous, leave a `// TODO:` and ask the owner rather than guessing. Create a failing test that codifies the assumption when helpful.
+- **PR policy:** Open feature branches and create PRs against `main` (or the repo's default). Do not merge to `main` without owner approval and passing CI.
+- **Privacy-first:** Enforce privacy rules in code and tests; never bypass server-side validation for convenience.
+
+These guidelines are mandatory for any automated contributor; failure to follow them should be considered a blocker for merging changes.
