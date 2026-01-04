@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -17,11 +17,12 @@ import { router } from "expo-router";
 import { auth } from "../../src/services/auth";
 import { api } from "../../src/services/api";
 import { logger } from "../../src/lib/logger";
+import { validateDisplayName, validateBio, limits, isNearLimit } from "../../src/lib/validation";
 
-const MAX_BIO_LENGTH = 280;
-const MAX_DISPLAY_NAME_LENGTH = 50;
-const MAX_PHOTO_SIZE_MB = 5;
-const MAX_PHOTO_SIZE_BYTES = MAX_PHOTO_SIZE_MB * 1024 * 1024;
+const MAX_BIO_LENGTH = limits.bio.max;
+const MAX_DISPLAY_NAME_LENGTH = limits.displayName.max;
+const MAX_PHOTO_SIZE_MB = limits.photo.maxSizeBytes / (1024 * 1024);
+const MAX_PHOTO_SIZE_BYTES = limits.photo.maxSizeBytes;
 
 export default function ProfileSetup() {
   const [displayName, setDisplayName] = useState("");
@@ -30,6 +31,18 @@ export default function ProfileSetup() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [touched, setTouched] = useState({ displayName: false, bio: false });
+
+  // Real-time validation
+  const displayNameValidation = useMemo(() => validateDisplayName(displayName), [displayName]);
+  const bioValidation = useMemo(() => validateBio(bio), [bio]);
+
+  // Check if form is valid
+  const isFormValid = displayNameValidation.valid && bioValidation.valid;
+
+  // Character count styles
+  const displayNameNearLimit = isNearLimit(displayName, MAX_DISPLAY_NAME_LENGTH, 10);
+  const bioNearLimit = isNearLimit(bio, MAX_BIO_LENGTH, 30);
 
   useEffect(() => {
     loadProfile();
@@ -91,18 +104,17 @@ export default function ProfileSetup() {
   }
 
   const handleSave = useCallback(async () => {
-    if (!displayName.trim()) {
-      setError("Display name is required");
+    // Mark all fields as touched
+    setTouched({ displayName: true, bio: true });
+
+    // Validate using the utility functions
+    if (!displayNameValidation.valid) {
+      setError(displayNameValidation.error || "Invalid display name");
       return;
     }
 
-    if (displayName.length > MAX_DISPLAY_NAME_LENGTH) {
-      setError(`Display name must be ${MAX_DISPLAY_NAME_LENGTH} characters or less`);
-      return;
-    }
-
-    if (bio.length > MAX_BIO_LENGTH) {
-      setError(`Bio must be ${MAX_BIO_LENGTH} characters or less`);
+    if (!bioValidation.valid) {
+      setError(bioValidation.error || "Invalid bio");
       return;
     }
 
@@ -130,7 +142,7 @@ export default function ProfileSetup() {
     } finally {
       setSaving(false);
     }
-  }, [displayName, bio, photoUri]);
+  }, [displayName, bio, photoUri, displayNameValidation, bioValidation]);
 
   if (loading) {
     return (
@@ -171,42 +183,65 @@ export default function ProfileSetup() {
           <View style={styles.field}>
             <Text style={styles.label}>Display Name *</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                touched.displayName && !displayNameValidation.valid && styles.inputError,
+              ]}
               value={displayName}
               onChangeText={setDisplayName}
+              onBlur={() => setTouched((t) => ({ ...t, displayName: true }))}
               placeholder="Your name"
               maxLength={MAX_DISPLAY_NAME_LENGTH}
               autoCapitalize="words"
               autoCorrect={false}
             />
-            <Text style={styles.counter}>
-              {displayName.length}/{MAX_DISPLAY_NAME_LENGTH}
-            </Text>
+            <View style={styles.fieldFooter}>
+              {touched.displayName && !displayNameValidation.valid ? (
+                <Text style={styles.fieldError}>{displayNameValidation.error}</Text>
+              ) : (
+                <View />
+              )}
+              <Text style={[styles.counter, displayNameNearLimit && styles.counterWarning]}>
+                {displayName.length}/{MAX_DISPLAY_NAME_LENGTH}
+              </Text>
+            </View>
           </View>
 
           <View style={styles.field}>
             <Text style={styles.label}>Bio (optional)</Text>
             <TextInput
-              style={[styles.input, styles.bioInput]}
+              style={[
+                styles.input,
+                styles.bioInput,
+                touched.bio && !bioValidation.valid && styles.inputError,
+              ]}
               value={bio}
               onChangeText={setBio}
+              onBlur={() => setTouched((t) => ({ ...t, bio: true }))}
               placeholder="A few words about yourself..."
               maxLength={MAX_BIO_LENGTH}
               multiline
               numberOfLines={4}
               textAlignVertical="top"
             />
-            <Text style={styles.counter}>
-              {bio.length}/{MAX_BIO_LENGTH}
-            </Text>
+            <View style={styles.fieldFooter}>
+              {touched.bio && !bioValidation.valid ? (
+                <Text style={styles.fieldError}>{bioValidation.error}</Text>
+              ) : (
+                <View />
+              )}
+              <Text style={[styles.counter, bioNearLimit && styles.counterWarning]}>
+                {bio.length}/{MAX_BIO_LENGTH}
+              </Text>
+            </View>
           </View>
 
           {error && <Text style={styles.error}>{error}</Text>}
 
           <Pressable
-            style={[styles.button, saving && styles.buttonDisabled]}
+            style={[styles.button, (saving || !isFormValid) && styles.buttonDisabled]}
             onPress={handleSave}
-            disabled={saving}
+            disabled={saving || !isFormValid}
           >
             {saving ? (
               <ActivityIndicator color="#fff" />
@@ -306,14 +341,31 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
   },
+  inputError: {
+    borderColor: "#ff3b30",
+  },
   bioInput: {
     height: 100,
+  },
+  fieldFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  fieldError: {
+    fontSize: 12,
+    color: "#ff3b30",
+    flex: 1,
+    marginRight: 8,
   },
   counter: {
     fontSize: 12,
     color: "#999",
     textAlign: "right",
-    marginTop: 4,
+  },
+  counterWarning: {
+    color: "#ff9500",
   },
   error: {
     color: "red",

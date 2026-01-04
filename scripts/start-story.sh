@@ -109,6 +109,21 @@ fi
 BRANCH_NAME="${BRANCH_PREFIX}-${SLUG}"
 
 echo "Creating branch: $BRANCH_NAME"
+# Before creating a branch, fetch and update local 'main' from origin
+echo "Syncing local 'main' with origin/main..."
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+git fetch origin main
+if git show-ref --verify --quiet refs/heads/main; then
+  git checkout main || true
+  git pull origin main || true
+else
+  # Try to create local main tracking origin/main if available
+  git checkout -b main origin/main 2>/dev/null || true
+fi
+# Return to original branch if it existed
+if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "HEAD" ]; then
+  git checkout "$CURRENT_BRANCH" || true
+fi
 
 # Check if branch already exists
 if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
