@@ -20,15 +20,22 @@ export default function Index() {
     <View style={styles.container}>
       <Text style={styles.title}>Social Accountability</Text>
       {user && <Text style={styles.welcome}>Welcome, {user.displayName}!</Text>}
-      <Text style={styles.subtitle}>Your habits dashboard coming soon...</Text>
 
-      <View style={styles.nav}>
-        <Pressable style={styles.navButton} onPress={() => router.push("/settings")}>
-          <Text style={styles.navButtonText}>Settings</Text>
+      {/* Main Actions */}
+      <View style={styles.mainActions}>
+        <Pressable style={styles.primaryButton} onPress={() => router.push("/goals")}>
+          <Text style={styles.primaryButtonText}>My Goals</Text>
         </Pressable>
+      </View>
 
+      {/* Navigation */}
+      <View style={styles.nav}>
         <Pressable style={styles.navButton} onPress={() => router.push("/friends")}>
           <Text style={styles.navButtonText}>Friends</Text>
+        </Pressable>
+
+        <Pressable style={styles.navButton} onPress={() => router.push("/settings")}>
+          <Text style={styles.navButtonText}>Settings</Text>
         </Pressable>
       </View>
     </View>
@@ -51,25 +58,36 @@ const styles = StyleSheet.create({
   welcome: {
     fontSize: 18,
     color: "#333",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#666",
     marginBottom: 40,
+  },
+  mainActions: {
+    marginBottom: 40,
+  },
+  primaryButton: {
+    backgroundColor: "#000",
+    paddingHorizontal: 48,
+    paddingVertical: 16,
+    borderRadius: 12,
+  },
+  primaryButtonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "600",
   },
   nav: {
     flexDirection: "row",
     gap: 16,
   },
   navButton: {
-    backgroundColor: "#000",
+    backgroundColor: "#f5f5f5",
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e5e5e5",
   },
   navButtonText: {
-    color: "#fff",
+    color: "#333",
     fontSize: 16,
     fontWeight: "500",
   },

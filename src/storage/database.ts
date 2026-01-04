@@ -8,7 +8,7 @@ import type { SQLiteBindValue, SQLiteRunResult } from "expo-sqlite";
 import { logger } from "../lib/logger";
 
 const DB_NAME = "social_accountability.db";
-const CURRENT_VERSION = 1;
+const CURRENT_VERSION = 2;
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -75,6 +75,9 @@ async function applyMigration(database: SQLite.SQLiteDatabase, version: number):
     switch (version) {
       case 1:
         await migrationV1(database);
+        break;
+      case 2:
+        await migrationV2(database);
         break;
       default:
         throw new Error(`Unknown migration version: ${version}`);
@@ -181,6 +184,74 @@ async function migrationV1(database: SQLite.SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_friendships_friendId ON friendships(friendId);
     CREATE INDEX IF NOT EXISTS idx_friend_requests_toUserId ON friend_requests(toUserId);
     CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status);
+  `);
+}
+
+/**
+ * Migration V2: Goals and Habits tables for M2
+ */
+async function migrationV2(database: SQLite.SQLiteDatabase): Promise<void> {
+  await database.execAsync(`
+    -- Goals table
+    CREATE TABLE IF NOT EXISTS goals (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      title TEXT NOT NULL,
+      pillar TEXT NOT NULL,
+      privacy TEXT NOT NULL DEFAULT 'SELF',
+      isArchived INTEGER NOT NULL DEFAULT 0,
+      archivedAt TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      syncedAt TEXT
+    );
+
+    -- Habits table
+    CREATE TABLE IF NOT EXISTS habits (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      goalId TEXT,
+      parentHabitId TEXT,
+      title TEXT NOT NULL,
+      pillar TEXT NOT NULL,
+      schedule TEXT NOT NULL,
+      privacy TEXT NOT NULL DEFAULT 'SELF',
+      isArchived INTEGER NOT NULL DEFAULT 0,
+      archivedAt TEXT,
+      currentStreak INTEGER NOT NULL DEFAULT 0,
+      longestStreak INTEGER NOT NULL DEFAULT 0,
+      lastCheckInAt TEXT,
+      lastMissedAt TEXT,
+      recoveryStreak INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (goalId) REFERENCES goals(id),
+      FOREIGN KEY (parentHabitId) REFERENCES habits(id)
+    );
+
+    -- Habit check-ins table
+    CREATE TABLE IF NOT EXISTS habit_check_ins (
+      id TEXT PRIMARY KEY,
+      habitId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      occurredAt TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'MANUAL',
+      evidenceRef TEXT,
+      note TEXT,
+      createdAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (habitId) REFERENCES habits(id)
+    );
+
+    -- Indexes for goals/habits queries
+    CREATE INDEX IF NOT EXISTS idx_goals_userId ON goals(userId);
+    CREATE INDEX IF NOT EXISTS idx_goals_pillar ON goals(pillar);
+    CREATE INDEX IF NOT EXISTS idx_habits_userId ON habits(userId);
+    CREATE INDEX IF NOT EXISTS idx_habits_goalId ON habits(goalId);
+    CREATE INDEX IF NOT EXISTS idx_habits_pillar ON habits(pillar);
+    CREATE INDEX IF NOT EXISTS idx_check_ins_habitId ON habit_check_ins(habitId);
+    CREATE INDEX IF NOT EXISTS idx_check_ins_occurredAt ON habit_check_ins(occurredAt);
   `);
 }
 

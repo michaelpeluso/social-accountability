@@ -1,5 +1,5 @@
 // Enums
-export type Privacy = "SELF" | "CIRCLE" | "PUBLIC";
+export type Privacy = "SELF" | "FRIENDS" | "PUBLIC";
 export type Pillar = "MIND" | "BODY" | "HEART" | "SOUL";
 export type HabitFrequency = "daily" | "weekly";
 export type CheckInSource = "MANUAL" | "INTEGRATION";
@@ -41,9 +41,11 @@ export type Goal = {
   title: string;
   pillar: Pillar;
   privacy: Privacy;
+  isArchived: boolean;
   archivedAt?: string;
   createdAt: string;
   updatedAt: string;
+  syncedAt?: string;
 };
 
 export type Habit = {
@@ -52,11 +54,20 @@ export type Habit = {
   goalId?: string;
   parentHabitId?: string;
   title: string;
+  pillar: Pillar; // Inherited from goal or set directly
   schedule: HabitSchedule;
   privacy: Privacy;
+  isArchived: boolean;
   archivedAt?: string;
+  // Streak data (cached, recalculated on check-in)
+  currentStreak: number;
+  longestStreak: number;
+  lastCheckInAt?: string;
+  lastMissedAt?: string;
+  recoveryStreak: number;
   createdAt: string;
   updatedAt: string;
+  syncedAt?: string;
 };
 
 export type HabitCheckIn = {
@@ -66,7 +77,9 @@ export type HabitCheckIn = {
   occurredAt: string;
   source: CheckInSource;
   evidenceRef?: string;
+  note?: string; // Optional note (max 500 chars)
   createdAt: string;
+  syncedAt?: string;
 };
 
 export type Post = {
