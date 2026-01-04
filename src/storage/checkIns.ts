@@ -12,6 +12,7 @@ import { getDatabase } from "./database";
 export interface CreateCheckInInput {
   occurredAt?: string; // Defaults to now
   source?: CheckInSource; // Defaults to MANUAL
+  value?: number; // For count/duration habits (e.g., 25 mins, 8 reps)
   evidenceRef?: string;
   note?: string;
 }
@@ -23,6 +24,7 @@ interface CheckInRow {
   user_id: string;
   occurred_at: string;
   source: CheckInSource;
+  value: number | null;
   evidence_ref: string | null;
   note: string | null;
   created_at: string;
@@ -36,6 +38,7 @@ function rowToCheckIn(row: CheckInRow): HabitCheckIn {
     userId: row.user_id,
     occurredAt: row.occurred_at,
     source: row.source,
+    value: row.value ?? undefined,
     evidenceRef: row.evidence_ref ?? undefined,
     note: row.note ?? undefined,
     createdAt: row.created_at,
@@ -74,14 +77,15 @@ export async function createCheckIn(
   // Insert check-in
   await db.runAsync(
     `INSERT INTO habit_check_ins (
-      id, habit_id, user_id, occurred_at, source, evidence_ref, note, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      id, habit_id, user_id, occurred_at, source, value, evidence_ref, note, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       habitId,
       userId,
       occurredAt,
       input.source ?? "MANUAL",
+      input.value ?? null,
       input.evidenceRef ?? null,
       input.note ?? null,
       now,
@@ -97,6 +101,7 @@ export async function createCheckIn(
     userId,
     occurredAt,
     source: input.source ?? "MANUAL",
+    value: input.value,
     evidenceRef: input.evidenceRef,
     note: input.note,
     createdAt: now,

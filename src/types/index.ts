@@ -1,15 +1,41 @@
 // Enums
 export type Privacy = "SELF" | "FRIENDS" | "PUBLIC";
 export type Pillar = "MIND" | "BODY" | "HEART" | "SOUL";
-export type HabitFrequency = "daily" | "weekly";
+export type HabitFrequency = "daily" | "weekly" | "monthly" | "custom";
+export type HabitType = "BUILD" | "QUIT"; // BUILD = maintain/grow, QUIT = break/stop
+export type CompletionType = "BINARY" | "COUNT" | "DURATION"; // How to measure completion
 export type CheckInSource = "MANUAL" | "INTEGRATION";
 export type CircleRole = "OWNER" | "MEMBER";
 
-// Schedule Type
+// Goal Types
+export type GoalDataSource = "MANUAL" | "HABIT_DERIVED" | "INTEGRATION";
+
+// Identity preset names (M4 will expand this)
+export type IdentityPreset =
+  | "Student"
+  | "Athlete"
+  | "Parent"
+  | "Artist"
+  | "Professional"
+  | "Friend"
+  | "Partner";
+
+// Schedule Types
+export type ScheduleTime = {
+  hour: number; // 0-23
+  minute: number; // 0-59
+};
+
+export type ScheduleSlot = {
+  dayOfWeek?: number; // 0-6, Sunday = 0 (for weekly)
+  dayOfMonth?: number; // 1-31 (for monthly)
+  time?: ScheduleTime; // Optional specific time
+};
+
 export type HabitSchedule = {
   frequency: HabitFrequency;
-  targetCount: number;
-  daysOfWeek?: number[]; // 0-6, Sunday = 0
+  targetCount: number; // How many times per period
+  slots?: ScheduleSlot[]; // Specific times/days (e.g., Mon 5pm, Fri 4pm)
 };
 
 // Domain Models
@@ -35,14 +61,54 @@ export type CircleMember = {
   createdAt: string;
 };
 
+export type Identity = {
+  id: string;
+  userId: string;
+  name: string; // "Student", "Athlete", etc.
+  pillar: Pillar; // Each identity maps to one pillar
+  icon: string; // Emoji
+  preset: boolean; // True if from preset list, false if custom
+  createdAt: string;
+};
+
 export type Goal = {
   id: string;
   userId: string;
   title: string;
+  description?: string; // Brief description (max 500 chars)
   pillar: Pillar;
   privacy: Privacy;
+
+  // Identity (M2: optional, M4: full identity system)
+  identityId?: string; // Link to Identity
+
+  // Values
+  isIndefinite: boolean; // If true, no target value (ongoing goal)
+  startValue?: number; // Where you're starting from
+  targetValue?: number; // Where you want to get to
+  currentValue?: number; // Current progress value
+
+  // Timeframe
+  startDate?: string; // When goal tracking starts
+  deadline?: string; // Hard deadline for completion
+
+  // Data Source
+  dataSource: GoalDataSource; // MANUAL, HABIT_DERIVED, INTEGRATION
+
+  // Linked Habits (M2: basic linking, M5: weighted contribution)
+  linkedHabitIds?: string[]; // Habits contributing to this goal
+
+  // Future: Metric/unit from tracked data sources (M5+)
+  // dataSourceMetric?: string; // e.g., "weight", "steps", "instagram_time"
+
+  // Future: Reward on completion (M4)
+  // reward?: string;
+
   isArchived: boolean;
   archivedAt?: string;
+  // Vacation mode - pause tracking for all linked habits
+  vacationMode?: boolean;
+  vacationEndsAt?: string;
   createdAt: string;
   updatedAt: string;
   syncedAt?: string;
@@ -54,8 +120,39 @@ export type Habit = {
   goalId?: string;
   parentHabitId?: string;
   title: string;
+  description?: string; // Brief/steps/reminder (max 500 chars)
   pillar: Pillar; // Inherited from goal or set directly
+
+  // Type & Measurement
+  habitType: HabitType; // BUILD or QUIT
+  completionType: CompletionType; // How to measure (binary, count, duration)
+  targetValue?: number; // Target for count/duration (e.g., 30 mins, 10 reps)
+  unit?: string; // Unit label (min, reps, pages, ml, etc.)
+
+  // Visual
+  icon?: string; // Emoji or icon identifier
+  tags?: string[]; // User-defined tags for filtering
+
+  // Scheduling
   schedule: HabitSchedule;
+  timezone?: string; // IANA timezone (e.g., "America/New_York")
+
+  // Flexibility & Tolerance
+  difficulty?: 1 | 2 | 3 | 4 | 5; // User-rated difficulty
+  miniVersion?: string; // Minimum viable version (e.g., "1 push-up")
+  graceDays?: number; // Days allowed to miss without breaking streak (0-3)
+
+  // Future: Triggers & Context (M5)
+  // triggerId?: string;
+  // cue?: string;
+  // stackAfterHabitId?: string;
+
+  // Future: Reminders (M4)
+  // reminderEnabled?: boolean;
+  // reminderTimes?: string[];
+  // reminderText?: string;
+  // reflectionPrompt?: string;
+
   privacy: Privacy;
   isArchived: boolean;
   archivedAt?: string;
@@ -76,6 +173,8 @@ export type HabitCheckIn = {
   userId: string;
   occurredAt: string;
   source: CheckInSource;
+  // Completion data
+  value?: number; // For COUNT/DURATION: actual value logged (e.g., 25 mins, 8 reps)
   evidenceRef?: string;
   note?: string; // Optional note (max 500 chars)
   createdAt: string;
@@ -125,8 +224,17 @@ export type PaginatedResponse<T> = {
 // Request Types
 export type CreateGoalRequest = {
   title: string;
+  description?: string;
   pillar: Pillar;
   privacy: Privacy;
+  identityId?: string;
+  isIndefinite: boolean;
+  startValue?: number;
+  targetValue?: number;
+  startDate?: string;
+  deadline?: string;
+  dataSource: GoalDataSource;
+  linkedHabitIds?: string[];
 };
 
 export type CreateHabitRequest = {

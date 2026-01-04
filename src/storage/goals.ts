@@ -6,7 +6,7 @@
 import { query, queryFirst, execute } from "./database";
 import { logger } from "../lib/logger";
 import { enqueue } from "../services/sync";
-import type { Goal, Pillar, Privacy } from "../types";
+import type { Goal, Pillar, Privacy, GoalDataSource } from "../types";
 
 /**
  * Generate a UUID for new goals (device-side for offline support)
@@ -16,12 +16,30 @@ function generateId(): string {
 }
 
 /**
+ * Input data for creating a goal
+ */
+export interface CreateGoalData {
+  title: string;
+  pillar: Pillar;
+  privacy: Privacy;
+  description?: string;
+  identityId?: string;
+  // Values
+  isIndefinite: boolean;
+  startValue?: number;
+  targetValue?: number;
+  // Timeframe
+  startDate?: string;
+  deadline?: string;
+  // Data source & linking
+  dataSource: GoalDataSource;
+  linkedHabitIds?: string[];
+}
+
+/**
  * Create a new goal
  */
-export async function createGoal(
-  userId: string,
-  data: { title: string; pillar: Pillar; privacy: Privacy }
-): Promise<Goal> {
+export async function createGoal(userId: string, data: CreateGoalData): Promise<Goal> {
   const now = new Date().toISOString();
   const id = generateId();
 
@@ -31,15 +49,53 @@ export async function createGoal(
     title: data.title.trim(),
     pillar: data.pillar,
     privacy: data.privacy,
+    description: data.description?.trim(),
+    identityId: data.identityId,
+    // Values
+    isIndefinite: data.isIndefinite,
+    startValue: data.startValue,
+    targetValue: data.targetValue,
+    currentValue: data.startValue, // Initialize to start value
+    // Timeframe
+    startDate: data.startDate,
+    deadline: data.deadline,
+    // Data source & linking
+    dataSource: data.dataSource,
+    linkedHabitIds: data.linkedHabitIds,
+    // System fields
     isArchived: false,
     createdAt: now,
     updatedAt: now,
   };
 
   await execute(
-    `INSERT INTO goals (id, userId, title, pillar, privacy, isArchived, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [goal.id, goal.userId, goal.title, goal.pillar, goal.privacy, 0, goal.createdAt, goal.updatedAt]
+    `INSERT INTO goals (
+      id, userId, title, pillar, privacy, description, identityId,
+      isIndefinite, startValue, targetValue, currentValue,
+      startDate, deadline,
+      dataSource, linkedHabitIds,
+      isArchived, createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      goal.id,
+      goal.userId,
+      goal.title,
+      goal.pillar,
+      goal.privacy,
+      goal.description || null,
+      goal.identityId || null,
+      goal.isIndefinite ? 1 : 0,
+      goal.startValue ?? null,
+      goal.targetValue ?? null,
+      goal.currentValue ?? null,
+      goal.startDate || null,
+      goal.deadline || null,
+      goal.dataSource,
+      goal.linkedHabitIds ? JSON.stringify(goal.linkedHabitIds) : null,
+      goal.isArchived ? 1 : 0,
+      goal.createdAt,
+      goal.updatedAt,
+    ]
   );
 
   // Queue for background sync
@@ -96,11 +152,28 @@ export async function getGoalById(goalId: string): Promise<Goal | null> {
  */
 export async function updateGoal(
   goalId: string,
-  updates: { title?: string; pillar?: Pillar; privacy?: Privacy; isArchived?: boolean }
+  updates: {
+    title?: string;
+    pillar?: Pillar;
+    privacy?: Privacy;
+    description?: string;
+    identityId?: string;
+    isIndefinite?: boolean;
+    startValue?: number;
+    targetValue?: number;
+    currentValue?: number;
+    startDate?: string;
+    deadline?: string;
+    dataSource?: GoalDataSource;
+    linkedHabitIds?: string[];
+    vacationMode?: boolean;
+    vacationEndsAt?: string;
+    isArchived?: boolean;
+  }
 ): Promise<Goal | null> {
   const now = new Date().toISOString();
   const setClauses: string[] = [];
-  const params: (string | number)[] = [];
+  const params: (string | number | null)[] = [];
 
   if (updates.title !== undefined) {
     setClauses.push("title = ?");
@@ -113,6 +186,54 @@ export async function updateGoal(
   if (updates.privacy !== undefined) {
     setClauses.push("privacy = ?");
     params.push(updates.privacy);
+  }
+  if (updates.description !== undefined) {
+    setClauses.push("description = ?");
+    params.push(updates.description ? updates.description.trim() : null);
+  }
+  if (updates.identityId !== undefined) {
+    setClauses.push("identityId = ?");
+    params.push(updates.identityId || null);
+  }
+  if (updates.isIndefinite !== undefined) {
+    setClauses.push("isIndefinite = ?");
+    params.push(updates.isIndefinite ? 1 : 0);
+  }
+  if (updates.startValue !== undefined) {
+    setClauses.push("startValue = ?");
+    params.push(updates.startValue ?? null);
+  }
+  if (updates.targetValue !== undefined) {
+    setClauses.push("targetValue = ?");
+    params.push(updates.targetValue ?? null);
+  }
+  if (updates.currentValue !== undefined) {
+    setClauses.push("currentValue = ?");
+    params.push(updates.currentValue ?? null);
+  }
+  if (updates.startDate !== undefined) {
+    setClauses.push("startDate = ?");
+    params.push(updates.startDate || null);
+  }
+  if (updates.deadline !== undefined) {
+    setClauses.push("deadline = ?");
+    params.push(updates.deadline || null);
+  }
+  if (updates.dataSource !== undefined) {
+    setClauses.push("dataSource = ?");
+    params.push(updates.dataSource);
+  }
+  if (updates.linkedHabitIds !== undefined) {
+    setClauses.push("linkedHabitIds = ?");
+    params.push(updates.linkedHabitIds ? JSON.stringify(updates.linkedHabitIds) : null);
+  }
+  if (updates.vacationMode !== undefined) {
+    setClauses.push("vacationMode = ?");
+    params.push(updates.vacationMode ? 1 : 0);
+  }
+  if (updates.vacationEndsAt !== undefined) {
+    setClauses.push("vacationEndsAt = ?");
+    params.push(updates.vacationEndsAt || null);
   }
   if (updates.isArchived !== undefined) {
     setClauses.push("isArchived = ?");
@@ -182,6 +303,23 @@ interface GoalRow {
   title: string;
   pillar: string;
   privacy: string;
+  description: string | null;
+  identityId: string | null;
+  // Values
+  isIndefinite: number;
+  startValue: number | null;
+  targetValue: number | null;
+  currentValue: number | null;
+  // Timeframe
+  startDate: string | null;
+  deadline: string | null;
+  // Data source & linking
+  dataSource: string;
+  linkedHabitIds: string | null; // JSON array
+  // Vacation mode
+  vacationMode: number;
+  vacationEndsAt: string | null;
+  // System fields
   isArchived: number;
   archivedAt: string | null;
   createdAt: string;
@@ -196,6 +334,23 @@ function rowToGoal(row: GoalRow): Goal {
     title: row.title,
     pillar: row.pillar as Pillar,
     privacy: row.privacy as Privacy,
+    description: row.description ?? undefined,
+    identityId: row.identityId ?? undefined,
+    // Values
+    isIndefinite: row.isIndefinite === 1,
+    startValue: row.startValue ?? undefined,
+    targetValue: row.targetValue ?? undefined,
+    currentValue: row.currentValue ?? undefined,
+    // Timeframe
+    startDate: row.startDate ?? undefined,
+    deadline: row.deadline ?? undefined,
+    // Data source & linking
+    dataSource: (row.dataSource || "MANUAL") as GoalDataSource,
+    linkedHabitIds: row.linkedHabitIds ? JSON.parse(row.linkedHabitIds) : undefined,
+    // Vacation mode
+    vacationMode: row.vacationMode === 1,
+    vacationEndsAt: row.vacationEndsAt ?? undefined,
+    // System fields
     isArchived: row.isArchived === 1,
     archivedAt: row.archivedAt ?? undefined,
     createdAt: row.createdAt,

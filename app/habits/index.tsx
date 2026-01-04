@@ -22,12 +22,50 @@ import { auth } from "../../src/services/auth";
 import { createHabit, getHabits } from "../../src/storage/habits";
 import { getGoals } from "../../src/storage/goals";
 import { PILLAR_INFO, ALL_PILLARS, PRIVACY_INFO } from "../../src/types/goals";
-import type { Habit, Goal, Pillar, Privacy, HabitSchedule, HabitFrequency } from "../../src/types";
+import type {
+  Habit,
+  Goal,
+  Pillar,
+  Privacy,
+  HabitSchedule,
+  HabitFrequency,
+  HabitType,
+  CompletionType,
+} from "../../src/types";
 
 const PRIVACY_OPTIONS: Privacy[] = ["SELF", "FRIENDS", "PUBLIC"];
 const FREQUENCY_OPTIONS: { value: HabitFrequency; label: string }[] = [
   { value: "daily", label: "Daily" },
   { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+];
+const HABIT_TYPE_OPTIONS: { value: HabitType; label: string; desc: string }[] = [
+  { value: "BUILD", label: "Build", desc: "A habit to develop" },
+  { value: "QUIT", label: "Quit", desc: "A habit to break" },
+];
+const COMPLETION_TYPE_OPTIONS: { value: CompletionType; label: string; desc: string }[] = [
+  { value: "BINARY", label: "Yes/No", desc: "Did you do it?" },
+  { value: "COUNT", label: "Count", desc: "How many?" },
+  { value: "DURATION", label: "Duration", desc: "How long?" },
+];
+const DIFFICULTY_OPTIONS = [1, 2, 3, 4, 5] as const;
+const EMOJI_OPTIONS = [
+  "💪",
+  "🏃",
+  "📚",
+  "🧘",
+  "💤",
+  "💧",
+  "🥗",
+  "✍️",
+  "🎯",
+  "⭐",
+  "🔥",
+  "💡",
+  "🌱",
+  "🧠",
+  "❤️",
+  "🙏",
 ];
 
 export default function HabitsScreen() {
@@ -39,14 +77,41 @@ export default function HabitsScreen() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
-  // Form state
+  // Form state - Basic
   const [newTitle, setNewTitle] = useState("");
+  const [newDescription, setNewDescription] = useState("");
   const [selectedGoalId, setSelectedGoalId] = useState<string | undefined>(params.goalId);
   const [selectedPillar, setSelectedPillar] = useState<Pillar>("BODY");
   const [selectedPrivacy, setSelectedPrivacy] = useState<Privacy>("SELF");
+
+  // Form state - Type & Measurement
+  const [habitType, setHabitType] = useState<HabitType>("BUILD");
+  const [completionType, setCompletionType] = useState<CompletionType>("BINARY");
+  const [targetValue, setTargetValue] = useState("");
+  const [unit, setUnit] = useState("");
+
+  // Form state - Visual
+  const [icon, setIcon] = useState("💪");
+
+  // Form state - Schedule
   const [frequency, setFrequency] = useState<HabitFrequency>("daily");
   const [targetCount, setTargetCount] = useState("1");
+
+  // Form state - Flexibility
+  const [difficulty, setDifficulty] = useState<1 | 2 | 3 | 4 | 5>(3);
+  const [miniVersion, setMiniVersion] = useState("");
+  const [graceDays, setGraceDays] = useState("0");
+
+  // Form state - Duration timer (HH:MM:SS)
+  const [durationHours, setDurationHours] = useState("0");
+  const [durationMinutes, setDurationMinutes] = useState("0");
+  const [durationSeconds, setDurationSeconds] = useState("0");
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Get pillar from selected goal (to lock pillar selection)
+  const selectedGoal = goals.find((g) => g.id === selectedGoalId);
+  const effectivePillar = selectedGoal ? selectedGoal.pillar : selectedPillar;
 
   const loadHabits = useCallback(
     async (uid: string) => {
@@ -109,12 +174,38 @@ export default function HabitsScreen() {
         targetCount: count,
       };
 
+      // Calculate target value based on completion type
+      let finalTargetValue: number | undefined;
+      let finalUnit: string | undefined;
+
+      if (completionType === "COUNT" && targetValue) {
+        finalTargetValue = parseFloat(targetValue);
+        finalUnit = unit.trim() || undefined;
+      } else if (completionType === "DURATION") {
+        // Convert HH:MM:SS to total seconds
+        const hours = parseInt(durationHours, 10) || 0;
+        const minutes = parseInt(durationMinutes, 10) || 0;
+        const seconds = parseInt(durationSeconds, 10) || 0;
+        finalTargetValue = hours * 3600 + minutes * 60 + seconds;
+        finalUnit = "seconds"; // Always store as seconds internally
+      }
+
       await createHabit(userId, {
         title: newTitle.trim(),
         goalId: selectedGoalId,
-        pillar: selectedPillar,
+        pillar: effectivePillar,
         schedule,
         privacy: selectedPrivacy,
+        description: newDescription.trim() || undefined,
+        // New fields
+        habitType,
+        completionType,
+        targetValue: finalTargetValue,
+        unit: finalUnit,
+        icon,
+        difficulty,
+        miniVersion: miniVersion.trim() || undefined,
+        graceDays: parseInt(graceDays, 10) || 0,
       });
 
       setShowCreateModal(false);
@@ -130,11 +221,23 @@ export default function HabitsScreen() {
 
   function resetForm() {
     setNewTitle("");
+    setNewDescription("");
     setSelectedGoalId(params.goalId);
     setSelectedPillar("BODY");
     setSelectedPrivacy("SELF");
+    setHabitType("BUILD");
+    setCompletionType("BINARY");
+    setTargetValue("");
+    setUnit("");
+    setIcon("💪");
     setFrequency("daily");
     setTargetCount("1");
+    setDifficulty(3);
+    setMiniVersion("");
+    setGraceDays("0");
+    setDurationHours("0");
+    setDurationMinutes("0");
+    setDurationSeconds("0");
   }
 
   function openCreateModal() {
@@ -273,6 +376,39 @@ export default function HabitsScreen() {
               />
             </View>
 
+            {/* Description Input */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Description (optional)</Text>
+              <TextInput
+                style={[styles.textInput, styles.textArea]}
+                placeholder="What do you need to do?"
+                value={newDescription}
+                onChangeText={setNewDescription}
+                multiline
+                numberOfLines={3}
+                maxLength={500}
+              />
+              <Text style={styles.charCount}>{newDescription.length}/500</Text>
+            </View>
+
+            {/* Icon Selector */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Icon</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.emojiPicker}>
+                  {EMOJI_OPTIONS.map((emoji) => (
+                    <Pressable
+                      key={emoji}
+                      style={[styles.emojiOption, icon === emoji && styles.emojiOptionSelected]}
+                      onPress={() => setIcon(emoji)}
+                    >
+                      <Text style={styles.emojiText}>{emoji}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+
             {/* Goal Selector (optional) */}
             {goals.length > 0 && (
               <View style={styles.formGroup}>
@@ -321,6 +457,165 @@ export default function HabitsScreen() {
               </View>
             )}
 
+            {/* Pillar Selector - only show if no goal selected */}
+            {!selectedGoalId && (
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Pillar</Text>
+                <View style={styles.pillarPicker}>
+                  {ALL_PILLARS.map((pillar) => (
+                    <Pressable
+                      key={pillar}
+                      style={[
+                        styles.pillarOption,
+                        selectedPillar === pillar && {
+                          backgroundColor: PILLAR_INFO[pillar].color + "30",
+                          borderColor: PILLAR_INFO[pillar].color,
+                        },
+                      ]}
+                      onPress={() => setSelectedPillar(pillar)}
+                    >
+                      <Text style={styles.pillarEmoji}>{PILLAR_INFO[pillar].emoji}</Text>
+                      <Text style={styles.pillarOptionText}>{PILLAR_INFO[pillar].label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Habit Type: Build or Quit */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Habit type</Text>
+              <View style={styles.typeRow}>
+                {HABIT_TYPE_OPTIONS.map((option) => (
+                  <Pressable
+                    key={option.value}
+                    style={[
+                      styles.typeOption,
+                      habitType === option.value && styles.typeOptionSelected,
+                    ]}
+                    onPress={() => setHabitType(option.value)}
+                  >
+                    <Text
+                      style={[
+                        styles.typeLabel,
+                        habitType === option.value && styles.typeLabelSelected,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                    <Text style={styles.typeDesc}>{option.desc}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {/* Completion Type */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>How to measure</Text>
+              <View style={styles.completionRow}>
+                {COMPLETION_TYPE_OPTIONS.map((option) => (
+                  <Pressable
+                    key={option.value}
+                    style={[
+                      styles.completionOption,
+                      completionType === option.value && styles.completionOptionSelected,
+                    ]}
+                    onPress={() => setCompletionType(option.value)}
+                  >
+                    <Text
+                      style={[
+                        styles.completionLabel,
+                        completionType === option.value && styles.completionLabelSelected,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {/* Target Value - COUNT */}
+            {completionType === "COUNT" && (
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Target count</Text>
+                <View style={styles.targetRow}>
+                  <TextInput
+                    style={styles.targetInput}
+                    value={targetValue}
+                    onChangeText={setTargetValue}
+                    keyboardType="numeric"
+                    placeholder="e.g., 30"
+                    maxLength={5}
+                  />
+                  <TextInput
+                    style={styles.unitInput}
+                    value={unit}
+                    onChangeText={setUnit}
+                    placeholder="reps, pages, etc."
+                    maxLength={20}
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* Target Duration - Timer style HH:MM:SS */}
+            {completionType === "DURATION" && (
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Target duration</Text>
+                <View style={styles.durationRow}>
+                  <View style={styles.durationInputGroup}>
+                    <TextInput
+                      style={styles.durationInput}
+                      value={durationHours}
+                      onChangeText={(v) => setDurationHours(v.replace(/[^0-9]/g, ""))}
+                      keyboardType="numeric"
+                      placeholder="0"
+                      maxLength={2}
+                    />
+                    <Text style={styles.durationLabel}>hr</Text>
+                  </View>
+                  <Text style={styles.durationSeparator}>:</Text>
+                  <View style={styles.durationInputGroup}>
+                    <TextInput
+                      style={styles.durationInput}
+                      value={durationMinutes}
+                      onChangeText={(v) => setDurationMinutes(v.replace(/[^0-9]/g, ""))}
+                      keyboardType="numeric"
+                      placeholder="0"
+                      maxLength={2}
+                    />
+                    <Text style={styles.durationLabel}>min</Text>
+                  </View>
+                  <Text style={styles.durationSeparator}>:</Text>
+                  <View style={styles.durationInputGroup}>
+                    <TextInput
+                      style={styles.durationInput}
+                      value={durationSeconds}
+                      onChangeText={(v) => setDurationSeconds(v.replace(/[^0-9]/g, ""))}
+                      keyboardType="numeric"
+                      placeholder="0"
+                      maxLength={2}
+                    />
+                    <Text style={styles.durationLabel}>sec</Text>
+                  </View>
+                </View>
+                <Text style={styles.durationHint}>
+                  {(() => {
+                    const h = parseInt(durationHours, 10) || 0;
+                    const m = parseInt(durationMinutes, 10) || 0;
+                    const s = parseInt(durationSeconds, 10) || 0;
+                    if (h === 0 && m === 0 && s === 0) return "Set a target duration";
+                    const parts = [];
+                    if (h > 0) parts.push(`${h} hour${h !== 1 ? "s" : ""}`);
+                    if (m > 0) parts.push(`${m} minute${m !== 1 ? "s" : ""}`);
+                    if (s > 0) parts.push(`${s} second${s !== 1 ? "s" : ""}`);
+                    return parts.join(", ");
+                  })()}
+                </Text>
+              </View>
+            )}
+
             {/* Schedule Section */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Schedule</Text>
@@ -357,35 +652,25 @@ export default function HabitsScreen() {
               </View>
             </View>
 
-            {/* Pillar Selector */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Pillar</Text>
-              <View style={styles.pillarPicker}>
-                {ALL_PILLARS.map((pillar) => (
-                  <Pressable
-                    key={pillar}
+            {/* Show selected pillar from goal */}
+            {selectedGoalId && selectedGoal && (
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Pillar (from goal)</Text>
+                <View style={styles.lockedPillarBadge}>
+                  <Text style={styles.pillarOptionEmoji}>
+                    {PILLAR_INFO[selectedGoal.pillar].emoji}
+                  </Text>
+                  <Text
                     style={[
-                      styles.pillarOption,
-                      selectedPillar === pillar && {
-                        backgroundColor: PILLAR_INFO[pillar].color + "30",
-                        borderColor: PILLAR_INFO[pillar].color,
-                      },
+                      styles.lockedPillarText,
+                      { color: PILLAR_INFO[selectedGoal.pillar].color },
                     ]}
-                    onPress={() => setSelectedPillar(pillar)}
                   >
-                    <Text style={styles.pillarOptionEmoji}>{PILLAR_INFO[pillar].emoji}</Text>
-                    <Text
-                      style={[
-                        styles.pillarOptionText,
-                        selectedPillar === pillar && { color: PILLAR_INFO[pillar].color },
-                      ]}
-                    >
-                      {PILLAR_INFO[pillar].label}
-                    </Text>
-                  </Pressable>
-                ))}
+                    {PILLAR_INFO[selectedGoal.pillar].label}
+                  </Text>
+                </View>
               </View>
-            </View>
+            )}
 
             {/* Privacy Selector */}
             <View style={styles.formGroup}>
@@ -414,6 +699,65 @@ export default function HabitsScreen() {
                   </Pressable>
                 ))}
               </View>
+            </View>
+
+            {/* Difficulty Rating */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Difficulty</Text>
+              <View style={styles.difficultyRow}>
+                {DIFFICULTY_OPTIONS.map((d) => (
+                  <Pressable
+                    key={d}
+                    style={[
+                      styles.difficultyOption,
+                      difficulty === d && styles.difficultyOptionSelected,
+                    ]}
+                    onPress={() => setDifficulty(d)}
+                  >
+                    <Text
+                      style={[
+                        styles.difficultyText,
+                        difficulty === d && styles.difficultyTextSelected,
+                      ]}
+                    >
+                      {d}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.difficultyHint}>1 = Easy, 5 = Very Hard</Text>
+            </View>
+
+            {/* Mini Version */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Mini version (optional)</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="e.g., 1 push-up, read 1 page"
+                value={miniVersion}
+                onChangeText={setMiniVersion}
+                maxLength={100}
+              />
+              <Text style={styles.miniHint}>What is the smallest version of this habit?</Text>
+            </View>
+
+            {/* Grace Days */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Grace days</Text>
+              <View style={styles.graceRow}>
+                {["0", "1", "2", "3"].map((g) => (
+                  <Pressable
+                    key={g}
+                    style={[styles.graceOption, graceDays === g && styles.graceOptionSelected]}
+                    onPress={() => setGraceDays(g)}
+                  >
+                    <Text style={[styles.graceText, graceDays === g && styles.graceTextSelected]}>
+                      {g}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.graceHint}>Days you can miss without breaking your streak</Text>
             </View>
           </ScrollView>
         </SafeAreaView>
@@ -748,5 +1092,244 @@ const styles = StyleSheet.create({
   privacyOptionDesc: {
     fontSize: 13,
     color: "#999",
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: "top",
+    paddingTop: 14,
+  },
+  charCount: {
+    fontSize: 12,
+    color: "#999",
+    textAlign: "right",
+    marginTop: 4,
+  },
+  lockedPillarBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "#e5e5e5",
+    backgroundColor: "#f5f5f5",
+    alignSelf: "flex-start",
+  },
+  lockedPillarText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  // Emoji picker
+  emojiPicker: {
+    flexDirection: "row",
+    gap: 8,
+    paddingVertical: 4,
+  },
+  emojiOption: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "#e5e5e5",
+    backgroundColor: "#fafafa",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emojiOptionSelected: {
+    borderColor: "#000",
+    backgroundColor: "#f0f0f0",
+  },
+  emojiText: {
+    fontSize: 22,
+  },
+  // Habit type
+  typeRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  typeOption: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "#e5e5e5",
+    backgroundColor: "#fafafa",
+  },
+  typeOptionSelected: {
+    borderColor: "#000",
+    backgroundColor: "#f5f5f5",
+  },
+  typeLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#666",
+    marginBottom: 4,
+  },
+  typeLabelSelected: {
+    color: "#000",
+  },
+  typeDesc: {
+    fontSize: 13,
+    color: "#999",
+  },
+  // Completion type
+  completionRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  completionOption: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "#e5e5e5",
+    backgroundColor: "#fafafa",
+    alignItems: "center",
+  },
+  completionOptionSelected: {
+    borderColor: "#000",
+    backgroundColor: "#f5f5f5",
+  },
+  completionLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#666",
+  },
+  completionLabelSelected: {
+    color: "#000",
+  },
+  // Target value & unit
+  targetRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  targetInput: {
+    flex: 1,
+    fontSize: 17,
+    borderWidth: 2,
+    borderColor: "#e5e5e5",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  unitInput: {
+    flex: 2,
+    fontSize: 17,
+    borderWidth: 2,
+    borderColor: "#e5e5e5",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  // Duration timer input
+  durationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  durationInputGroup: {
+    alignItems: "center",
+  },
+  durationInput: {
+    width: 56,
+    height: 56,
+    fontSize: 24,
+    fontWeight: "600",
+    textAlign: "center",
+    borderWidth: 2,
+    borderColor: "#e5e5e5",
+    borderRadius: 10,
+    backgroundColor: "#fafafa",
+  },
+  durationLabel: {
+    fontSize: 11,
+    color: "#999",
+    marginTop: 4,
+    textTransform: "uppercase",
+  },
+  durationSeparator: {
+    fontSize: 28,
+    fontWeight: "600",
+    color: "#666",
+    marginHorizontal: 2,
+    marginBottom: 16,
+  },
+  durationHint: {
+    fontSize: 13,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 10,
+  },
+  // Difficulty
+  difficultyRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  difficultyOption: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: "#e5e5e5",
+    backgroundColor: "#fafafa",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  difficultyOptionSelected: {
+    borderColor: "#000",
+    backgroundColor: "#000",
+  },
+  difficultyText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#666",
+  },
+  difficultyTextSelected: {
+    color: "#fff",
+  },
+  difficultyHint: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 8,
+  },
+  // Mini version
+  miniHint: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 6,
+  },
+  // Grace days
+  graceRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  graceOption: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "#e5e5e5",
+    backgroundColor: "#fafafa",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  graceOptionSelected: {
+    borderColor: "#000",
+    backgroundColor: "#f5f5f5",
+  },
+  graceText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#666",
+  },
+  graceTextSelected: {
+    color: "#000",
+  },
+  graceHint: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 8,
   },
 });

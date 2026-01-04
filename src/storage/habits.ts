@@ -6,7 +6,7 @@
 import { query, queryFirst, execute } from "./database";
 import { logger } from "../lib/logger";
 import { enqueue } from "../services/sync";
-import type { Habit, HabitSchedule, Pillar, Privacy } from "../types";
+import type { Habit, HabitSchedule, Pillar, Privacy, HabitType, CompletionType } from "../types";
 
 /**
  * Generate a UUID for new habits (device-side for offline support)
@@ -22,6 +22,18 @@ export interface CreateHabitData {
   pillar: Pillar;
   schedule: HabitSchedule;
   privacy: Privacy;
+  // Optional fields
+  description?: string;
+  habitType?: HabitType;
+  completionType?: CompletionType;
+  targetValue?: number;
+  unit?: string;
+  icon?: string;
+  tags?: string[];
+  timezone?: string;
+  difficulty?: 1 | 2 | 3 | 4 | 5;
+  miniVersion?: string;
+  graceDays?: number;
 }
 
 /**
@@ -46,8 +58,24 @@ export async function createHabit(userId: string, data: CreateHabitData): Promis
     parentHabitId: data.parentHabitId,
     title: data.title.trim(),
     pillar: data.pillar,
+    // Type & Measurement
+    habitType: data.habitType || "BUILD",
+    completionType: data.completionType || "BINARY",
+    targetValue: data.targetValue,
+    unit: data.unit,
+    // Visual
+    icon: data.icon,
+    tags: data.tags,
+    // Scheduling
     schedule: data.schedule,
+    timezone: data.timezone,
+    // Flexibility
+    difficulty: data.difficulty,
+    miniVersion: data.miniVersion,
+    graceDays: data.graceDays ?? 0,
+    // Privacy & Status
     privacy: data.privacy,
+    description: data.description?.trim(),
     isArchived: false,
     currentStreak: 0,
     longestStreak: 0,
@@ -57,9 +85,10 @@ export async function createHabit(userId: string, data: CreateHabitData): Promis
   };
 
   await execute(
-    `INSERT INTO habits (id, userId, goalId, parentHabitId, title, pillar, schedule, privacy, 
-     isArchived, currentStreak, longestStreak, recoveryStreak, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO habits (id, userId, goalId, parentHabitId, title, pillar, habitType, completionType,
+     targetValue, unit, icon, tags, schedule, timezone, difficulty, miniVersion, graceDays,
+     privacy, description, isArchived, currentStreak, longestStreak, recoveryStreak, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       habit.id,
       habit.userId,
@@ -67,12 +96,23 @@ export async function createHabit(userId: string, data: CreateHabitData): Promis
       habit.parentHabitId || null,
       habit.title,
       habit.pillar,
+      habit.habitType,
+      habit.completionType,
+      habit.targetValue ?? null,
+      habit.unit || null,
+      habit.icon || null,
+      habit.tags ? JSON.stringify(habit.tags) : null,
       JSON.stringify(habit.schedule),
+      habit.timezone || null,
+      habit.difficulty ?? null,
+      habit.miniVersion || null,
+      habit.graceDays ?? 0,
       habit.privacy,
-      0,
-      0,
-      0,
-      0,
+      habit.description || null,
+      0, // isArchived
+      0, // currentStreak
+      0, // longestStreak
+      0, // recoveryStreak
       habit.createdAt,
       habit.updatedAt,
     ]
@@ -153,6 +193,19 @@ export async function updateHabit(
     pillar?: Pillar;
     schedule?: HabitSchedule;
     privacy?: Privacy;
+    description?: string;
+    // New fields
+    habitType?: HabitType;
+    completionType?: CompletionType;
+    targetValue?: number;
+    unit?: string;
+    icon?: string;
+    tags?: string[];
+    timezone?: string;
+    difficulty?: 1 | 2 | 3 | 4 | 5;
+    miniVersion?: string;
+    graceDays?: number;
+    // Status
     isArchived?: boolean;
     currentStreak?: number;
     longestStreak?: number;
@@ -180,6 +233,51 @@ export async function updateHabit(
   if (updates.privacy !== undefined) {
     setClauses.push("privacy = ?");
     params.push(updates.privacy);
+  }
+  if (updates.description !== undefined) {
+    setClauses.push("description = ?");
+    params.push(updates.description ? updates.description.trim() : null);
+  }
+  // New fields
+  if (updates.habitType !== undefined) {
+    setClauses.push("habitType = ?");
+    params.push(updates.habitType);
+  }
+  if (updates.completionType !== undefined) {
+    setClauses.push("completionType = ?");
+    params.push(updates.completionType);
+  }
+  if (updates.targetValue !== undefined) {
+    setClauses.push("targetValue = ?");
+    params.push(updates.targetValue);
+  }
+  if (updates.unit !== undefined) {
+    setClauses.push("unit = ?");
+    params.push(updates.unit || null);
+  }
+  if (updates.icon !== undefined) {
+    setClauses.push("icon = ?");
+    params.push(updates.icon || null);
+  }
+  if (updates.tags !== undefined) {
+    setClauses.push("tags = ?");
+    params.push(updates.tags ? JSON.stringify(updates.tags) : null);
+  }
+  if (updates.timezone !== undefined) {
+    setClauses.push("timezone = ?");
+    params.push(updates.timezone || null);
+  }
+  if (updates.difficulty !== undefined) {
+    setClauses.push("difficulty = ?");
+    params.push(updates.difficulty);
+  }
+  if (updates.miniVersion !== undefined) {
+    setClauses.push("miniVersion = ?");
+    params.push(updates.miniVersion || null);
+  }
+  if (updates.graceDays !== undefined) {
+    setClauses.push("graceDays = ?");
+    params.push(updates.graceDays);
   }
   if (updates.isArchived !== undefined) {
     setClauses.push("isArchived = ?");
@@ -270,8 +368,24 @@ interface HabitRow {
   parentHabitId: string | null;
   title: string;
   pillar: string;
+  // Type & Measurement
+  habitType: string;
+  completionType: string;
+  targetValue: number | null;
+  unit: string | null;
+  // Visual
+  icon: string | null;
+  tags: string | null; // JSON array
+  // Scheduling
   schedule: string;
+  timezone: string | null;
+  // Flexibility
+  difficulty: number | null;
+  miniVersion: string | null;
+  graceDays: number;
+  // Status
   privacy: string;
+  description: string | null;
   isArchived: number;
   archivedAt: string | null;
   currentStreak: number;
@@ -292,8 +406,24 @@ function rowToHabit(row: HabitRow): Habit {
     parentHabitId: row.parentHabitId ?? undefined,
     title: row.title,
     pillar: row.pillar as Pillar,
+    // Type & Measurement
+    habitType: (row.habitType || "BUILD") as HabitType,
+    completionType: (row.completionType || "BINARY") as CompletionType,
+    targetValue: row.targetValue ?? undefined,
+    unit: row.unit ?? undefined,
+    // Visual
+    icon: row.icon ?? undefined,
+    tags: row.tags ? JSON.parse(row.tags) : undefined,
+    // Scheduling
     schedule: JSON.parse(row.schedule) as HabitSchedule,
+    timezone: row.timezone ?? undefined,
+    // Flexibility
+    difficulty: (row.difficulty as 1 | 2 | 3 | 4 | 5 | null) ?? undefined,
+    miniVersion: row.miniVersion ?? undefined,
+    graceDays: row.graceDays ?? 0,
+    // Status
     privacy: row.privacy as Privacy,
+    description: row.description ?? undefined,
     isArchived: row.isArchived === 1,
     archivedAt: row.archivedAt ?? undefined,
     currentStreak: row.currentStreak,

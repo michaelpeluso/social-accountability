@@ -49,6 +49,8 @@ describe("Goals Storage", () => {
         title: "Run a marathon",
         pillar: "BODY",
         privacy: "SELF",
+        isIndefinite: false,
+        dataSource: "MANUAL",
       });
 
       expect(goal.id).toMatch(/^goal-/);
@@ -71,6 +73,8 @@ describe("Goals Storage", () => {
         title: "  Spaced Title  ",
         pillar: "MIND",
         privacy: "FRIENDS",
+        isIndefinite: false,
+        dataSource: "MANUAL",
       });
 
       expect(goal.title).toBe("Spaced Title");
@@ -81,6 +85,8 @@ describe("Goals Storage", () => {
         title: "Learn Spanish",
         pillar: "MIND",
         privacy: "SELF",
+        isIndefinite: true,
+        dataSource: "MANUAL",
       });
 
       expect(enqueue).toHaveBeenCalledWith("CREATE", "goals", goal.id, goal);
