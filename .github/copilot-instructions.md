@@ -229,3 +229,65 @@ These rules are for any autonomous or assistant agent (including CI bots or LLM-
 - **Privacy-first:** Enforce privacy rules in code and tests; never bypass server-side validation for convenience.
 
 These guidelines are mandatory for any automated contributor; failure to follow them should be considered a blocker for merging changes.
+
+---
+
+## Milestone Implementation Workflow
+
+When the owner asks to "start development on milestone X" or "implement M0", follow this workflow:
+
+### 1. Fetch Open Stories
+
+```bash
+# Fetch all open issues for milestone (e.g., M0)
+gh issue list --search 'is:issue is:open "[M0-" in:title' --state open --json number,title,body --jq '.[] | "\(.number)|\(.title)"'
+```
+
+### 2. For Each Story
+
+1. **Read acceptance criteria** from the issue body
+2. **Check if already implemented** - look for existing files, run tests
+3. **Implement if missing** - create files, write code, add tests
+4. **Verify implementation:**
+   - Run `npm run type-check` - must pass
+   - Run `npm test` - all tests must pass
+   - Run `npm run lint` - no errors
+   - For UI stories: start Expo and verify on device
+5. **Close the issue** with verification comment:
+   ```bash
+   gh issue close <number> --comment "Verified complete:
+   - [List each acceptance criterion checked]
+   - Tests: X passing in tests/path/file.test.ts"
+   ```
+
+### 3. Verification Requirements
+
+- **Code stories**: Must have passing tests
+- **UI stories**: Must verify app loads and screens render (start Expo in background, continue other work while user tests)
+- **Config stories**: Must verify files exist and validation works
+- **Never close without verification** - run the actual checks
+
+**Testing Workflow for UI Stories:**
+
+- Start Expo in background: `npm start 2>&1 &`
+- Continue with other stories/implementation
+- When ready for user verification, leave a note that Expo is running with QR code
+- User will test asynchronously and report back results
+- Do not block agent progress waiting for user device testing
+
+### 4. Progress Reporting
+
+After completing each story, update the TODO list and report progress:
+
+- Stories verified and closed
+- Stories remaining
+- Any blockers encountered
+
+### 5. Final Milestone Validation
+
+Before declaring milestone complete:
+
+```bash
+npm run type-check && npm test && npm run lint
+# All must pass with zero errors
+```
