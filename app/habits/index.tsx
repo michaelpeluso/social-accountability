@@ -1,6 +1,6 @@
 /**
- * Goals Screen - Display and manage user goals
- * M2-2.1: Create Goal feature
+ * Habits Screen - Display and manage user habits
+ * M2-2.2: Create Habit feature
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -14,18 +14,25 @@ import {
   Modal,
   TextInput,
   Alert,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { auth } from "../../src/services/auth";
-import { createGoal, getGoals, archiveGoal } from "../../src/storage/goals";
+import { createHabit, getHabits } from "../../src/storage/habits";
+import { getGoals } from "../../src/storage/goals";
 import { PILLAR_INFO, ALL_PILLARS, PRIVACY_INFO } from "../../src/types/goals";
-import type { Goal, Pillar, Privacy } from "../../src/types";
+import type { Habit, Goal, Pillar, Privacy, HabitSchedule, HabitFrequency } from "../../src/types";
 
-// Privacy options for goal creation
 const PRIVACY_OPTIONS: Privacy[] = ["SELF", "FRIENDS", "PUBLIC"];
+const FREQUENCY_OPTIONS: { value: HabitFrequency; label: string }[] = [
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+];
 
-export default function GoalsScreen() {
+export default function HabitsScreen() {
+  const params = useLocalSearchParams<{ goalId?: string }>();
+  const [habits, setHabits] = useState<Habit[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -34,59 +41,88 @@ export default function GoalsScreen() {
 
   // Form state
   const [newTitle, setNewTitle] = useState("");
+  const [selectedGoalId, setSelectedGoalId] = useState<string | undefined>(params.goalId);
   const [selectedPillar, setSelectedPillar] = useState<Pillar>("BODY");
   const [selectedPrivacy, setSelectedPrivacy] = useState<Privacy>("SELF");
+  const [frequency, setFrequency] = useState<HabitFrequency>("daily");
+  const [targetCount, setTargetCount] = useState("1");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const loadHabits = useCallback(
+    async (uid: string) => {
+      try {
+        const userHabits = await getHabits(uid, { goalId: params.goalId });
+        setHabits(userHabits);
+      } catch {
+        Alert.alert("Error", "Failed to load habits");
+      }
+    },
+    [params.goalId]
+  );
+
+  const loadGoals = useCallback(async (uid: string) => {
+    try {
+      const userGoals = await getGoals(uid);
+      setGoals(userGoals);
+    } catch {
+      // Silent fail for goals - not critical
+    }
+  }, []);
 
   const initializeScreen = useCallback(async () => {
     const user = await auth.getUser();
     if (user) {
       setUserId(user.id);
-      await loadGoals(user.id);
+      await Promise.all([loadHabits(user.id), loadGoals(user.id)]);
     }
     setIsLoading(false);
-  }, []);
+  }, [loadHabits, loadGoals]);
 
   useEffect(() => {
     initializeScreen();
   }, [initializeScreen]);
 
-  async function loadGoals(uid: string) {
-    try {
-      const userGoals = await getGoals(uid);
-      setGoals(userGoals);
-    } catch {
-      Alert.alert("Error", "Failed to load goals");
-    }
-  }
-
   const onRefresh = useCallback(async () => {
     if (!userId) return;
     setIsRefreshing(true);
-    await loadGoals(userId);
+    await loadHabits(userId);
     setIsRefreshing(false);
-  }, [userId]);
+  }, [userId, loadHabits]);
 
-  async function handleCreateGoal() {
+  async function handleCreateHabit() {
     if (!userId) return;
     if (!newTitle.trim()) {
-      Alert.alert("Error", "Please enter a goal title");
+      Alert.alert("Error", "Please enter a habit title");
+      return;
+    }
+
+    const count = parseInt(targetCount, 10);
+    if (isNaN(count) || count < 1) {
+      Alert.alert("Error", "Target count must be at least 1");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await createGoal(userId, {
+      const schedule: HabitSchedule = {
+        frequency,
+        targetCount: count,
+      };
+
+      await createHabit(userId, {
         title: newTitle.trim(),
+        goalId: selectedGoalId,
         pillar: selectedPillar,
+        schedule,
         privacy: selectedPrivacy,
       });
 
       setShowCreateModal(false);
       resetForm();
-      await loadGoals(userId);
-    } catch {
-      Alert.alert("Error", "Failed to create goal");
+      await loadHabits(userId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to create habit";
+      Alert.alert("Error", message);
     } finally {
       setIsSubmitting(false);
     }
@@ -94,8 +130,11 @@ export default function GoalsScreen() {
 
   function resetForm() {
     setNewTitle("");
+    setSelectedGoalId(params.goalId);
     setSelectedPillar("BODY");
     setSelectedPrivacy("SELF");
+    setFrequency("daily");
+    setTargetCount("1");
   }
 
   function openCreateModal() {
@@ -103,41 +142,28 @@ export default function GoalsScreen() {
     setShowCreateModal(true);
   }
 
-  async function handleArchiveGoal(goalId: string, goalTitle: string) {
-    if (!userId) return;
-
-    Alert.alert("Archive Goal", `Archive "${goalTitle}"? You can restore it later.`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Archive",
-        onPress: async () => {
-          try {
-            await archiveGoal(goalId);
-            await loadGoals(userId);
-          } catch {
-            Alert.alert("Error", "Failed to archive goal");
-          }
-        },
-      },
-    ]);
-  }
-
-  // Group goals by pillar
-  const goalsByPillar = goals.reduce(
-    (acc, goal) => {
-      if (!acc[goal.pillar]) {
-        acc[goal.pillar] = [];
+  // Group habits by pillar
+  const habitsByPillar = habits.reduce(
+    (acc, habit) => {
+      if (!acc[habit.pillar]) {
+        acc[habit.pillar] = [];
       }
-      acc[goal.pillar].push(goal);
+      acc[habit.pillar].push(habit);
       return acc;
     },
-    {} as Record<Pillar, Goal[]>
+    {} as Record<Pillar, Habit[]>
   );
+
+  const getGoalTitle = (goalId?: string) => {
+    if (!goalId) return null;
+    const goal = goals.find((g) => g.id === goalId);
+    return goal?.title;
+  };
 
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={styles.loadingText}>Loading goals...</Text>
+        <Text style={styles.loadingText}>Loading habits...</Text>
       </SafeAreaView>
     );
   }
@@ -149,27 +175,25 @@ export default function GoalsScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backButtonText}>Back</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Goals</Text>
+        <Text style={styles.headerTitle}>Habits</Text>
         <Pressable onPress={openCreateModal} style={styles.addButton}>
           <Text style={styles.addButtonText}>+ New</Text>
         </Pressable>
       </View>
 
-      {/* Goals List */}
-      {goals.length === 0 ? (
+      {/* Habits List */}
+      {habits.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyEmoji}>🎯</Text>
-          <Text style={styles.emptyTitle}>No goals yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Create your first goal to start tracking your progress
-          </Text>
+          <Text style={styles.emptyEmoji}>🔄</Text>
+          <Text style={styles.emptyTitle}>No habits yet</Text>
+          <Text style={styles.emptySubtitle}>Create recurring habits to build consistency</Text>
           <Pressable style={styles.createFirstButton} onPress={openCreateModal}>
-            <Text style={styles.createFirstButtonText}>Create Goal</Text>
+            <Text style={styles.createFirstButtonText}>Create Habit</Text>
           </Pressable>
         </View>
       ) : (
         <FlatList
-          data={ALL_PILLARS.filter((p) => goalsByPillar[p]?.length > 0)}
+          data={ALL_PILLARS.filter((p) => habitsByPillar[p]?.length > 0)}
           keyExtractor={(pillar) => pillar}
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
           contentContainerStyle={styles.listContent}
@@ -182,20 +206,31 @@ export default function GoalsScreen() {
                 <Text style={[styles.pillarTitle, { color: PILLAR_INFO[pillar].color }]}>
                   {PILLAR_INFO[pillar].label}
                 </Text>
-                <Text style={styles.goalCount}>{goalsByPillar[pillar]?.length || 0}</Text>
+                <Text style={styles.habitCount}>{habitsByPillar[pillar]?.length || 0}</Text>
               </View>
-              {goalsByPillar[pillar]?.map((goal) => (
+              {habitsByPillar[pillar]?.map((habit) => (
                 <Pressable
-                  key={goal.id}
-                  style={styles.goalCard}
+                  key={habit.id}
+                  style={styles.habitCard}
                   onPress={() => {
-                    router.push(`/goals/${goal.id}`);
+                    router.push(`/habits/${habit.id}`);
                   }}
-                  onLongPress={() => handleArchiveGoal(goal.id, goal.title)}
                 >
-                  <Text style={styles.goalTitle}>{goal.title}</Text>
-                  <View style={styles.goalMeta}>
-                    <Text style={styles.privacyBadge}>{PRIVACY_INFO[goal.privacy].label}</Text>
+                  <View style={styles.habitHeader}>
+                    <Text style={styles.habitTitle}>{habit.title}</Text>
+                    {habit.currentStreak > 0 && (
+                      <View style={styles.streakBadge}>
+                        <Text style={styles.streakText}>{habit.currentStreak} day streak</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.habitMeta}>
+                    <Text style={styles.scheduleBadge}>
+                      {habit.schedule.targetCount}x {habit.schedule.frequency}
+                    </Text>
+                    {getGoalTitle(habit.goalId) && (
+                      <Text style={styles.goalLink}>{getGoalTitle(habit.goalId)}</Text>
+                    )}
                   </View>
                 </Pressable>
               ))}
@@ -204,7 +239,7 @@ export default function GoalsScreen() {
         />
       )}
 
-      {/* Create Goal Modal */}
+      {/* Create Habit Modal */}
       <Modal
         visible={showCreateModal}
         animationType="slide"
@@ -216,26 +251,110 @@ export default function GoalsScreen() {
             <Pressable onPress={() => setShowCreateModal(false)}>
               <Text style={styles.modalCancel}>Cancel</Text>
             </Pressable>
-            <Text style={styles.modalTitle}>New Goal</Text>
-            <Pressable onPress={handleCreateGoal} disabled={isSubmitting}>
+            <Text style={styles.modalTitle}>New Habit</Text>
+            <Pressable onPress={handleCreateHabit} disabled={isSubmitting}>
               <Text style={[styles.modalSave, isSubmitting && styles.disabled]}>
                 {isSubmitting ? "Saving..." : "Save"}
               </Text>
             </Pressable>
           </View>
 
-          <View style={styles.modalContent}>
+          <ScrollView style={styles.modalContent}>
             {/* Title Input */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>What&apos;s your goal?</Text>
+              <Text style={styles.label}>Habit name</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="e.g., Run a 5K, Read 20 books"
+                placeholder="e.g., Meditate, Read, Exercise"
                 value={newTitle}
                 onChangeText={setNewTitle}
                 autoFocus
                 maxLength={100}
               />
+            </View>
+
+            {/* Goal Selector (optional) */}
+            {goals.length > 0 && (
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Link to goal (optional)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.goalPicker}>
+                    <Pressable
+                      style={[styles.goalOption, !selectedGoalId && styles.goalOptionSelected]}
+                      onPress={() => setSelectedGoalId(undefined)}
+                    >
+                      <Text
+                        style={[
+                          styles.goalOptionText,
+                          !selectedGoalId && styles.goalOptionTextSelected,
+                        ]}
+                      >
+                        None
+                      </Text>
+                    </Pressable>
+                    {goals.map((goal) => (
+                      <Pressable
+                        key={goal.id}
+                        style={[
+                          styles.goalOption,
+                          selectedGoalId === goal.id && styles.goalOptionSelected,
+                        ]}
+                        onPress={() => {
+                          setSelectedGoalId(goal.id);
+                          setSelectedPillar(goal.pillar);
+                        }}
+                      >
+                        <Text style={styles.goalOptionEmoji}>{PILLAR_INFO[goal.pillar].emoji}</Text>
+                        <Text
+                          style={[
+                            styles.goalOptionText,
+                            selectedGoalId === goal.id && styles.goalOptionTextSelected,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {goal.title}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Schedule Section */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Schedule</Text>
+              <View style={styles.scheduleRow}>
+                <TextInput
+                  style={styles.countInput}
+                  value={targetCount}
+                  onChangeText={setTargetCount}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                />
+                <Text style={styles.scheduleText}>times per</Text>
+                <View style={styles.frequencyPicker}>
+                  {FREQUENCY_OPTIONS.map((option) => (
+                    <Pressable
+                      key={option.value}
+                      style={[
+                        styles.frequencyOption,
+                        frequency === option.value && styles.frequencyOptionSelected,
+                      ]}
+                      onPress={() => setFrequency(option.value)}
+                    >
+                      <Text
+                        style={[
+                          styles.frequencyOptionText,
+                          frequency === option.value && styles.frequencyOptionTextSelected,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
             </View>
 
             {/* Pillar Selector */}
@@ -270,7 +389,7 @@ export default function GoalsScreen() {
 
             {/* Privacy Selector */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Who can see this goal?</Text>
+              <Text style={styles.label}>Who can see this habit?</Text>
               <View style={styles.privacyPicker}>
                 {PRIVACY_OPTIONS.map((privacy) => (
                   <Pressable
@@ -296,7 +415,7 @@ export default function GoalsScreen() {
                 ))}
               </View>
             </View>
-          </View>
+          </ScrollView>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -401,12 +520,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     flex: 1,
   },
-  goalCount: {
+  habitCount: {
     fontSize: 14,
     color: "#999",
     fontWeight: "500",
   },
-  goalCard: {
+  habitCard: {
     backgroundColor: "#fff",
     padding: 16,
     borderRadius: 12,
@@ -417,21 +536,43 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  goalTitle: {
-    fontSize: 16,
-    fontWeight: "500",
+  habitHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 8,
   },
-  goalMeta: {
-    flexDirection: "row",
+  habitTitle: {
+    fontSize: 16,
+    fontWeight: "500",
+    flex: 1,
   },
-  privacyBadge: {
+  streakBadge: {
+    backgroundColor: "#FF6B6B20",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  streakText: {
+    fontSize: 12,
+    color: "#FF6B6B",
+    fontWeight: "600",
+  },
+  habitMeta: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  scheduleBadge: {
     fontSize: 12,
     color: "#666",
     backgroundColor: "#f0f0f0",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
+  },
+  goalLink: {
+    fontSize: 12,
+    color: "#007AFF",
   },
   // Modal styles
   modalContainer: {
@@ -481,6 +622,81 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: "#e5e5e5",
     paddingVertical: 12,
+  },
+  goalPicker: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  goalOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "#e5e5e5",
+    backgroundColor: "#fafafa",
+    maxWidth: 150,
+  },
+  goalOptionSelected: {
+    borderColor: "#000",
+    backgroundColor: "#f5f5f5",
+  },
+  goalOptionEmoji: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  goalOptionText: {
+    fontSize: 14,
+    color: "#666",
+    flexShrink: 1,
+  },
+  goalOptionTextSelected: {
+    color: "#000",
+    fontWeight: "500",
+  },
+  scheduleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  countInput: {
+    width: 50,
+    fontSize: 20,
+    fontWeight: "600",
+    textAlign: "center",
+    borderWidth: 2,
+    borderColor: "#e5e5e5",
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  scheduleText: {
+    fontSize: 16,
+    color: "#666",
+  },
+  frequencyPicker: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  frequencyOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "#e5e5e5",
+    backgroundColor: "#fafafa",
+  },
+  frequencyOptionSelected: {
+    borderColor: "#000",
+    backgroundColor: "#f5f5f5",
+  },
+  frequencyOptionText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  frequencyOptionTextSelected: {
+    color: "#000",
+    fontWeight: "600",
   },
   pillarPicker: {
     flexDirection: "row",
