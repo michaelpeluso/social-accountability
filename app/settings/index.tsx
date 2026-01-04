@@ -9,8 +9,11 @@ import {
   Alert,
   TextInput,
   Modal,
+  Platform,
 } from "react-native";
 import { router } from "expo-router";
+import { File, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import { auth } from "../../src/services/auth";
 import { api } from "../../src/services/api";
 import { logger } from "../../src/lib/logger";
@@ -49,14 +52,63 @@ export default function Settings() {
         return;
       }
 
-      logger.info("Settings: data exported", { userId: user?.id });
-      Alert.alert(
-        "Export Complete",
-        "Your data has been exported successfully. In a future update, you'll be able to download the file."
-      );
+      const exportData = response.data;
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const fileName = `social-accountability-export-${timestamp}.json`;
+
+      // Check if sharing is available
+      const sharingAvailable = await Sharing.isAvailableAsync();
+
+      if (Platform.OS === "web") {
+        // Web: trigger download via blob
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        Alert.alert("Export Complete", "Your data has been downloaded.");
+      } else if (sharingAvailable) {
+        // Native: save to file and share using new expo-file-system API
+        const file = new File(Paths.document, fileName);
+
+        await file.write(JSON.stringify(exportData, null, 2));
+
+        await Sharing.shareAsync(file.uri, {
+          mimeType: "application/json",
+          dialogTitle: "Save your data export",
+          UTI: "public.json",
+        });
+
+        // Clean up the file after sharing
+        await file.delete();
+
+        logger.info("Settings: data exported and shared", { userId: user?.id });
+      } else {
+        // Fallback: save to document directory only
+        const file = new File(Paths.document, fileName);
+
+        await file.write(JSON.stringify(exportData, null, 2));
+
+        Alert.alert(
+          "Export Complete",
+          `Your data has been saved to the app's documents folder as ${fileName}`
+        );
+
+        logger.info("Settings: data exported to local file", {
+          userId: user?.id,
+          fileUri: file.uri,
+        });
+      }
     } catch (err) {
       logger.error("Settings: export failed", { error: err });
-      Alert.alert("Error", "Failed to export data");
+      Alert.alert("Error", "Failed to export data. Please try again.");
     } finally {
       setExporting(false);
     }
