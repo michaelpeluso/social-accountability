@@ -1145,6 +1145,174 @@ Response: { success: true }
 
 ---
 
+### 8.11 Designated Accountability Partner
+
+**Story:** As a user, I want to designate one trusted friend as my "accountability partner" who gets deeper access to my progress and struggles.
+
+**Acceptance Criteria:**
+
+- [ ] Settings → Privacy → "Accountability Partner" section
+- [ ] User can select one friend from their circle as accountability partner
+- [ ] Partner receives special access permissions:
+  - View ALL habits (including SELF privacy habits)
+  - View detailed analytics and trend breakdowns
+  - View journal entries (if user enables)
+  - See real-time struggle signals (missed streaks, behavioral drift)
+  - Receive alerts when user is slipping ("Sarah missed meditation 3 days in a row")
+- [ ] Partnership requires mutual acceptance (partner must accept role)
+- [ ] User can revoke partnership anytime (immediate access removal)
+- [ ] Partner badge: Special indicator in friend list ("Your Accountability Partner 🤝")
+- [ ] Settings granular controls: User can toggle specific permissions (habits, journal, analytics)
+
+**Permission Levels:**
+
+```typescript
+type AccountabilityPartnerPermissions = {
+  viewSelfHabits: boolean; // See private (SELF) habits
+  viewJournal: boolean; // Read journal entries
+  viewDetailedAnalytics: boolean; // Consistency score breakdowns, trends
+  receiveStrugggleAlerts: boolean; // "User missed X 3 days in a row"
+  viewCheckInHistory: boolean; // See full check-in timeline
+  viewIdentities: boolean; // See all identities (even private ones)
+};
+
+// Default: All true when user designates partner
+// User can granularly disable any permission
+```
+
+**Acceptance Flow:**
+
+```
+User → Selects Friend → "Invite as Accountability Partner"
+        ↓
+Friend receives invitation: "Sarah wants you as her accountability partner.
+You'll have deeper access to her progress. Accept?"
+        ↓
+[Accept] [Decline] [Learn More]
+        ↓
+Partnership active ✅
+
+Settings → Accountability Partner
+  Current Partner: Mike Johnson 🤝
+
+  Permissions:
+  ✅ View my private habits
+  ✅ View my journal
+  ✅ View detailed analytics
+  ✅ Receive struggle alerts
+  ✅ View check-in history
+  ❌ View my private identities (disabled)
+
+  [Revoke Partnership] [Adjust Permissions]
+```
+
+**Partner Dashboard (What Partner Sees):**
+
+```
+Sarah's Progress (Accountability Partner View)
+
+Overview:
+  Consistency Score: 78/100 (↓ -5 from last week)
+  Active Habits: 7
+  Current Streaks: 2 active, 1 broken this week ⚠️
+
+Recent Struggles:
+  ⚠️ Morning meditation: Missed 3 days in a row
+  ⚠️ Consistency score dropped 5 points this week
+  ℹ️ Sleep avg: 6.2hrs (down from 7.1hrs usual)
+
+Habits (including private):
+  ✅ Morning meditation (SELF) - 0-day streak ❌
+  ✅ Evening workout (FRIENDS) - 12-day streak 🔥
+  ✅ No late-night snacking (SELF) - 8-day streak
+  ...
+
+Journal (if enabled):
+  Jan 14: "Feeling overwhelmed with work deadlines..."
+  Jan 12: "Skipped meditation again. Need to reset routine."
+
+Suggested Support:
+  💬 "Sarah's meditation streak broke. Send encouragement?"
+  🔔 "Consistency score down. Check in on Sarah?"
+```
+
+**Use Cases:**
+
+1. **Spouse/Partner:** Wife sees husband's smoking cessation progress, offers support when he's struggling
+2. **Best Friend:** College roommate tracks each other's study habits and mental health check-ins
+3. **Parent/Teen:** Parent monitors teen's screen time and sleep habits (with teen's consent)
+4. **Trainer/Client:** Personal trainer sees client's workout and nutrition habits in detail
+5. **Therapist/Patient:** Therapist (if friended) sees patient's mood journal and coping habit adherence
+
+**Why Designated (Single) Partner:**
+
+- **Trust Level:** Only 1 person gets deepest access (spouse, best friend level)
+- **Intimacy:** Prevents oversharing with entire friend circle
+- **Accountability:** Most effective with one trusted person vs diffuse group
+- **Focus:** Partner can meaningfully engage vs casual friends who skim feed
+
+**Privacy Safeguards:**
+
+- User must explicitly invite and partner must accept
+- Granular permission toggles (not all-or-nothing)
+- Instant revoke (no delay, immediate access removal)
+- Audit log: User can see what partner viewed (optional transparency)
+- Partner can't share user's data further (enforced by app, not exportable)
+
+**Technical Requirements:**
+
+- New table: `accountability_partnerships` (userId, partnerId, status: 'PENDING' | 'ACTIVE', permissions: JSON, createdAt)
+- Authorization: Check partnership + permissions before serving data
+- Notifications: Real-time alerts to partner when user struggles (configurable frequency)
+- Revoke: Cascade delete access, clear partner-specific cached data
+
+**API Contract:**
+
+```
+POST /accountability-partner/invite
+Body: { partnerId: string, permissions: AccountabilityPartnerPermissions }
+Response: { data: Partnership }
+
+POST /accountability-partner/accept
+Body: { partnershipId: string }
+Response: { data: Partnership }
+
+PATCH /accountability-partner/permissions
+Body: { permissions: Partial<AccountabilityPartnerPermissions> }
+Response: { data: Partnership }
+
+DELETE /accountability-partner
+Response: { success: true }
+
+GET /accountability-partner/dashboard?forUserId=:id
+Response: {
+  data: {
+    consistencyScore, habits, recentStruggles, journalEntries?, analytics
+  }
+}
+```
+
+**Edge Cases:**
+
+- User unfriends partner → Partnership auto-revoked
+- Partner deletes account → Partnership removed, user notified
+- User switches partner → Old partner immediately loses access, new invited
+- Both users are each other's partners → Mutual accountability (allowed)
+
+**Cost:** $0 (server-side authorization logic only)
+
+**Dependencies:** M4 (journal), M6 (consistency score, behavioral drift)
+
+**Future Enhancements (M9+):**
+
+- Multiple accountability partners (2-3 max) with role-based permissions
+- Partner coaching prompts: "Sarah missed meditation. Suggested message: 'Hey, want to meditate together tomorrow morning?'"
+- Shared habit goals: Partner and user work on habit together with combined streak
+
+**Why:** Deepest level of accountability requires trust with ONE person. Spouse, best friend, or close confidant can provide meaningful support vs superficial friend circle. Opt-in model respects privacy while enabling vulnerable sharing for users who want it.
+
+---
+
 ## Guiding Principles for M7+
 
 1. **Ship M1-M6 first, validate product-market fit**
