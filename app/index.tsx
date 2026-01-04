@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { router } from "expo-router";
-import { auth } from "../services/auth";
+import { auth } from "../src/services/auth";
 import type { User } from "../src/types/user";
 
 export default function Index() {

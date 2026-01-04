@@ -10,7 +10,7 @@ import {
   TextInput,
   RefreshControl,
 } from "react-native";
-import { api } from "../../services/api";
+import { api } from "../../src/services/api";
 import { logger } from "../../src/lib/logger";
 import type { User, FriendRequest } from "../../src/types/user";
 

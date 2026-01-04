@@ -14,8 +14,8 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import { auth } from "../../services/auth";
-import { api } from "../../services/api";
+import { auth } from "../../src/services/auth";
+import { api } from "../../src/services/api";
 import { logger } from "../../src/lib/logger";
 
 const MAX_BIO_LENGTH = 280;

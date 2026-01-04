@@ -3,7 +3,7 @@
  * Device-first: API calls sync to cloud replica, not primary
  */
 
-import { logger } from "../src/lib/logger";
+import { logger } from "../lib/logger";
 import type {
   User,
   SignInWithAppleRequest,
@@ -14,7 +14,7 @@ import type {
   Friendship,
   FriendRequest,
   ExportData,
-} from "../src/types/user";
+} from "../types/user";
 
 // API configuration - uses mock mode when ENABLE_APPLE_AUTH=false
 const API_URL = process.env.API_URL || "http://localhost:3000";

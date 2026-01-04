@@ -6,9 +6,9 @@
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-import { logger } from "../src/lib/logger";
+import { logger } from "../lib/logger";
 import { api } from "./api";
-import type { User, SignInWithAppleRequest } from "../src/types/user";
+import type { User, SignInWithAppleRequest } from "../types/user";
 
 const TOKEN_KEY = "auth_token";
 const USER_KEY = "auth_user";

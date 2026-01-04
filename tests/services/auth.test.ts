@@ -1,4 +1,4 @@
-import { auth } from "../../services/auth";
+import { auth } from "../../src/services/auth";
 
 describe("auth service", () => {
   beforeEach(async () => {

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Slot, router, useSegments, useRootNavigationState } from "expo-router";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { auth } from "../services/auth";
+import { auth } from "../src/services/auth";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);

@@ -12,8 +12,8 @@ import {
 } from "react-native";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
-import { auth, isAppleAuthAvailable } from "../../services/auth";
-import { api } from "../../services/api";
+import { auth, isAppleAuthAvailable } from "../../src/services/auth";
+import { api } from "../../src/services/api";
 import { logger } from "../../src/lib/logger";
 
 export default function SignIn() {
