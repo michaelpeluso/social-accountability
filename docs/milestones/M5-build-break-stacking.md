@@ -259,6 +259,58 @@ Worst time: 7-9pm (avg 2.3)
 ];
 ```
 
+**Context-Based Triggers (Future Enhancement - M7):**
+
+Beyond time-based stacking, habits can be triggered by environmental context:
+
+```typescript
+// Location-based triggers (with user consent)
+{
+  trigger: "LOCATION",
+  location: "Gym",
+  action: "Log workout check-in",
+  privacy: "Location hash stored encrypted, never shared"
+}
+
+{
+  trigger: "LOCATION",
+  location: "Home",
+  action: "Remind to meditate",
+  timeRange: "after 6pm"
+}
+
+// Bluetooth device triggers
+{
+  trigger: "BLUETOOTH_CONNECT",
+  device: "Car bluetooth",
+  action: "Start audiobook habit",
+  note: "Automatically suggest listening when in car"
+}
+
+// Other habit completion triggers
+{
+  trigger: "HABIT_COMPLETE",
+  completedHabit: "Morning workout",
+  action: "Remind to log breakfast",
+  delay: "15 minutes"
+}
+
+{
+  trigger: "HABIT_COMPLETE",
+  completedHabit: "Finish work for day",
+  action: "Suggest evening walk"
+}
+
+// App state triggers
+{
+  trigger: "PHONE_UNLOCK",
+  condition: "before 9am",
+  action: "Block social media apps (BREAK habit support)"
+}
+```
+
+**Implementation Note:** Context-based triggers require additional iOS permissions and are planned for M7 (see M7-growth-hub.md). M5 focuses on time-based pattern detection only.
+
 **Stack Insight Card UI:**
 
 ```
@@ -571,6 +623,112 @@ enum ChallengeType {
 
 ---
 
+### 5.8 Goal Enhancements: Weighted Habit Contributions
+
+**Story:** As a user, I want my linked habits to contribute different weights to my goal progress.
+
+**Acceptance Criteria:**
+
+- [ ] Goal editing shows linked habits with weight sliders (0-100%)
+- [ ] Total weights don't need to sum to 100% (each habit contributes independently)
+- [ ] Goal progress calculated as weighted average of habit completion
+- [ ] Example: "Run marathon" goal with habits:
+  - Long run (40% weight)
+  - Speed training (30% weight)
+  - Recovery stretching (20% weight)
+  - Nutrition tracking (10% weight)
+- [ ] Goal progress updates when any linked habit is checked in
+- [ ] Progress visualization shows contribution breakdown
+
+**Example:**
+
+```typescript
+{
+  goal: {
+    title: "Run a marathon",
+    linkedHabitWeights: {
+      "habit-long-run": 0.4,
+      "habit-speed-training": 0.3,
+      "habit-stretching": 0.2,
+      "habit-nutrition": 0.1,
+    },
+    currentProgress: 0.75, // weighted from habit completions
+  }
+}
+```
+
+**Technical Requirements:**
+
+- Goal.linkedHabitWeights column (JSON object: {habitId: weight})
+- Calculate progress: Σ(habitCompletionRate × weight) / Σ(weights)
+- Device-side calculation on check-in
+- Update goal progress whenever linked habit is checked in
+
+**Why:** Not all habits contribute equally to a goal. A marathon goal benefits more from long runs than stretching.
+
+**Privacy Notes:**
+
+- Weights are internal calculation, not shared
+
+**Cost:** $0
+
+---
+
+### 5.9 Goal Enhancements: Habit-Derived Data Source
+
+**Story:** As a user, I want my goal progress to be automatically calculated from my habit check-ins.
+
+**Acceptance Criteria:**
+
+- [ ] Goal dataSource can be "HABIT_DERIVED" (in addition to MANUAL)
+- [ ] When HABIT_DERIVED:
+  - Goal links to one or more habits
+  - Progress calculated from check-in count, duration, or value
+  - No manual entry needed (read-only progress)
+- [ ] Derivation formula configurable:
+  - COUNT: Goal progress = number of check-ins
+  - SUM: Goal progress = sum of check-in values
+  - AVERAGE: Goal progress = average of check-in values
+- [ ] Example: "Run 100 miles this month" derived from daily run check-ins
+- [ ] Dashboard shows "Auto-updating from habits" badge
+
+**Example:**
+
+```typescript
+{
+  goal: {
+    title: "Run 100 miles this month",
+    goalType: "COUNT",
+    metric: "miles",
+    targetValue: 100,
+    dataSource: "HABIT_DERIVED",
+    derivationConfig: {
+      habitId: "habit-morning-run",
+      formula: "SUM", // sum all check-in values
+      valueField: "value", // use value field from check-ins
+    },
+    currentValue: 67.5, // auto-calculated
+  }
+}
+```
+
+**Technical Requirements:**
+
+- Goal.derivationConfig column (JSON: {habitId, formula, valueField})
+- Recalculate goal progress on each linked habit check-in
+- Device-side aggregation query
+- Clear distinction in UI between manual and derived goals
+
+**Why:** Reduces duplicate data entry. If user tracks "Morning run" habit with miles, goal "Run 100 miles" shouldn't require separate entry.
+
+**Privacy Notes:**
+
+- Derived data respects source habit's privacy level
+
+**Cost:** $0
+
+---
+
 ## Validation Checklist
 
 - [ ] BUILD/BREAK habits created with different icons
@@ -587,6 +745,8 @@ enum ChallengeType {
 ❌ NO Calendar/ScreenTime APIs (M7)
 ❌ NO ML sentiment analysis (M7)
 ❌ NO location triggers (M7)
+❌ NO auto-suggest habits for goals (M7+)
+❌ NO integration data sources for goals (M7+)
 
 ---
 

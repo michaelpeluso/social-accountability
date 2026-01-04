@@ -1313,6 +1313,164 @@ Response: {
 
 ---
 
+### 8.X Goal Enhancements: Auto-Suggest Habits
+
+**Story:** As a user, I want the app to suggest habits that will help me achieve my goal.
+
+**Acceptance Criteria:**
+
+- [ ] When creating a goal, "Suggest habits" button appears
+- [ ] System analyzes goal type, metric, and target to suggest habits:
+  - Weight loss goal → "Daily walk", "Log meals", "Drink water"
+  - Reading goal → "Read 30 min", "Visit library weekly"
+  - Savings goal → "Track expenses", "Skip daily coffee"
+- [ ] Suggestions are curated templates (not ML-generated initially)
+- [ ] User can:
+  - Accept suggestion (creates habit linked to goal)
+  - Customize suggestion (edit before creating)
+  - Dismiss suggestion
+- [ ] Suggestions improve over time based on:
+  - User's successful habits
+  - Community popular habits for similar goals
+  - ML recommendations (future)
+- [ ] Can toggle off suggestions in settings
+
+**Example:**
+
+```typescript
+{
+  goal: {
+    title: "Lose 20 lbs",
+    goalType: "WEIGHT",
+    metric: "lbs",
+  },
+  suggestedHabits: [
+    {
+      template: "Daily walk",
+      icon: "🚶",
+      pillar: "BODY",
+      frequency: { type: "DAILY" },
+      reason: "Walking burns calories and builds consistency",
+    },
+    {
+      template: "Log meals",
+      icon: "📝",
+      pillar: "BODY",
+      frequency: { type: "DAILY" },
+      reason: "Tracking food increases awareness of eating habits",
+    },
+    {
+      template: "Drink 8 glasses of water",
+      icon: "💧",
+      pillar: "BODY",
+      frequency: { type: "DAILY" },
+      reason: "Hydration aids metabolism and reduces hunger",
+    },
+  ],
+}
+```
+
+**Technical Requirements:**
+
+- Curated template database (50-100 templates per goal type)
+- Template matching: goalType + metric → relevant templates
+- Device-side template search (no API calls)
+- Track acceptance rates for template refinement
+- ML ranking (M8+): Personalized suggestions based on user history
+
+**Why:** Users often know their goal but not the daily actions to achieve it. Suggestions bridge the gap between "I want to lose weight" and "What should I do every day?"
+
+**Privacy Notes:**
+
+- Templates are public (no user data in suggestions)
+- Acceptance data can be anonymized for template ranking
+
+**Cost:** $0 (device-side template matching)
+
+**Dependencies:** M5 (linked habits), M6 (behavioral patterns for ML ranking)
+
+---
+
+### 8.X Goal Enhancements: Integration Data Sources
+
+**Story:** As a user, I want my goal progress to update automatically from connected apps (HealthKit, banking, etc.).
+
+**Acceptance Criteria:**
+
+- [ ] Goal dataSource can be "INTEGRATION"
+- [ ] Supported integrations:
+  - HealthKit: steps, weight, calories, workouts
+  - ScreenTime API: app usage limits
+  - Banking APIs (future): spending tracking
+  - Calendar API (future): time allocation
+- [ ] Integration config specifies:
+  - Source (e.g., "healthkit.weight")
+  - Aggregation (LATEST, SUM, AVERAGE)
+  - Time range (daily, weekly, monthly)
+- [ ] Goal progress auto-updates on app launch
+- [ ] Manual override available ("Update now" button)
+- [ ] Clear consent flow: "This goal will read data from HealthKit"
+- [ ] Can disconnect integration without deleting goal
+
+**Example:**
+
+```typescript
+{
+  goal: {
+    title: "Lose 20 lbs",
+    goalType: "WEIGHT",
+    metric: "lbs",
+    startValue: 180,
+    targetValue: 160,
+    dataSource: "INTEGRATION",
+    integrationConfig: {
+      source: "healthkit.bodyMass",
+      aggregation: "LATEST",
+      unit: "lb",
+    },
+    currentValue: 172, // auto-populated from HealthKit
+  },
+  permissions: {
+    healthKit: ["bodyMass"], // required permission
+  },
+}
+```
+
+**Technical Requirements:**
+
+- Integration registry: Define supported sources with schemas
+- Permission mapping: Each source → required iOS/API permissions
+- Consent UI: Clear explanation of data access per integration
+- Retry logic: Handle API failures gracefully
+- Caching: Don't poll APIs excessively (rate limits)
+- See [M501-integrations-expansion.md](M501-integrations-expansion.md) for integration architecture
+
+**Supported Sources (Priority Order):**
+
+1. **HealthKit** (M7 proof-of-concept in M5)
+   - Steps, weight, workouts, sleep, calories
+2. **ScreenTime** (M7)
+   - App usage, category limits
+3. **Banking** (M8+)
+   - Plaid integration for spending goals
+4. **Calendar** (M8+)
+   - Time allocation, meeting counts
+
+**Why:** Automation is the app's core value proposition. Users shouldn't manually enter data that already exists in their devices.
+
+**Privacy Notes:**
+
+- Explicit consent per integration
+- Data processed locally (not synced to cloud)
+- Can revoke access anytime
+- Clear data audit: "What does this goal access?"
+
+**Cost:** $0 (device-side APIs) or $0.01/user/month (Plaid banking - future)
+
+**Dependencies:** M5 (HealthKit POC), M7 (full sensor integration)
+
+---
+
 ## Guiding Principles for M7+
 
 1. **Ship M1-M6 first, validate product-market fit**

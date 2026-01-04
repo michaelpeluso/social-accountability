@@ -1,6 +1,6 @@
 # Milestone 4: Identity, Analytics & Engagement
 
-**Goal:** Add identity system, journal/mood tracking, enhanced analytics, close friends feature, and report exports.
+**Goal:** Add identity system, journal/mood tracking, enhanced analytics, close friends feature, habit reminders, and report exports.
 **Timeline:** 3-4 weeks
 **Cost Target:** $0-5 (all device-side compute + optional PDF export)
 **Dependencies:** M3 complete (social features working)
@@ -9,7 +9,7 @@
 
 ## Overview
 
-M4 enriches the tracking experience with identities (Student, Athlete, Parent, etc.) that map to pillars, manual journal/mood entries for self-reflection, deeper analytics (correlations, time-of-day patterns), close friends privacy tier, and report exports. All analytics calculated device-side for zero cost.
+M4 enriches the tracking experience with identities (Student, Athlete, Parent, etc.) that map to pillars, manual journal/mood entries for self-reflection, deeper analytics (correlations, time-of-day patterns), close friends privacy tier, habit reminders/notifications, reflection prompts, and report exports. All analytics calculated device-side for zero cost.
 
 ---
 
@@ -689,6 +689,295 @@ Response: { data: { summary, charts, csvUrl } }
 
 ---
 
+### 4.9 Habit Reminders
+
+**Story:** As a user, I want to receive reminders for my habits so that I don't forget to complete them.
+
+**Acceptance Criteria:**
+
+- [ ] Habit creation/edit form includes reminder settings:
+  - Enable reminders toggle (default: off)
+  - Reminder time(s) - supports multiple times per day
+  - Reminder days (matches habit frequency or custom)
+  - Custom reminder text (optional, 100 chars)
+- [ ] Local notifications scheduled via expo-notifications
+- [ ] Notification shows:
+  - Habit icon + name
+  - Custom text or default: "Time for [habit name]!"
+  - Quick action: "Check In" directly from notification
+- [ ] Quiet hours respected (from notification settings)
+- [ ] Reminder auto-disabled after 7 consecutive missed check-ins (re-engagement prompt)
+- [ ] Notification center shows all pending habits for today
+
+**Example Reminder Configuration:**
+
+```typescript
+{
+  habitId: "habit_123",
+  name: "Morning Meditation",
+  reminders: [
+    {
+      id: "reminder_1",
+      time: "07:00",
+      days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+      customText: "Start your day with clarity 🧘",
+      enabled: true
+    },
+    {
+      id: "reminder_2",
+      time: "18:00", // Evening fallback
+      days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+      customText: "Still time to meditate!",
+      enabled: true
+    }
+  ]
+}
+```
+
+**Notification Examples:**
+
+```
+// Default notification
+┌─────────────────────────────────────┐
+│ 🏃 Morning Run                      │
+│ Time for Morning Run!               │
+│ [Check In]  [Snooze 1hr]            │
+└─────────────────────────────────────┘
+
+// Custom text notification
+┌─────────────────────────────────────┐
+│ 🧘 Morning Meditation               │
+│ Start your day with clarity 🧘     │
+│ [Check In]  [Snooze 1hr]            │
+└─────────────────────────────────────┘
+```
+
+**Smart Reminder Behavior:**
+
+```typescript
+// Auto-disable after repeated ignores
+if (consecutiveMissedCheckIns >= 7) {
+  disableReminder(habitId);
+  showReengagementPrompt({
+    title: "Haven't seen you in a while",
+    message: "We've paused reminders for 'Morning Run'. Ready to restart?",
+    actions: ["Resume", "Keep Paused", "Archive Habit"],
+  });
+}
+```
+
+**API Contract:**
+
+```
+PATCH /habits/:id
+Body: { reminders: Reminder[] }
+Response: { data: Habit }
+```
+
+**Technical Requirements:**
+
+- expo-notifications for local scheduling
+- SQLite stores reminder config
+- Background task to reschedule after app restart
+- Quick actions use expo-notifications action handlers
+
+**Privacy Notes:**
+
+- Reminder content is device-only (not synced to server)
+- Notification text should not reveal habit content on lock screen (configurable)
+
+**Security Notes:**
+
+- Rate limit: max 50 reminders per user (prevent notification spam)
+- Custom text validated for length (100 chars max)
+
+**Cost:** $0 (local notifications only)
+
+---
+
+### 4.10 Reflection Prompts
+
+**Story:** As a user, I want post-check-in reflection prompts so that I can build deeper awareness of my habits.
+
+**Acceptance Criteria:**
+
+- [ ] After check-in, optional reflection prompt appears (50% of the time, randomized)
+- [ ] Prompt categories:
+  - **Energy:** "How energized do you feel after this habit?"
+  - **Difficulty:** "Was this harder or easier than usual today?"
+  - **Context:** "What made this possible today?"
+  - **Intention:** "How does this habit support who you want to be?"
+  - **Custom:** User-defined prompts (per habit)
+- [ ] Response options:
+  - Quick scale (1-5 emoji)
+  - Optional text note (200 chars)
+- [ ] Responses stored with check-in for insights
+- [ ] Habit settings: enable/disable reflections, add custom prompts
+
+**Example Reflection Flow:**
+
+```
+✓ Check-in complete for "Morning Run"!
+
+┌─────────────────────────────────────────┐
+│  How energized do you feel?             │
+│                                         │
+│  😫  😕  😐  🙂  💪                      │
+│  1   2   3   4   5                      │
+│                                         │
+│  [Add note...]                          │
+│                                         │
+│  [Save]  [Skip]                         │
+└─────────────────────────────────────────┘
+```
+
+**Custom Prompts Example:**
+
+```typescript
+{
+  habitId: "habit_456",
+  name: "No Social Media Before 9am",
+  customReflectionPrompts: [
+    "What did you do instead of scrolling?",
+    "How did your morning focus feel?",
+    "Any temptation to check notifications?"
+  ]
+}
+```
+
+**Reflection Data for Insights:**
+
+```typescript
+// Stored with check-in
+{
+  checkInId: "checkin_789",
+  reflections: [
+    {
+      prompt: "How energized do you feel?",
+      scale: 4,
+      note: "Really good run today, perfect weather",
+      timestamp: "2026-01-01T07:30:00Z"
+    }
+  ]
+}
+
+// Aggregated insight:
+{
+  habit: "Morning Run",
+  avgEnergyRating: 4.2,
+  trend: "↑ Higher energy on Tue/Thu",
+  insight: "You rate morning runs 30% higher than evening runs"
+}
+```
+
+**Why:** Reflection builds metacognition. Users understand why habits work (or don't), leading to better self-awareness and habit optimization.
+
+**Technical Requirements:**
+
+- Store reflections as JSON column on check-ins or separate table
+- Random prompt selection (50% frequency)
+- Custom prompts per habit (max 5)
+- Device-side aggregation for insights
+
+**Privacy Notes:**
+
+- Reflections are SELF-only (never shared)
+- Journal-level privacy applies
+
+**Cost:** $0
+
+---
+
+### 4.12 Goal Enhancements: Identity Framing
+
+**Story:** As a user, I want to link my goals to identities so that my goals reflect who I want to become.
+
+**Acceptance Criteria:**
+
+- [ ] Goal creation shows optional "Identity" field
+- [ ] Goal can link to one identity (e.g., "Run marathon" → Athlete identity)
+- [ ] Dashboard shows goals grouped by identity
+- [ ] Goal progress contributes to identity metrics
+- [ ] Identity view shows linked goals with progress bars
+
+**Example:**
+
+```typescript
+{
+  goal: {
+    title: "Lose 20 lbs",
+    identityId: "identity-athlete",
+  },
+  identity: {
+    name: "Athlete",
+    pillar: "BODY",
+    linkedGoals: ["goal-lose-weight", "goal-run-marathon"],
+    linkedHabits: ["habit-gym", "habit-run"],
+  }
+}
+```
+
+**Why:** Goals become more meaningful when framed as proof of identity. "I want to lose weight" becomes "I want to be an Athlete."
+
+**Technical Requirements:**
+
+- Goal.identityId foreign key (optional)
+- Identity dashboard includes goal count and combined progress
+- Device-side calculation
+
+**Privacy Notes:**
+
+- Identity links respect goal privacy level
+
+**Cost:** $0
+
+---
+
+### 4.13 Goal Enhancements: Reward on Completion
+
+**Story:** As a user, I want to set a reward for completing my goal to stay motivated.
+
+**Acceptance Criteria:**
+
+- [ ] Goal creation shows optional "Reward" field (200 chars)
+- [ ] Goal detail page shows reward prominently
+- [ ] When goal is completed, celebration screen shows reward:
+  - Confetti animation
+  - "You earned: [reward description]"
+  - Share button to post completion
+- [ ] Completed goals screen shows past rewards
+- [ ] Reward reminder notifications when goal is close (90%)
+
+**Example:**
+
+```typescript
+{
+  title: "Save $1000",
+  targetValue: 1000,
+  currentValue: 950,
+  reward: "Weekend trip to the beach! 🏖️",
+  progress: 95, // triggers "almost there" notification
+}
+```
+
+**Why:** Tangible rewards increase goal completion rates. Users define their own reward, making it personally meaningful.
+
+**Technical Requirements:**
+
+- Goal.reward column (TEXT, 200 chars)
+- Celebration screen with Lottie confetti animation
+- Progress notification at 90% threshold
+- Device-side only (no API changes)
+
+**Privacy Notes:**
+
+- Reward is visible only to user (SELF-only)
+- Completion posts do NOT include reward by default (user can add manually)
+
+**Cost:** $0
+
+---
+
 ## Validation Checklist
 
 - [ ] Identities created and linked to habits
@@ -700,6 +989,12 @@ Response: { data: { summary, charts, csvUrl } }
 - [ ] Close friends marked and privacy enforced
 - [ ] All privacy levels work: SELF/CLOSE_FRIENDS/FRIENDS/PUBLIC
 - [ ] Reports export to PDF/CSV
+- [ ] Habit reminders schedule and fire correctly
+- [ ] Custom reminder text displays in notifications
+- [ ] Quiet hours respected
+- [ ] Reflection prompts appear after check-ins
+- [ ] Custom reflection prompts configurable per habit
+- [ ] Reflection data aggregated for insights
 
 ---
 
@@ -710,8 +1005,12 @@ Response: { data: { summary, charts, csvUrl } }
 ❌ NO intensity tracking (M5)
 ❌ NO HealthKit integration (M5)
 ❌ NO challenges (M5)
+❌ NO weighted habit contributions to goals (M5)
+❌ NO habit-derived goal data sources (M5)
 ❌ NO behavioral drift (M6)
 ❌ NO ML/automation (M7)
+❌ NO auto-suggest habits for goals (M7+)
+❌ NO integration data sources for goals (M7+)
 
 ---
 
@@ -721,6 +1020,7 @@ Response: { data: { summary, charts, csvUrl } }
 
 - All analytics on device: $0
 - PDF generation: $0 (client-side) or $5 (Lambda)
+- Reminders: $0 (local notifications only)
 
 **Privacy Compliance:**
 
@@ -729,6 +1029,8 @@ Response: { data: { summary, charts, csvUrl } }
 - ✅ Correlations device-only
 - ✅ Close friends private designation
 - ✅ Reports contain user's own data only
+- ✅ Reminders device-only (not synced)
+- ✅ Reflections SELF-only
 
 ---
 

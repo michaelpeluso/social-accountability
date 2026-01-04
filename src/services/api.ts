@@ -15,6 +15,56 @@ import type {
   FriendRequest,
   ExportData,
 } from "../types/user";
+import type {
+  Goal,
+  Habit,
+  HabitCheckIn,
+  HabitSchedule,
+  Pillar,
+  Privacy,
+  CheckInSource,
+} from "../types";
+
+// Goal API types
+export interface CreateGoalRequest {
+  title: string;
+  pillar: Pillar;
+  privacy: Privacy;
+}
+
+export interface UpdateGoalRequest {
+  title?: string;
+  pillar?: Pillar;
+  privacy?: Privacy;
+  isArchived?: boolean;
+}
+
+// Habit API types
+export interface CreateHabitRequest {
+  title: string;
+  goalId?: string;
+  parentHabitId?: string;
+  pillar: Pillar;
+  schedule: HabitSchedule;
+  privacy: Privacy;
+}
+
+export interface UpdateHabitRequest {
+  title?: string;
+  pillar?: Pillar;
+  schedule?: HabitSchedule;
+  privacy?: Privacy;
+  isArchived?: boolean;
+}
+
+// CheckIn API types
+export interface CreateCheckInRequest {
+  habitId: string;
+  occurredAt?: string;
+  source?: CheckInSource;
+  evidenceRef?: string;
+  note?: string;
+}
 
 // API configuration - uses mock mode when ENABLE_APPLE_AUTH=false
 const API_URL = process.env.API_URL || "http://localhost:3000";
@@ -177,6 +227,95 @@ const mockApi = {
 
   searchUsers: async (_query: string): Promise<ApiResponse<User[]>> => {
     // Mock empty results for now - real search happens on backend
+    return { data: [] };
+  },
+
+  // Goal mock endpoints
+  createGoal: async (goal: Goal): Promise<ApiResponse<Goal>> => {
+    logger.info("Mock API: createGoal", { goalId: goal.id });
+    return { data: goal };
+  },
+
+  updateGoal: async (goalId: string, updates: UpdateGoalRequest): Promise<ApiResponse<Goal>> => {
+    logger.info("Mock API: updateGoal", { goalId });
+    return {
+      data: {
+        id: goalId,
+        userId: "mock-user-123",
+        title: updates.title || "Updated Goal",
+        pillar: updates.pillar || "BODY",
+        privacy: updates.privacy || "SELF",
+        isArchived: updates.isArchived || false,
+        isIndefinite: false,
+        dataSource: "MANUAL",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    };
+  },
+
+  deleteGoal: async (goalId: string): Promise<ApiResponse<{ message: string }>> => {
+    logger.info("Mock API: deleteGoal", { goalId });
+    return { data: { message: "Goal deleted" } };
+  },
+
+  getGoals: async (): Promise<ApiResponse<Goal[]>> => {
+    return { data: [] };
+  },
+
+  // Habit mock endpoints
+  createHabit: async (habit: Habit): Promise<ApiResponse<Habit>> => {
+    logger.info("Mock API: createHabit", { habitId: habit.id });
+    return { data: habit };
+  },
+
+  updateHabit: async (
+    habitId: string,
+    updates: UpdateHabitRequest
+  ): Promise<ApiResponse<Habit>> => {
+    logger.info("Mock API: updateHabit", { habitId });
+    return {
+      data: {
+        id: habitId,
+        userId: "mock-user-123",
+        title: updates.title || "Updated Habit",
+        pillar: updates.pillar || "BODY",
+        habitType: "BUILD",
+        completionType: "BINARY",
+        schedule: updates.schedule || { frequency: "daily", targetCount: 1 },
+        privacy: updates.privacy || "SELF",
+        isArchived: updates.isArchived || false,
+        currentStreak: 0,
+        longestStreak: 0,
+        recoveryStreak: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    };
+  },
+
+  deleteHabit: async (habitId: string): Promise<ApiResponse<{ message: string }>> => {
+    logger.info("Mock API: deleteHabit", { habitId });
+    return { data: { message: "Habit deleted" } };
+  },
+
+  getHabits: async (): Promise<ApiResponse<Habit[]>> => {
+    return { data: [] };
+  },
+
+  // CheckIn mock endpoints
+  createCheckIn: async (checkIn: HabitCheckIn): Promise<ApiResponse<HabitCheckIn>> => {
+    logger.info("Mock API: createCheckIn", { checkInId: checkIn.id, habitId: checkIn.habitId });
+    return { data: checkIn };
+  },
+
+  deleteCheckIn: async (checkInId: string): Promise<ApiResponse<{ message: string }>> => {
+    logger.info("Mock API: deleteCheckIn", { checkInId });
+    return { data: { message: "Check-in deleted" } };
+  },
+
+  getCheckIns: async (habitId: string): Promise<ApiResponse<HabitCheckIn[]>> => {
+    logger.info("Mock API: getCheckIns", { habitId });
     return { data: [] };
   },
 
@@ -393,6 +532,131 @@ export const api = {
         {},
         token || undefined
       );
+    },
+  },
+
+  goals: {
+    create: async (goal: Goal): Promise<ApiResponse<Goal>> => {
+      if (USE_MOCK) return mockApi.createGoal(goal);
+      const token = await getToken();
+      return apiFetch<Goal>(
+        "/goals",
+        {
+          method: "POST",
+          body: JSON.stringify(goal),
+        },
+        token || undefined
+      );
+    },
+
+    update: async (goalId: string, updates: UpdateGoalRequest): Promise<ApiResponse<Goal>> => {
+      if (USE_MOCK) return mockApi.updateGoal(goalId, updates);
+      const token = await getToken();
+      return apiFetch<Goal>(
+        `/goals/${goalId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(updates),
+        },
+        token || undefined
+      );
+    },
+
+    delete: async (goalId: string): Promise<ApiResponse<{ message: string }>> => {
+      if (USE_MOCK) return mockApi.deleteGoal(goalId);
+      const token = await getToken();
+      return apiFetch(
+        `/goals/${goalId}`,
+        {
+          method: "DELETE",
+        },
+        token || undefined
+      );
+    },
+
+    getAll: async (): Promise<ApiResponse<Goal[]>> => {
+      if (USE_MOCK) return mockApi.getGoals();
+      const token = await getToken();
+      return apiFetch<Goal[]>("/goals", {}, token || undefined);
+    },
+  },
+
+  habits: {
+    create: async (habit: Habit): Promise<ApiResponse<Habit>> => {
+      if (USE_MOCK) return mockApi.createHabit(habit);
+      const token = await getToken();
+      return apiFetch<Habit>(
+        "/habits",
+        {
+          method: "POST",
+          body: JSON.stringify(habit),
+        },
+        token || undefined
+      );
+    },
+
+    update: async (habitId: string, updates: UpdateHabitRequest): Promise<ApiResponse<Habit>> => {
+      if (USE_MOCK) return mockApi.updateHabit(habitId, updates);
+      const token = await getToken();
+      return apiFetch<Habit>(
+        `/habits/${habitId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(updates),
+        },
+        token || undefined
+      );
+    },
+
+    delete: async (habitId: string): Promise<ApiResponse<{ message: string }>> => {
+      if (USE_MOCK) return mockApi.deleteHabit(habitId);
+      const token = await getToken();
+      return apiFetch(
+        `/habits/${habitId}`,
+        {
+          method: "DELETE",
+        },
+        token || undefined
+      );
+    },
+
+    getAll: async (): Promise<ApiResponse<Habit[]>> => {
+      if (USE_MOCK) return mockApi.getHabits();
+      const token = await getToken();
+      return apiFetch<Habit[]>("/habits", {}, token || undefined);
+    },
+  },
+
+  checkIns: {
+    create: async (checkIn: HabitCheckIn): Promise<ApiResponse<HabitCheckIn>> => {
+      if (USE_MOCK) return mockApi.createCheckIn(checkIn);
+      const token = await getToken();
+      return apiFetch<HabitCheckIn>(
+        "/check-ins",
+        {
+          method: "POST",
+          body: JSON.stringify(checkIn),
+        },
+        token || undefined
+      );
+    },
+
+    delete: async (checkInId: string): Promise<ApiResponse<{ message: string }>> => {
+      if (USE_MOCK) return mockApi.deleteCheckIn(checkInId);
+      const token = await getToken();
+      return apiFetch(
+        `/check-ins/${checkInId}`,
+        {
+          method: "DELETE",
+        },
+        token || undefined
+      );
+    },
+
+    getByHabit: async (habitId: string): Promise<ApiResponse<HabitCheckIn[]>> => {
+      if (USE_MOCK) return mockApi.getCheckIns(habitId);
+      const token = await getToken();
+      return apiFetch<HabitCheckIn[]>(`/habits/${habitId}/check-ins`, {}, token || undefined);
     },
   },
 };
