@@ -186,18 +186,17 @@ Neutral presentation of misses.
 
 ---
 
-### Library / Growth
+### Growth Hub
 
 **Purpose**
-Learning and skill acquisition.
+Learning and skill acquisition. This is where the user can access their library, gym workouts, journal, mood tracker, etc.
 
 **Characteristics**
 
 - Tile‑based layout
-- Mixed sizes
 - Editorial + data hybrid
 
-Breathable but still metric‑aware.
+Breathable but still metric‑aware. Each tile opens to a personalized growth page for the respective activity.
 
 ---
 

@@ -31,7 +31,7 @@
 - **Goal** (M2/M3): "Proof I'm that person" - quantitative targets (Run 5K under 30min)
 - **Habit** (M2): "What I do daily" - recurring actions (Run 4x/month)
 - Goals CAN complete, Habits NEVER complete (recurring forever)
-- See [spec/data-model.md](../spec/data-model.md#relationships-diagram)
+- See [spec/data-model.md](../docs/data-model.md#relationships-diagram)
 
 ### 4. Post vs Story Decoupling
 

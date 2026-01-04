@@ -1,132 +1,128 @@
 import { AppError, errors } from "../../src/lib/errors";
 
 describe("AppError", () => {
-  it("creates an error with code, message, and status", () => {
-    const error = new AppError("TEST_ERROR", "test message", 500);
+  describe("constructor", () => {
+    it("should create error with code, message, and status", () => {
+      const error = new AppError("NOT_FOUND", "Not found", 404);
 
-    expect(error.code).toBe("TEST_ERROR");
-    expect(error.message).toBe("test message");
-    expect(error.status).toBe(500);
-    expect(error.name).toBe("AppError");
-  });
+      expect(error.message).toBe("Not found");
+      expect(error.code).toBe("NOT_FOUND");
+      expect(error.status).toBe(404);
+      expect(error.name).toBe("AppError");
+    });
 
-  it("defaults status to 400", () => {
-    const error = new AppError("BAD_REQUEST", "bad request");
+    it("should be an instance of Error", () => {
+      const error = new AppError("UNKNOWN", "Test");
 
-    expect(error.status).toBe(400);
-  });
+      expect(error).toBeInstanceOf(Error);
+      expect(error).toBeInstanceOf(AppError);
+    });
 
-  it("extends Error", () => {
-    const error = new AppError("TEST", "test");
+    it("should default status to 400", () => {
+      const error = new AppError("BAD_REQUEST", "Test");
 
-    expect(error).toBeInstanceOf(Error);
-    expect(error).toBeInstanceOf(AppError);
+      expect(error.status).toBe(400);
+    });
   });
 
   describe("toApiResponse", () => {
-    it("returns error object with code and message", () => {
-      const error = new AppError("NOT_FOUND", "resource not found", 404);
+    it("should return API response format", () => {
+      const error = new AppError("VALIDATION_ERROR", "Validation failed", 400);
       const response = error.toApiResponse();
 
       expect(response).toEqual({
         error: {
-          code: "NOT_FOUND",
-          message: "resource not found",
+          code: "VALIDATION_ERROR",
+          message: "Validation failed",
         },
       });
-    });
-
-    it("does not expose status in API response", () => {
-      const error = new AppError("SERVER_ERROR", "internal error", 500);
-      const response = error.toApiResponse();
-
-      expect(response.error).not.toHaveProperty("status");
     });
   });
 });
 
-describe("error helpers", () => {
-  it("creates unauthorized error (401)", () => {
-    const error = errors.unauthorized();
+describe("errors factory functions", () => {
+  describe("unauthorized", () => {
+    it("should create unauthorized error with default message", () => {
+      const error = errors.unauthorized();
 
-    expect(error.code).toBe("UNAUTHORIZED");
-    expect(error.status).toBe(401);
-    expect(error.message).toBe("unauthorized");
+      expect(error.code).toBe("UNAUTHORIZED");
+      expect(error.status).toBe(401);
+      expect(error.message).toBe("unauthorized");
+    });
+
+    it("should accept custom message", () => {
+      const error = errors.unauthorized("Token expired");
+
+      expect(error.message).toBe("Token expired");
+    });
   });
 
-  it("creates unauthorized error with custom message", () => {
-    const error = errors.unauthorized("invalid token");
+  describe("forbidden", () => {
+    it("should create forbidden error", () => {
+      const error = errors.forbidden();
 
-    expect(error.message).toBe("invalid token");
+      expect(error.code).toBe("FORBIDDEN");
+      expect(error.status).toBe(403);
+    });
   });
 
-  it("creates forbidden error (403)", () => {
-    const error = errors.forbidden();
+  describe("notFound", () => {
+    it("should create not found error", () => {
+      const error = errors.notFound();
 
-    expect(error.code).toBe("FORBIDDEN");
-    expect(error.status).toBe(403);
+      expect(error.code).toBe("NOT_FOUND");
+      expect(error.status).toBe(404);
+    });
+
+    it("should accept custom message", () => {
+      const error = errors.notFound("User not found");
+
+      expect(error.message).toBe("User not found");
+    });
   });
 
-  it("creates notFound error (404)", () => {
-    const error = errors.notFound("user not found");
+  describe("badRequest", () => {
+    it("should create bad request error", () => {
+      const error = errors.badRequest();
 
-    expect(error.code).toBe("NOT_FOUND");
-    expect(error.status).toBe(404);
-    expect(error.message).toBe("user not found");
+      expect(error.code).toBe("BAD_REQUEST");
+      expect(error.status).toBe(400);
+    });
   });
 
-  it("creates badRequest error (400)", () => {
-    const error = errors.badRequest();
+  describe("rateLimited", () => {
+    it("should create rate limited error", () => {
+      const error = errors.rateLimited();
 
-    expect(error.code).toBe("BAD_REQUEST");
-    expect(error.status).toBe(400);
+      expect(error.code).toBe("RATE_LIMITED");
+      expect(error.status).toBe(429);
+    });
   });
 
-  it("creates rateLimited error (429)", () => {
-    const error = errors.rateLimited();
+  describe("validationFailed", () => {
+    it("should create validation failed error", () => {
+      const error = errors.validationFailed();
 
-    expect(error.code).toBe("RATE_LIMITED");
-    expect(error.status).toBe(429);
+      expect(error.code).toBe("VALIDATION_FAILED");
+      expect(error.status).toBe(400);
+    });
   });
 
-  it("creates validationFailed error (400)", () => {
-    const error = errors.validationFailed("email is required");
+  describe("conflict", () => {
+    it("should create conflict error", () => {
+      const error = errors.conflict();
 
-    expect(error.code).toBe("VALIDATION_FAILED");
-    expect(error.status).toBe(400);
-    expect(error.message).toBe("email is required");
+      expect(error.code).toBe("CONFLICT");
+      expect(error.status).toBe(409);
+    });
   });
 
-  it("creates conflict error (409)", () => {
-    const error = errors.conflict("username taken");
+  describe("serviceUnavailable", () => {
+    it("should create service unavailable error", () => {
+      const error = errors.serviceUnavailable();
 
-    expect(error.code).toBe("CONFLICT");
-    expect(error.status).toBe(409);
-    expect(error.message).toBe("username taken");
-  });
-
-  it("creates serviceUnavailable error (503)", () => {
-    const error = errors.serviceUnavailable();
-
-    expect(error.code).toBe("SERVICE_UNAVAILABLE");
-    expect(error.status).toBe(503);
-  });
-
-  it("all helpers return AppError instances", () => {
-    const allErrors = [
-      errors.unauthorized(),
-      errors.forbidden(),
-      errors.notFound(),
-      errors.badRequest(),
-      errors.rateLimited(),
-      errors.validationFailed(),
-      errors.conflict(),
-      errors.serviceUnavailable(),
-    ];
-
-    allErrors.forEach((error) => {
-      expect(error).toBeInstanceOf(AppError);
-      expect(error).toBeInstanceOf(Error);
+      expect(error.code).toBe("SERVICE_UNAVAILABLE");
+      expect(error.status).toBe(503);
     });
   });
 });

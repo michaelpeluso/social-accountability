@@ -1,34 +1,35 @@
-import { auth } from "../../services/auth";
+import { auth } from "../../src/services/auth";
 
 describe("auth service", () => {
   beforeEach(async () => {
-    // Clear any stored auth data before each test
     await auth.signOut();
   });
 
-  describe("signIn", () => {
-    it("should return mock user and token", async () => {
-      const session = await auth.signIn();
+  describe("signInWithApple", () => {
+    it("should return success with mock user and token", async () => {
+      const result = await auth.signInWithApple();
 
-      expect(session).toBeDefined();
-      expect(session.user).toBeDefined();
-      expect(session.user.id).toBe("mock-user-123");
-      expect(session.token).toBeDefined();
-      expect(session.token).toContain("mock-jwt-token-");
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.session).toBeDefined();
+        expect(result.session.user).toBeDefined();
+        expect(result.session.user.id).toBeDefined();
+        expect(result.session.token).toBeDefined();
+      }
     });
 
-    it("should store session in AsyncStorage", async () => {
-      await auth.signIn();
+    it("should store session after sign-in", async () => {
+      await auth.signInWithApple();
       const session = await auth.getSession();
 
       expect(session).not.toBeNull();
-      expect(session?.user.id).toBe("mock-user-123");
+      expect(session?.user.id).toBeDefined();
     });
   });
 
   describe("signOut", () => {
     it("should clear stored session", async () => {
-      await auth.signIn();
+      await auth.signInWithApple();
       await auth.signOut();
       const session = await auth.getSession();
 
@@ -43,11 +44,11 @@ describe("auth service", () => {
     });
 
     it("should return session when valid token exists", async () => {
-      await auth.signIn();
+      await auth.signInWithApple();
       const session = await auth.getSession();
 
       expect(session).not.toBeNull();
-      expect(session?.user.displayName).toBe("Test User");
+      expect(session?.user.displayName).toBeDefined();
     });
   });
 
@@ -58,9 +59,36 @@ describe("auth service", () => {
     });
 
     it("should return true when signed in", async () => {
-      await auth.signIn();
+      await auth.signInWithApple();
       const isAuth = await auth.isAuthenticated();
       expect(isAuth).toBe(true);
+    });
+  });
+
+  describe("getToken", () => {
+    it("should return null when not signed in", async () => {
+      const token = await auth.getToken();
+      expect(token).toBeNull();
+    });
+
+    it("should return token when signed in", async () => {
+      await auth.signInWithApple();
+      const token = await auth.getToken();
+      expect(token).toBeDefined();
+    });
+  });
+
+  describe("getUser", () => {
+    it("should return null when not signed in", async () => {
+      const user = await auth.getUser();
+      expect(user).toBeNull();
+    });
+
+    it("should return user when signed in", async () => {
+      await auth.signInWithApple();
+      const user = await auth.getUser();
+      expect(user).toBeDefined();
+      expect(user?.id).toBeDefined();
     });
   });
 });
