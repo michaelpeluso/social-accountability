@@ -22,6 +22,13 @@ import { auth } from "../../src/services/auth";
 import { createGoal, getGoals, archiveGoal } from "../../src/storage/goals";
 import { PILLAR_INFO, ALL_PILLARS, PRIVACY_INFO } from "../../src/types/goals";
 import type { Goal, Pillar, Privacy, GoalDataSource, IdentityPreset } from "../../src/types";
+import {
+  DatePicker,
+  IdentityPicker,
+  PillarPicker,
+  PrivacyPicker,
+  DataSourcePicker,
+} from "../../src/components";
 
 // Privacy options for goal creation
 const PRIVACY_OPTIONS: Privacy[] = ["SELF", "FRIENDS", "PUBLIC"];
@@ -69,18 +76,20 @@ export default function GoalsScreen() {
   const [selectedPrivacy, setSelectedPrivacy] = useState<Privacy>("SELF");
 
   // Form state - Values
-  const [isIndefinite, setIsIndefinite] = useState(false);
   const [startValue, setStartValue] = useState("");
   const [targetValue, setTargetValue] = useState("");
 
-  // Form state - Timeframe
-  const [startDate, setStartDate] = useState("");
-  const [deadline, setDeadline] = useState("");
+  // Form state - Timeframe (use Date objects in UI)
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [deadline, setDeadline] = useState<Date | undefined>(undefined);
 
   // Form state - Data Source
   const [dataSource, setDataSource] = useState<GoalDataSource>("MANUAL");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Inline validation messages
+  const [startDateError, setStartDateError] = useState<string | undefined>(undefined);
+  const [deadlineDateError, setDeadlineDateError] = useState<string | undefined>(undefined);
 
   // When identity is selected, set pillar automatically
   const effectivePillar = selectedIdentity
@@ -123,9 +132,15 @@ export default function GoalsScreen() {
       return;
     }
 
-    // Validate target value for non-indefinite goals
-    if (!isIndefinite && !targetValue.trim()) {
-      Alert.alert("Error", "Please enter a target value or mark as indefinite");
+    // Validate target value is provided
+    if (!targetValue.trim()) {
+      Alert.alert("Error", "Please enter a target value");
+      return;
+    }
+
+    // Prevent saving when there are validation errors
+    if (startDateError || deadlineDateError) {
+      Alert.alert("Error", "Please fix invalid date fields before saving");
       return;
     }
 
@@ -138,12 +153,14 @@ export default function GoalsScreen() {
         description: newDescription.trim() || undefined,
         identityId: selectedIdentity, // Store identity name as ID for now (M4 will use real IDs)
         // Values
-        isIndefinite,
+        isIndefinite: !deadline, // Indefinite if no deadline provided
         startValue: startValue ? parseFloat(startValue) : undefined,
-        targetValue: !isIndefinite && targetValue ? parseFloat(targetValue) : undefined,
-        // Timeframe
-        startDate: startDate || undefined,
-        deadline: deadline || undefined,
+        targetValue: targetValue ? parseFloat(targetValue) : undefined,
+        // Timeframe (startDate defaults to today if not provided)
+        startDate: startDate
+          ? startDate.toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0],
+        deadline: deadline ? deadline.toISOString().split("T")[0] : undefined,
         // Data Source
         dataSource,
       });
@@ -164,11 +181,12 @@ export default function GoalsScreen() {
     setSelectedIdentity(undefined);
     setSelectedPillar("BODY");
     setSelectedPrivacy("SELF");
-    setIsIndefinite(false);
     setStartValue("");
     setTargetValue("");
-    setStartDate("");
-    setDeadline("");
+    setStartDate(undefined);
+    setDeadline(undefined);
+    setStartDateError(undefined);
+    setDeadlineDateError(undefined);
     setDataSource("MANUAL");
   }
 
@@ -298,7 +316,7 @@ export default function GoalsScreen() {
             </Pressable>
           </View>
 
-          <ScrollView style={styles.modalContent}>
+          <ScrollView style={styles.modalContent} keyboardShouldPersistTaps="handled">
             {/* Title Input */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>What&apos;s your goal?</Text>
@@ -307,7 +325,7 @@ export default function GoalsScreen() {
                 placeholder="e.g., Lose 10 pounds, Run a marathon"
                 value={newTitle}
                 onChangeText={setNewTitle}
-                autoFocus
+                returnKeyType="next"
                 maxLength={100}
               />
             </View>
@@ -323,6 +341,8 @@ export default function GoalsScreen() {
                 multiline
                 numberOfLines={3}
                 maxLength={500}
+                returnKeyType="done"
+                blurOnSubmit={true}
               />
               <Text style={styles.charCount}>{newDescription.length}/500</Text>
             </View>
@@ -333,233 +353,120 @@ export default function GoalsScreen() {
               <Text style={styles.hint}>
                 Choose an identity or None to select a pillar directly
               </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.identityRow}>
-                  <Pressable
-                    style={[
-                      styles.identityOption,
-                      selectedIdentity === undefined && styles.identityOptionSelected,
-                    ]}
-                    onPress={() => setSelectedIdentity(undefined)}
-                  >
-                    <Text style={styles.identityIcon}>❌</Text>
-                    <Text
-                      style={[
-                        styles.identityLabel,
-                        selectedIdentity === undefined && styles.identityLabelSelected,
-                      ]}
-                    >
-                      None
-                    </Text>
-                  </Pressable>
-                  {IDENTITY_PRESETS.map((identity) => (
-                    <Pressable
-                      key={identity.value}
-                      style={[
-                        styles.identityOption,
-                        selectedIdentity === identity.value && styles.identityOptionSelected,
-                      ]}
-                      onPress={() => setSelectedIdentity(identity.value)}
-                    >
-                      <Text style={styles.identityIcon}>{identity.icon}</Text>
-                      <Text
-                        style={[
-                          styles.identityLabel,
-                          selectedIdentity === identity.value && styles.identityLabelSelected,
-                        ]}
-                      >
-                        {identity.value}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </ScrollView>
+              <IdentityPicker
+                options={IDENTITY_PRESETS}
+                selected={selectedIdentity}
+                onSelect={setSelectedIdentity}
+              />
             </View>
 
-            {/* Pillar Selector (conditional) */}
-            {selectedIdentity ? (
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Pillar</Text>
-                <View style={styles.lockedPillarBadge}>
-                  <Text style={styles.pillarOptionEmoji}>{PILLAR_INFO[effectivePillar].emoji}</Text>
-                  <Text style={styles.lockedPillarText}>
-                    {PILLAR_INFO[effectivePillar].label} (auto-selected from {selectedIdentity})
-                  </Text>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Pillar</Text>
-                <View style={styles.pillarPicker}>
-                  {ALL_PILLARS.map((pillar) => (
-                    <Pressable
-                      key={pillar}
-                      style={[
-                        styles.pillarOption,
-                        selectedPillar === pillar && {
-                          backgroundColor: PILLAR_INFO[pillar].color + "30",
-                          borderColor: PILLAR_INFO[pillar].color,
-                        },
-                      ]}
-                      onPress={() => setSelectedPillar(pillar)}
-                    >
-                      <Text style={styles.pillarOptionEmoji}>{PILLAR_INFO[pillar].emoji}</Text>
-                      <Text
-                        style={[
-                          styles.pillarOptionText,
-                          selectedPillar === pillar && { color: PILLAR_INFO[pillar].color },
-                        ]}
-                      >
-                        {PILLAR_INFO[pillar].label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* Indefinite Toggle */}
+            {/* Pillar Selector */}
             <View style={styles.formGroup}>
-              <Pressable style={styles.toggleRow} onPress={() => setIsIndefinite(!isIndefinite)}>
-                <View>
-                  <Text style={styles.toggleLabel}>Indefinite goal</Text>
-                  <Text style={styles.toggleHint}>No specific target value (ongoing)</Text>
-                </View>
-                <View style={[styles.toggle, isIndefinite && styles.toggleActive]}>
-                  <View style={[styles.toggleThumb, isIndefinite && styles.toggleThumbActive]} />
-                </View>
-              </Pressable>
+              <Text style={styles.label}>Pillar</Text>
+              <PillarPicker
+                selected={effectivePillar}
+                onSelect={setSelectedPillar}
+                locked={!!selectedIdentity}
+                lockedReason={
+                  selectedIdentity ? `auto-selected from ${selectedIdentity}` : undefined
+                }
+              />
             </View>
 
             {/* Start & Target Values */}
-            {!isIndefinite && (
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Values</Text>
-                <View style={styles.valuesRow}>
-                  <View style={styles.valueInputGroup}>
-                    <Text style={styles.valueLabel}>Start</Text>
-                    <TextInput
-                      style={styles.valueInput}
-                      value={startValue}
-                      onChangeText={setStartValue}
-                      keyboardType="numeric"
-                      placeholder="0"
-                      maxLength={10}
-                    />
-                  </View>
-                  <Text style={styles.valueArrow}>→</Text>
-                  <View style={styles.valueInputGroup}>
-                    <Text style={styles.valueLabel}>Target</Text>
-                    <TextInput
-                      style={styles.valueInput}
-                      value={targetValue}
-                      onChangeText={setTargetValue}
-                      keyboardType="numeric"
-                      placeholder="100"
-                      maxLength={10}
-                    />
-                  </View>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Values</Text>
+              <View style={styles.valuesRow}>
+                <View style={styles.valueInputGroup}>
+                  <Text style={styles.valueLabel}>Start</Text>
+                  <TextInput
+                    style={styles.valueInput}
+                    value={startValue}
+                    onChangeText={setStartValue}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    maxLength={10}
+                    returnKeyType="next"
+                  />
                 </View>
-                <Text style={styles.hint}>
-                  Unit of measurement will be selected from tracked data sources in future
-                  milestones
-                </Text>
+                <Text style={styles.valueArrow}>→</Text>
+                <View style={styles.valueInputGroup}>
+                  <Text style={styles.valueLabel}>Target</Text>
+                  <TextInput
+                    style={styles.valueInput}
+                    value={targetValue}
+                    onChangeText={setTargetValue}
+                    keyboardType="numeric"
+                    placeholder="100"
+                    maxLength={10}
+                    returnKeyType="done"
+                  />
+                </View>
               </View>
-            )}
+              <Text style={styles.hint}>
+                Unit of measurement will be selected from tracked data sources in future milestones
+              </Text>
+            </View>
 
             {/* Timeline */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Timeline</Text>
               <View style={styles.datesRow}>
                 <View style={styles.dateInputGroup}>
-                  <Text style={styles.dateLabel}>Start date</Text>
-                  <TextInput
-                    style={styles.dateInput}
-                    placeholder="YYYY-MM-DD"
+                  <DatePicker
+                    label="Start date"
                     value={startDate}
-                    onChangeText={setStartDate}
-                    maxLength={10}
+                    onChange={(date) => {
+                      setStartDate(date);
+                      setStartDateError(undefined);
+                    }}
+                    error={startDateError}
+                    placeholder="Tap to choose"
                   />
                 </View>
                 <View style={styles.dateInputGroup}>
-                  <Text style={styles.dateLabel}>Deadline</Text>
-                  <TextInput
-                    style={styles.dateInput}
-                    placeholder="YYYY-MM-DD"
+                  <DatePicker
+                    label="Deadline"
                     value={deadline}
-                    onChangeText={setDeadline}
-                    maxLength={10}
+                    onChange={(date) => {
+                      if (startDate && date < startDate) {
+                        setDeadline(date);
+                        setDeadlineDateError("Deadline must be after start date");
+                      } else {
+                        setDeadline(date);
+                        setDeadlineDateError(undefined);
+                      }
+                    }}
+                    error={deadlineDateError}
+                    placeholder="Tap to choose (indefinite)"
+                    minimumDate={startDate}
                   />
                 </View>
               </View>
-              <Text style={styles.hint}>Leave deadline empty for no time limit</Text>
+              <Text style={styles.hint}>
+                Start date defaults to today if not set. Leave deadline empty for an indefinite
+                goal.
+              </Text>
             </View>
 
             {/* Data Source */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>How will you track progress?</Text>
-              <View style={styles.dataSourceRow}>
-                {DATA_SOURCE_OPTIONS.map((option) => (
-                  <Pressable
-                    key={option.value}
-                    style={[
-                      styles.dataSourceOption,
-                      dataSource === option.value && styles.dataSourceOptionSelected,
-                      !option.enabled && styles.dataSourceOptionDisabled,
-                    ]}
-                    onPress={() => option.enabled && setDataSource(option.value)}
-                    disabled={!option.enabled}
-                  >
-                    <Text
-                      style={[
-                        styles.dataSourceLabel,
-                        dataSource === option.value && styles.dataSourceLabelSelected,
-                        !option.enabled && styles.dataSourceLabelDisabled,
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.dataSourceDesc,
-                        !option.enabled && styles.dataSourceDescDisabled,
-                      ]}
-                    >
-                      {option.desc}
-                    </Text>
-                    {!option.enabled && <Text style={styles.comingSoon}>Coming soon</Text>}
-                  </Pressable>
-                ))}
-              </View>
+              <DataSourcePicker
+                options={DATA_SOURCE_OPTIONS}
+                selected={dataSource}
+                onSelect={setDataSource}
+              />
             </View>
 
             {/* Privacy Selector */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Who can see this goal?</Text>
-              <View style={styles.privacyPicker}>
-                {PRIVACY_OPTIONS.map((privacy) => (
-                  <Pressable
-                    key={privacy}
-                    style={[
-                      styles.privacyOption,
-                      selectedPrivacy === privacy && styles.privacyOptionSelected,
-                    ]}
-                    onPress={() => setSelectedPrivacy(privacy)}
-                  >
-                    <Text
-                      style={[
-                        styles.privacyOptionLabel,
-                        selectedPrivacy === privacy && styles.privacyOptionLabelSelected,
-                      ]}
-                    >
-                      {PRIVACY_INFO[privacy].label}
-                    </Text>
-                    <Text style={styles.privacyOptionDesc}>
-                      {PRIVACY_INFO[privacy].description}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
+              <PrivacyPicker
+                options={PRIVACY_OPTIONS}
+                selected={selectedPrivacy}
+                onSelect={setSelectedPrivacy}
+              />
             </View>
 
             {/* Bottom spacing for scroll */}
@@ -733,7 +640,9 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 0,
   },
   formGroup: {
     marginBottom: 28,
@@ -749,57 +658,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: "#e5e5e5",
     paddingVertical: 12,
-  },
-  pillarPicker: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  pillarOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "#e5e5e5",
-    backgroundColor: "#fafafa",
-  },
-  pillarOptionEmoji: {
-    fontSize: 18,
-    marginRight: 6,
-  },
-  pillarOptionText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#666",
-  },
-  privacyPicker: {
-    gap: 10,
-  },
-  privacyOption: {
-    padding: 14,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "#e5e5e5",
-    backgroundColor: "#fafafa",
-  },
-  privacyOptionSelected: {
-    borderColor: "#000",
-    backgroundColor: "#f5f5f5",
-  },
-  privacyOptionLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#666",
-    marginBottom: 2,
-  },
-  privacyOptionLabelSelected: {
-    color: "#000",
-  },
-  privacyOptionDesc: {
-    fontSize: 13,
-    color: "#999",
   },
   textArea: {
     minHeight: 80,
@@ -817,90 +675,6 @@ const styles = StyleSheet.create({
     color: "#999",
     marginTop: 4,
     marginBottom: 8,
-  },
-  // Identity
-  identityRow: {
-    flexDirection: "row",
-    gap: 10,
-    paddingVertical: 4,
-  },
-  identityOption: {
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#e5e5e5",
-    backgroundColor: "#fafafa",
-    minWidth: 90,
-  },
-  identityOptionSelected: {
-    borderColor: "#000",
-    backgroundColor: "#f5f5f5",
-  },
-  identityIcon: {
-    fontSize: 24,
-    marginBottom: 4,
-  },
-  identityLabel: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#666",
-  },
-  identityLabelSelected: {
-    color: "#000",
-  },
-  lockedPillarBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "#e5e5e5",
-    backgroundColor: "#f9f9f9",
-  },
-  lockedPillarText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#666",
-    marginLeft: 8,
-  },
-  // Toggle
-  toggleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  toggleLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#333",
-  },
-  toggleHint: {
-    fontSize: 13,
-    color: "#999",
-    marginTop: 2,
-  },
-  toggle: {
-    width: 50,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "#e5e5e5",
-    padding: 2,
-  },
-  toggleActive: {
-    backgroundColor: "#000",
-  },
-  toggleThumb: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "#fff",
-  },
-  toggleThumbActive: {
-    transform: [{ translateX: 20 }],
   },
   // Values
   valuesRow: {
@@ -942,56 +716,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
     marginBottom: 4,
-  },
-  dateInput: {
-    fontSize: 15,
-    borderWidth: 2,
-    borderColor: "#e5e5e5",
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-  },
-  // Data Source
-  dataSourceRow: {
-    gap: 10,
-  },
-  dataSourceOption: {
-    padding: 14,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "#e5e5e5",
-    backgroundColor: "#fafafa",
-  },
-  dataSourceOptionSelected: {
-    borderColor: "#000",
-    backgroundColor: "#f5f5f5",
-  },
-  dataSourceOptionDisabled: {
-    opacity: 0.5,
-  },
-  dataSourceLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#666",
-    marginBottom: 2,
-  },
-  dataSourceLabelSelected: {
-    color: "#000",
-  },
-  dataSourceLabelDisabled: {
-    color: "#999",
-  },
-  dataSourceDesc: {
-    fontSize: 12,
-    color: "#999",
-  },
-  dataSourceDescDisabled: {
-    color: "#ccc",
-  },
-  comingSoon: {
-    fontSize: 10,
-    color: "#999",
-    fontStyle: "italic",
-    marginTop: 4,
   },
 });

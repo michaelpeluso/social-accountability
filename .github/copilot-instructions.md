@@ -61,6 +61,28 @@
 - Coordinates encrypted at rest if stored, never in posts/stories (M7 feature)
 - See [spec/architecture.md](../spec/architecture.md#data-sync-model) for detailed flow
 
+### 7. Component Modularity & Reusability (CRITICAL)
+
+- **NEVER inline UI patterns directly in screen files** - always extract to reusable components
+- **Component directory structure**: `/src/components/[category]/ComponentName.tsx`
+  - `pickers/` - Selection/input components (DatePicker, IdentityPicker, etc.)
+  - `forms/` - Form elements and validation wrappers
+  - `cards/` - List items and content cards
+  - `modals/` - Modal dialogs and sheets
+- **Every component must**:
+  - Be a controlled component (parent manages state via props)
+  - Include TypeScript interface for props
+  - Have self-contained styles using StyleSheet.create()
+  - Export from category's index.ts and main src/components/index.ts
+  - Be documented in src/components/README.md with usage example
+- **Platform-specific behavior** (iOS/Android) must be handled INSIDE components, not in consuming screens
+- **Theme handling** (light/dark mode) must be handled INSIDE components with proper color/theming
+- **Validation and error states** handled inside components via error prop
+- **When to extract**: If UI pattern appears twice OR could reasonably be used elsewhere, extract immediately
+- **Example**: DatePicker component handles iOS version detection, platform differences, theming, and modal presentation - screens just pass value/onChange
+- See [src/components/README.md](../src/components/README.md) for architecture details
+- **Single active input rule**: Only one input modal or picker may be open at a time. Components that present native pickers must register with the centralized picker manager (`src/components/pickers/pickerManager.ts`) so other open pickers are automatically closed before opening a new one.
+
 ---
 
 ## Development Workflow
