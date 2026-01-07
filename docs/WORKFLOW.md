@@ -108,6 +108,28 @@ Checks:
 
 ---
 
+## Installing Packages
+
+**Always use `npx expo install` instead of `npm install` for Expo-compatible packages.**
+
+```bash
+# Correct - installs SDK-compatible version
+npx expo install expo-image expo-camera
+
+# Avoid - may install incompatible versions
+npm install expo-image expo-camera
+```
+
+**Why?** Expo maintains a list of package versions compatible with each SDK version. Using `npx expo install` ensures you get the correct version for your SDK, avoiding version mismatches and native build errors.
+
+**For non-Expo packages** (e.g., lodash, date-fns), regular npm install is fine:
+
+```bash
+npm install lodash date-fns
+```
+
+---
+
 ## Git Workflow Scripts
 
 For working with GitHub issues:

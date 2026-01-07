@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { File, Paths } from "expo-file-system";
+import Constants from "expo-constants";
 import * as Sharing from "expo-sharing";
 import { auth } from "../../src/services/auth";
 import { api } from "../../src/services/api";
@@ -212,6 +213,27 @@ export default function Settings() {
         <Pressable style={styles.item} onPress={() => setShowDeleteModal(true)}>
           <Text style={[styles.itemText, styles.dangerText]}>Delete Account</Text>
         </Pressable>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>About</Text>
+
+        <View style={styles.item}>
+          <Text style={styles.itemText}>Version</Text>
+          <Text style={styles.itemValue}>
+            {Constants.expoConfig?.version || "0.0.0"} (
+            {Constants.expoConfig?.extra?.eas?.projectId ? "EAS" : "Dev"})
+          </Text>
+        </View>
+
+        <View style={styles.item}>
+          <Text style={styles.itemText}>Build</Text>
+          <Text style={styles.itemValue}>
+            {Constants.expoConfig?.ios?.buildNumber ||
+              Constants.expoConfig?.android?.versionCode ||
+              "1"}
+          </Text>
+        </View>
       </View>
 
       <View style={styles.section}>

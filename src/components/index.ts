@@ -5,6 +5,9 @@
 // Pickers
 export * from "./pickers";
 
+// Error Boundary
+export { ErrorBoundary } from "./ErrorBoundary";
+
 // Forms (future)
 // export * from "./forms";
 

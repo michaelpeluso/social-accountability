@@ -40,6 +40,11 @@ yarn-error.log
 dist/
 web-build/
 
+# Continuous Native Generation (CNG)
+# Native folders are generated fresh on build - do not commit
+ios/
+android/
+
 # Environment
 .env
 .env.local
