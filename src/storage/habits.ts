@@ -179,8 +179,13 @@ export async function getSubHabits(parentHabitId: string): Promise<Habit[]> {
  * Get a habit by ID
  */
 export async function getHabitById(habitId: string): Promise<Habit | null> {
-  const row = await queryFirst<HabitRow>("SELECT * FROM habits WHERE id = ?", [habitId]);
-  return row ? rowToHabit(row) : null;
+  try {
+    const row = await queryFirst<HabitRow>("SELECT * FROM habits WHERE id = ?", [habitId]);
+    return row ? rowToHabit(row) : null;
+  } catch (error) {
+    logger.error("Failed to get habit by ID", { habitId, error });
+    throw error;
+  }
 }
 
 /**
@@ -399,40 +404,62 @@ interface HabitRow {
 }
 
 function rowToHabit(row: HabitRow): Habit {
-  return {
-    id: row.id,
-    userId: row.userId,
-    goalId: row.goalId ?? undefined,
-    parentHabitId: row.parentHabitId ?? undefined,
-    title: row.title,
-    pillar: row.pillar as Pillar,
-    // Type & Measurement
-    habitType: (row.habitType || "BUILD") as HabitType,
-    completionType: (row.completionType || "BINARY") as CompletionType,
-    targetValue: row.targetValue ?? undefined,
-    unit: row.unit ?? undefined,
-    // Visual
-    icon: row.icon ?? undefined,
-    tags: row.tags ? JSON.parse(row.tags) : undefined,
-    // Scheduling
-    schedule: JSON.parse(row.schedule) as HabitSchedule,
-    timezone: row.timezone ?? undefined,
-    // Flexibility
-    difficulty: (row.difficulty as 1 | 2 | 3 | 4 | 5 | null) ?? undefined,
-    miniVersion: row.miniVersion ?? undefined,
-    graceDays: row.graceDays ?? 0,
-    // Status
-    privacy: row.privacy as Privacy,
-    description: row.description ?? undefined,
-    isArchived: row.isArchived === 1,
-    archivedAt: row.archivedAt ?? undefined,
-    currentStreak: row.currentStreak,
-    longestStreak: row.longestStreak,
-    lastCheckInAt: row.lastCheckInAt ?? undefined,
-    lastMissedAt: row.lastMissedAt ?? undefined,
-    recoveryStreak: row.recoveryStreak,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    syncedAt: row.syncedAt ?? undefined,
-  };
+  try {
+    // Parse JSON fields with specific error handling
+    let schedule: HabitSchedule;
+    try {
+      schedule = JSON.parse(row.schedule) as HabitSchedule;
+    } catch (e) {
+      throw new Error(`Invalid schedule JSON for habit ${row.id}: ${row.schedule}`);
+    }
+
+    let tags: string[] | undefined;
+    if (row.tags) {
+      try {
+        tags = JSON.parse(row.tags);
+      } catch (e) {
+        throw new Error(`Invalid tags JSON for habit ${row.id}: ${row.tags}`);
+      }
+    }
+
+    return {
+      id: row.id,
+      userId: row.userId,
+      goalId: row.goalId ?? undefined,
+      parentHabitId: row.parentHabitId ?? undefined,
+      title: row.title,
+      pillar: row.pillar as Pillar,
+      // Type & Measurement
+      habitType: (row.habitType || "BUILD") as HabitType,
+      completionType: (row.completionType || "BINARY") as CompletionType,
+      targetValue: row.targetValue ?? undefined,
+      unit: row.unit ?? undefined,
+      // Visual
+      icon: row.icon ?? undefined,
+      tags,
+      // Scheduling
+      schedule,
+      timezone: row.timezone ?? undefined,
+      // Flexibility
+      difficulty: (row.difficulty as 1 | 2 | 3 | 4 | 5 | null) ?? undefined,
+      miniVersion: row.miniVersion ?? undefined,
+      graceDays: row.graceDays ?? 0,
+      // Status
+      privacy: row.privacy as Privacy,
+      description: row.description ?? undefined,
+      isArchived: row.isArchived === 1,
+      archivedAt: row.archivedAt ?? undefined,
+      currentStreak: row.currentStreak,
+      longestStreak: row.longestStreak,
+      lastCheckInAt: row.lastCheckInAt ?? undefined,
+      lastMissedAt: row.lastMissedAt ?? undefined,
+      recoveryStreak: row.recoveryStreak,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      syncedAt: row.syncedAt ?? undefined,
+    };
+  } catch (error) {
+    logger.error("Failed to parse habit row", { habitId: row.id, error });
+    throw error;
+  }
 }

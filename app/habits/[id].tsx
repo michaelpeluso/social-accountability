@@ -1,9 +1,11 @@
 /**
  * Habit Detail Screen - View habit and log check-ins
  * M2-2.3: Log Check-In feature
+ * M2-2.4: Streak Calculation
+ * M2-2.5: Streak Recovery & Misses
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -27,6 +29,12 @@ import {
 } from "../../src/storage/checkIns";
 import { PILLAR_INFO } from "../../src/types/goals";
 import type { Habit, HabitCheckIn } from "../../src/types";
+import {
+  calculateStreak,
+  getCurrentPeriodCount,
+  getHabitStatus,
+  getStatusMessage,
+} from "../../src/logic";
 
 export default function HabitDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -53,8 +61,10 @@ export default function HabitDetailScreen() {
       setHabit(habitData);
       setCheckIns(checkInsData);
       setTodayCheckIns(todayData);
-    } catch {
-      Alert.alert("Error", "Failed to load habit");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load habit";
+      console.error("Error loading habit:", error);
+      Alert.alert("Error", message);
     }
   }, [id]);
 
@@ -171,6 +181,41 @@ export default function HabitDetailScreen() {
     }
   }
 
+  // Calculate real-time streak using pure logic functions
+  // These must be called unconditionally before any early returns
+  const streakCheckIns = useMemo(
+    () => checkIns.map((c) => ({ occurredAt: c.occurredAt })),
+    [checkIns]
+  );
+
+  const streakHabit = useMemo(
+    () =>
+      habit
+        ? {
+            frequency: habit.schedule.frequency,
+            targetCount: habit.schedule.targetCount,
+          }
+        : { frequency: "daily" as const, targetCount: 1 },
+    [habit]
+  );
+
+  const streakData = useMemo(
+    () => calculateStreak(streakHabit, streakCheckIns),
+    [streakHabit, streakCheckIns]
+  );
+
+  const periodProgress = useMemo(
+    () => getCurrentPeriodCount(streakHabit, streakCheckIns),
+    [streakHabit, streakCheckIns]
+  );
+
+  const habitStatus = useMemo(
+    () => getHabitStatus(streakHabit, streakCheckIns),
+    [streakHabit, streakCheckIns]
+  );
+
+  const statusMessage = useMemo(() => getStatusMessage(habitStatus), [habitStatus]);
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -231,32 +276,53 @@ export default function HabitDetailScreen() {
           </View>
         </View>
 
-        {/* Streak Display */}
+        {/* Status Banner - Shows recovery/at-risk status */}
+        {habitStatus !== "on-track" && habitStatus !== "inactive" && (
+          <View
+            style={[
+              styles.statusBanner,
+              habitStatus === "recovering" && styles.statusRecovering,
+              habitStatus === "at-risk" && styles.statusAtRisk,
+              habitStatus === "missed-today" && styles.statusMissedToday,
+            ]}
+          >
+            <Text style={styles.statusBannerText}>{statusMessage}</Text>
+          </View>
+        )}
+
+        {/* Streak Display - Using real-time calculated data */}
         <View style={styles.streakCard}>
           <View style={styles.streakItem}>
-            <Text style={styles.streakNumber}>{habit.currentStreak}</Text>
+            <Text style={styles.streakNumber}>{streakData.currentStreak}</Text>
             <Text style={styles.streakLabel}>Current Streak</Text>
           </View>
           <View style={styles.streakDivider} />
           <View style={styles.streakItem}>
-            <Text style={styles.streakNumber}>{habit.longestStreak}</Text>
+            <Text style={styles.streakNumber}>{streakData.longestStreak}</Text>
             <Text style={styles.streakLabel}>Best Streak</Text>
           </View>
         </View>
 
-        {/* Today's Progress */}
+        {/* Today's/This Week's Progress */}
         <View style={styles.todayCard}>
-          <Text style={styles.sectionTitle}>Today&apos;s Progress</Text>
+          <Text style={styles.sectionTitle}>
+            {habit.schedule.frequency === "weekly" ? "This Week" : "Today"}&apos;s Progress
+          </Text>
           <View style={styles.todayProgress}>
             <View style={styles.progressCircle}>
-              <Text style={[styles.progressCount, targetMet && styles.progressComplete]}>
-                {todayCount}/{habit.schedule.targetCount}
+              <Text
+                style={[
+                  styles.progressCount,
+                  periodProgress.remaining === 0 && styles.progressComplete,
+                ]}
+              >
+                {periodProgress.count}/{periodProgress.target}
               </Text>
             </View>
             <Text style={styles.progressLabel}>
-              {targetMet
+              {periodProgress.remaining === 0
                 ? "Target reached!"
-                : `${habit.schedule.targetCount - todayCount} more to go`}
+                : `${periodProgress.remaining} more to go`}
             </Text>
           </View>
 
@@ -429,6 +495,34 @@ const styles = StyleSheet.create({
   scheduleText: {
     fontSize: 16,
     color: "#666",
+  },
+  // Status banner styles
+  statusBanner: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  statusRecovering: {
+    backgroundColor: "#E8F5E9",
+    borderColor: "#4CAF50",
+    borderWidth: 1,
+  },
+  statusAtRisk: {
+    backgroundColor: "#FFEBEE",
+    borderColor: "#f44336",
+    borderWidth: 1,
+  },
+  statusMissedToday: {
+    backgroundColor: "#FFF3E0",
+    borderColor: "#FF9800",
+    borderWidth: 1,
+  },
+  statusBannerText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#333",
   },
   streakCard: {
     flexDirection: "row",

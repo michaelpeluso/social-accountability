@@ -47,3 +47,5 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 npx expo start
+
+# npx expo run:ios

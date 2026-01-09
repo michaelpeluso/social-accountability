@@ -905,7 +905,7 @@ Book progress: 52% → 60%
 -- ========================================
 CREATE TABLE books (
   id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
+  UserId TEXT NOT NULL,
   title TEXT NOT NULL,
   author TEXT,
   isbn TEXT,
@@ -916,7 +916,7 @@ CREATE TABLE books (
   rating INTEGER,
   cover_url TEXT,
   external_id TEXT, -- Goodreads/Audible ID
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
   CHECK (status IN ('READING', 'FINISHED', 'WANT_TO_READ')),
@@ -925,8 +925,8 @@ CREATE TABLE books (
   CHECK (finished_at IS NULL OR finished_at >= started_at)
 );
 
-CREATE INDEX idx_books_user_status ON books(user_id, status);
-CREATE INDEX idx_books_finished ON books(user_id, finished_at) WHERE status = 'FINISHED';
+CREATE INDEX idx_books_user_status ON books(UserId, status);
+CREATE INDEX idx_books_finished ON books(UserId, finished_at) WHERE status = 'FINISHED';
 
 CREATE TABLE book_check_ins (
   id TEXT PRIMARY KEY,
@@ -935,8 +935,8 @@ CREATE TABLE book_check_ins (
   progress_before INTEGER NOT NULL,
   progress_after INTEGER NOT NULL,
   pages_read INTEGER,
-  occurred_at TIMESTAMP NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  occurredAt TIMESTAMP NOT NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
   FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
   FOREIGN KEY (check_in_id) REFERENCES habit_check_ins(id) ON DELETE SET NULL,
@@ -945,42 +945,42 @@ CREATE TABLE book_check_ins (
   CHECK (progress_after BETWEEN 0 AND 100)
 );
 
-CREATE INDEX idx_book_checkins_book ON book_check_ins(book_id, occurred_at);
+CREATE INDEX idx_book_checkins_book ON book_check_ins(book_id, occurredAt);
 
 -- ========================================
 -- GROWTH HUB: TRAINING MODULE
 -- ========================================
 CREATE TABLE exercises (
   id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
+  UserId TEXT NOT NULL,
   name TEXT NOT NULL,
   category TEXT, -- CHEST | LEGS | BACK | SHOULDERS | ARMS | CORE
   equipment TEXT, -- BARBELL | DUMBBELL | MACHINE | BODYWEIGHT | CABLE
   is_custom BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-  UNIQUE(user_id, name)
+  UNIQUE(UserId, name)
 );
 
-CREATE INDEX idx_exercises_user ON exercises(user_id);
+CREATE INDEX idx_exercises_user ON exercises(UserId);
 
 CREATE TABLE workout_check_ins (
   id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
+  UserId TEXT NOT NULL,
   check_in_id TEXT, -- Optional FK to habit_check_ins
   workout_type TEXT, -- STRENGTH | CARDIO | SPORT | FLEXIBILITY
   duration INTEGER, -- minutes
   body_weight REAL, -- lbs or kg
-  occurred_at TIMESTAMP NOT NULL,
+  occurredAt TIMESTAMP NOT NULL,
   notes TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
   FOREIGN KEY (check_in_id) REFERENCES habit_check_ins(id) ON DELETE SET NULL,
   CHECK (duration > 0),
   CHECK (body_weight IS NULL OR body_weight > 0)
 );
 
-CREATE INDEX idx_workout_checkins_user ON workout_check_ins(user_id, occurred_at);
+CREATE INDEX idx_workout_checkins_user ON workout_check_ins(UserId, occurredAt);
 
 CREATE TABLE exercise_sets (
   id TEXT PRIMARY KEY,
@@ -1007,60 +1007,60 @@ CREATE INDEX idx_exercise_sets_exercise ON exercise_sets(exercise_id, workout_ch
 -- ========================================
 CREATE TABLE meal_check_ins (
   id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
+  UserId TEXT NOT NULL,
   check_in_id TEXT, -- Optional FK to habit_check_ins
   meal_type TEXT NOT NULL, -- BREAKFAST | LUNCH | DINNER | SNACK
   logged BOOLEAN DEFAULT TRUE,
-  occurred_at TIMESTAMP NOT NULL,
+  occurredAt TIMESTAMP NOT NULL,
   notes TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
   FOREIGN KEY (check_in_id) REFERENCES habit_check_ins(id) ON DELETE SET NULL,
   CHECK (meal_type IN ('BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'))
 );
 
-CREATE INDEX idx_meal_checkins_user ON meal_check_ins(user_id, occurred_at);
+CREATE INDEX idx_meal_checkins_user ON meal_check_ins(UserId, occurredAt);
 
 -- ========================================
 -- GROWTH HUB: PODCAST MODULE
 -- ========================================
 CREATE TABLE podcast_check_ins (
   id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
+  UserId TEXT NOT NULL,
   check_in_id TEXT, -- Optional FK to habit_check_ins
   show_name TEXT NOT NULL,
   episode_title TEXT,
   duration INTEGER, -- minutes
-  occurred_at TIMESTAMP NOT NULL,
+  occurredAt TIMESTAMP NOT NULL,
   external_id TEXT, -- Spotify episode ID
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
   FOREIGN KEY (check_in_id) REFERENCES habit_check_ins(id) ON DELETE SET NULL
 );
 
-CREATE INDEX idx_podcast_checkins_user ON podcast_check_ins(user_id, occurred_at);
+CREATE INDEX idx_podcast_checkins_user ON podcast_check_ins(UserId, occurredAt);
 
 -- ========================================
 -- GROWTH HUB: ACCOUNT LINKING
 -- ========================================
 CREATE TABLE module_accounts (
   id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
+  UserId TEXT NOT NULL,
   module_type TEXT NOT NULL, -- BOOK | WORKOUT | NUTRITION | PODCAST
   provider TEXT NOT NULL, -- goodreads | audible | strava | spotify | myfitnesspal
-  provider_user_id TEXT,
+  provider_UserId TEXT,
   access_token TEXT NOT NULL, -- AES-256 encrypted
   refresh_token TEXT, -- AES-256 encrypted
   token_expires_at TIMESTAMP,
   last_sync TIMESTAMP,
   sync_enabled BOOLEAN DEFAULT TRUE,
   status TEXT DEFAULT 'ACTIVE', -- ACTIVE | EXPIRED | REVOKED
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-  UNIQUE(user_id, module_type, provider)
+  UNIQUE(UserId, module_type, provider)
 );
 
-CREATE INDEX idx_module_accounts_user ON module_accounts(user_id);
+CREATE INDEX idx_module_accounts_user ON module_accounts(UserId);
 
 -- ========================================
 -- HABIT EXTENSIONS (add module support)

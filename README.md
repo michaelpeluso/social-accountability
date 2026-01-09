@@ -27,7 +27,7 @@
 npm install
 
 # Copy environment variables
-cp .env.example .env
+cp .env.local .env
 # Edit .env with your values
 
 # Start Expo dev server

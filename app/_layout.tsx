@@ -3,6 +3,7 @@ import { Slot, router, useSegments, useRootNavigationState } from "expo-router";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { auth } from "../src/services/auth";
+import { ErrorBoundary } from "../src/components/ErrorBoundary";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
@@ -50,11 +51,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <AuthGate>
-        <Slot />
-      </AuthGate>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <AuthGate>
+          <Slot />
+        </AuthGate>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
 
