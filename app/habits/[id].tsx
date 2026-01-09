@@ -61,8 +61,10 @@ export default function HabitDetailScreen() {
       setHabit(habitData);
       setCheckIns(checkInsData);
       setTodayCheckIns(todayData);
-    } catch {
-      Alert.alert("Error", "Failed to load habit");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load habit";
+      console.error("Error loading habit:", error);
+      Alert.alert("Error", message);
     }
   }, [id]);
 
@@ -194,7 +196,7 @@ export default function HabitDetailScreen() {
             targetCount: habit.schedule.targetCount,
           }
         : { frequency: "daily" as const, targetCount: 1 },
-    [habit?.schedule.frequency, habit?.schedule.targetCount]
+    [habit]
   );
 
   const streakData = useMemo(

@@ -52,7 +52,7 @@ describe("checkIns storage", () => {
     it("should create a check-in with default values", async () => {
       // First call: check habit exists, second call: get habit for streak update
       mockDb.getFirstAsync
-        .mockResolvedValueOnce({ id: testHabitId, user_id: testUserId })
+        .mockResolvedValueOnce({ id: testHabitId, UserId: testUserId })
         .mockResolvedValueOnce({ current_streak: 0, longest_streak: 0, last_check_in_at: null });
 
       const checkIn = await createCheckIn(testHabitId, testUserId, {});
@@ -66,7 +66,7 @@ describe("checkIns storage", () => {
 
     it("should create a check-in with custom values", async () => {
       mockDb.getFirstAsync
-        .mockResolvedValueOnce({ id: testHabitId, user_id: testUserId })
+        .mockResolvedValueOnce({ id: testHabitId, UserId: testUserId })
         .mockResolvedValueOnce({ current_streak: 0, longest_streak: 0, last_check_in_at: null });
 
       const checkIn = await createCheckIn(testHabitId, testUserId, {
@@ -83,7 +83,7 @@ describe("checkIns storage", () => {
     });
 
     it("should reject notes exceeding 500 characters", async () => {
-      mockDb.getFirstAsync.mockResolvedValueOnce({ id: testHabitId, user_id: testUserId });
+      mockDb.getFirstAsync.mockResolvedValueOnce({ id: testHabitId, UserId: testUserId });
 
       const longNote = "a".repeat(501);
 
@@ -114,14 +114,14 @@ describe("checkIns storage", () => {
       mockDb.getAllAsync.mockResolvedValueOnce([
         {
           id: "checkin_1",
-          habit_id: testHabitId,
-          user_id: testUserId,
-          occurred_at: "2024-01-15T10:00:00.000Z",
+          habitId: testHabitId,
+          UserId: testUserId,
+          occurredAt: "2024-01-15T10:00:00.000Z",
           source: "MANUAL",
-          evidence_ref: null,
+          evidenceRef: null,
           note: "Test note",
-          created_at: "2024-01-15T10:00:00.000Z",
-          synced_at: null,
+          createdAt: "2024-01-15T10:00:00.000Z",
+          syncedAt: null,
         },
       ]);
 
@@ -150,25 +150,25 @@ describe("checkIns storage", () => {
       mockDb.getAllAsync.mockResolvedValueOnce([
         {
           id: "checkin_1",
-          habit_id: "habit_1",
-          user_id: testUserId,
-          occurred_at: "2024-01-15T10:00:00.000Z",
+          habitId: "habit_1",
+          UserId: testUserId,
+          occurredAt: "2024-01-15T10:00:00.000Z",
           source: "MANUAL",
-          evidence_ref: null,
+          evidenceRef: null,
           note: null,
-          created_at: "2024-01-15T10:00:00.000Z",
-          synced_at: null,
+          createdAt: "2024-01-15T10:00:00.000Z",
+          syncedAt: null,
         },
         {
           id: "checkin_2",
-          habit_id: "habit_2",
-          user_id: testUserId,
-          occurred_at: "2024-01-15T11:00:00.000Z",
+          habitId: "habit_2",
+          UserId: testUserId,
+          occurredAt: "2024-01-15T11:00:00.000Z",
           source: "INTEGRATION",
-          evidence_ref: "step_count",
+          evidenceRef: "step_count",
           note: null,
-          created_at: "2024-01-15T11:00:00.000Z",
-          synced_at: "2024-01-15T11:01:00.000Z",
+          createdAt: "2024-01-15T11:00:00.000Z",
+          syncedAt: "2024-01-15T11:01:00.000Z",
         },
       ]);
 
@@ -188,7 +188,7 @@ describe("checkIns storage", () => {
       });
 
       expect(mockDb.getAllAsync).toHaveBeenCalledWith(
-        expect.stringContaining("occurred_at >= ?"),
+        expect.stringContaining("occurredAt >= ?"),
         expect.arrayContaining([testUserId, "2024-01-01T00:00:00.000Z", "2024-01-31T23:59:59.999Z"])
       );
     });
@@ -198,14 +198,14 @@ describe("checkIns storage", () => {
     it("should return check-in by ID", async () => {
       mockDb.getFirstAsync.mockResolvedValueOnce({
         id: "checkin_123",
-        habit_id: testHabitId,
-        user_id: testUserId,
-        occurred_at: "2024-01-15T10:00:00.000Z",
+        habitId: testHabitId,
+        UserId: testUserId,
+        occurredAt: "2024-01-15T10:00:00.000Z",
         source: "MANUAL",
-        evidence_ref: null,
+        evidenceRef: null,
         note: null,
-        created_at: "2024-01-15T10:00:00.000Z",
-        synced_at: null,
+        createdAt: "2024-01-15T10:00:00.000Z",
+        syncedAt: null,
       });
 
       const checkIn = await getCheckInById("checkin_123");
@@ -228,14 +228,14 @@ describe("checkIns storage", () => {
       mockDb.getAllAsync.mockResolvedValueOnce([
         {
           id: "checkin_today",
-          habit_id: testHabitId,
-          user_id: testUserId,
-          occurred_at: new Date().toISOString(),
+          habitId: testHabitId,
+          UserId: testUserId,
+          occurredAt: new Date().toISOString(),
           source: "MANUAL",
-          evidence_ref: null,
+          evidenceRef: null,
           note: null,
-          created_at: new Date().toISOString(),
-          synced_at: null,
+          createdAt: new Date().toISOString(),
+          syncedAt: null,
         },
       ]);
 
@@ -243,7 +243,7 @@ describe("checkIns storage", () => {
 
       expect(checkIns).toHaveLength(1);
       expect(mockDb.getAllAsync).toHaveBeenCalledWith(
-        expect.stringContaining("occurred_at >= ?"),
+        expect.stringContaining("occurredAt >= ?"),
         expect.any(Array)
       );
     });
@@ -252,7 +252,7 @@ describe("checkIns storage", () => {
   describe("deleteCheckIn", () => {
     it("should delete check-in and recalculate streaks", async () => {
       mockDb.getFirstAsync
-        .mockResolvedValueOnce({ id: "checkin_1", habit_id: testHabitId, user_id: testUserId })
+        .mockResolvedValueOnce({ id: "checkin_1", habitId: testHabitId, UserId: testUserId })
         .mockResolvedValueOnce(null); // For recalculate query
 
       mockDb.getAllAsync.mockResolvedValueOnce([]); // No remaining check-ins
@@ -275,31 +275,31 @@ describe("checkIns storage", () => {
   });
 
   describe("markCheckInSynced", () => {
-    it("should update synced_at timestamp", async () => {
+    it("should update syncedAt timestamp", async () => {
       const syncedAt = "2024-01-15T12:00:00.000Z";
 
       await markCheckInSynced("checkin_123", syncedAt);
 
       expect(mockDb.runAsync).toHaveBeenCalledWith(
-        "UPDATE habit_check_ins SET synced_at = ? WHERE id = ?",
+        "UPDATE habit_check_ins SET syncedAt = ? WHERE id = ?",
         [syncedAt, "checkin_123"]
       );
     });
   });
 
   describe("getUnsyncedCheckIns", () => {
-    it("should return check-ins without synced_at", async () => {
+    it("should return check-ins without syncedAt", async () => {
       mockDb.getAllAsync.mockResolvedValueOnce([
         {
           id: "checkin_unsynced",
-          habit_id: testHabitId,
-          user_id: testUserId,
-          occurred_at: "2024-01-15T10:00:00.000Z",
+          habitId: testHabitId,
+          UserId: testUserId,
+          occurredAt: "2024-01-15T10:00:00.000Z",
           source: "MANUAL",
-          evidence_ref: null,
+          evidenceRef: null,
           note: null,
-          created_at: "2024-01-15T10:00:00.000Z",
-          synced_at: null,
+          createdAt: "2024-01-15T10:00:00.000Z",
+          syncedAt: null,
         },
       ]);
 

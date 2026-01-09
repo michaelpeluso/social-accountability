@@ -20,29 +20,29 @@ export interface CreateCheckInInput {
 // Check-in row from SQLite
 interface CheckInRow {
   id: string;
-  habit_id: string;
-  user_id: string;
-  occurred_at: string;
+  habitId: string;
+  UserId: string;
+  occurredAt: string;
   source: CheckInSource;
   value: number | null;
-  evidence_ref: string | null;
+  evidenceRef: string | null;
   note: string | null;
-  created_at: string;
-  synced_at: string | null;
+  createdAt: string;
+  syncedAt: string | null;
 }
 
 function rowToCheckIn(row: CheckInRow): HabitCheckIn {
   return {
     id: row.id,
-    habitId: row.habit_id,
-    userId: row.user_id,
-    occurredAt: row.occurred_at,
+    habitId: row.habitId,
+    userId: row.UserId,
+    occurredAt: row.occurredAt,
     source: row.source,
     value: row.value ?? undefined,
-    evidenceRef: row.evidence_ref ?? undefined,
+    evidenceRef: row.evidenceRef ?? undefined,
     note: row.note ?? undefined,
-    createdAt: row.created_at,
-    syncedAt: row.synced_at ?? undefined,
+    createdAt: row.createdAt,
+    syncedAt: row.syncedAt ?? undefined,
   };
 }
 
@@ -65,8 +65,8 @@ export async function createCheckIn(
   }
 
   // Check habit exists and belongs to user
-  const habit = await db.getFirstAsync<{ id: string; user_id: string }>(
-    "SELECT id, user_id FROM habits WHERE id = ? AND user_id = ?",
+  const habit = await db.getFirstAsync<{ id: string; UserId: string }>(
+    "SELECT id, UserId FROM habits WHERE id = ? AND UserId = ?",
     [habitId, userId]
   );
 
@@ -77,7 +77,7 @@ export async function createCheckIn(
   // Insert check-in
   await db.runAsync(
     `INSERT INTO habit_check_ins (
-      id, habit_id, user_id, occurred_at, source, value, evidence_ref, note, created_at
+      id, habitId, UserId, occurredAt, source, value, evidenceRef, note, createdAt
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
@@ -123,8 +123,8 @@ export async function getCheckIns(
 
   const rows = await db.getAllAsync<CheckInRow>(
     `SELECT * FROM habit_check_ins 
-     WHERE habit_id = ? 
-     ORDER BY occurred_at DESC 
+     WHERE habitId = ? 
+     ORDER BY occurredAt DESC 
      LIMIT ? OFFSET ?`,
     [habitId, limit, offset]
   );
@@ -142,20 +142,20 @@ export async function getUserCheckIns(
   const db = await getDatabase();
   const limit = options.limit ?? 100;
 
-  let query = "SELECT * FROM habit_check_ins WHERE user_id = ?";
+  let query = "SELECT * FROM habit_check_ins WHERE UserId = ?";
   const params: (string | number)[] = [userId];
 
   if (options.startDate) {
-    query += " AND occurred_at >= ?";
+    query += " AND occurredAt >= ?";
     params.push(options.startDate);
   }
 
   if (options.endDate) {
-    query += " AND occurred_at <= ?";
+    query += " AND occurredAt <= ?";
     params.push(options.endDate);
   }
 
-  query += " ORDER BY occurred_at DESC LIMIT ?";
+  query += " ORDER BY occurredAt DESC LIMIT ?";
   params.push(limit);
 
   const rows = await db.getAllAsync<CheckInRow>(query, params);
@@ -187,8 +187,8 @@ export async function getTodayCheckIns(habitId: string): Promise<HabitCheckIn[]>
 
   const rows = await db.getAllAsync<CheckInRow>(
     `SELECT * FROM habit_check_ins 
-     WHERE habit_id = ? AND occurred_at >= ? AND occurred_at < ?
-     ORDER BY occurred_at DESC`,
+     WHERE habitId = ? AND occurredAt >= ? AND occurredAt < ?
+     ORDER BY occurredAt DESC`,
     [habitId, todayStart, tomorrowStart]
   );
 
@@ -202,8 +202,8 @@ export async function deleteCheckIn(checkInId: string, userId: string): Promise<
   const db = await getDatabase();
 
   // Get check-in to verify ownership and get habitId
-  const checkIn = await db.getFirstAsync<{ id: string; habit_id: string; user_id: string }>(
-    "SELECT id, habit_id, user_id FROM habit_check_ins WHERE id = ? AND user_id = ?",
+  const checkIn = await db.getFirstAsync<{ id: string; habitId: string; UserId: string }>(
+    "SELECT id, habitId, UserId FROM habit_check_ins WHERE id = ? AND UserId = ?",
     [checkInId, userId]
   );
 
@@ -214,7 +214,7 @@ export async function deleteCheckIn(checkInId: string, userId: string): Promise<
   await db.runAsync("DELETE FROM habit_check_ins WHERE id = ?", [checkInId]);
 
   // Recalculate streaks for the habit
-  await recalculateHabitStreaks(checkIn.habit_id);
+  await recalculateHabitStreaks(checkIn.habitId);
 
   return true;
 }
@@ -225,7 +225,7 @@ export async function deleteCheckIn(checkInId: string, userId: string): Promise<
 export async function markCheckInSynced(checkInId: string, serverSyncedAt: string): Promise<void> {
   const db = await getDatabase();
 
-  await db.runAsync("UPDATE habit_check_ins SET synced_at = ? WHERE id = ?", [
+  await db.runAsync("UPDATE habit_check_ins SET syncedAt = ? WHERE id = ?", [
     serverSyncedAt,
     checkInId,
   ]);
@@ -238,7 +238,7 @@ export async function getUnsyncedCheckIns(userId: string): Promise<HabitCheckIn[
   const db = await getDatabase();
 
   const rows = await db.getAllAsync<CheckInRow>(
-    "SELECT * FROM habit_check_ins WHERE user_id = ? AND synced_at IS NULL ORDER BY created_at ASC",
+    "SELECT * FROM habit_check_ins WHERE UserId = ? AND syncedAt IS NULL ORDER BY createdAt ASC",
     [userId]
   );
 
@@ -257,7 +257,7 @@ export async function countCheckInsInRange(
 
   const result = await db.getFirstAsync<{ count: number }>(
     `SELECT COUNT(*) as count FROM habit_check_ins 
-     WHERE habit_id = ? AND occurred_at >= ? AND occurred_at < ?`,
+     WHERE habitId = ? AND occurredAt >= ? AND occurredAt < ?`,
     [habitId, startDate, endDate]
   );
 
@@ -330,8 +330,8 @@ async function recalculateHabitStreaks(habitId: string): Promise<void> {
   const now = new Date().toISOString();
 
   // Get all check-ins ordered by date
-  const checkIns = await db.getAllAsync<{ occurred_at: string }>(
-    "SELECT occurred_at FROM habit_check_ins WHERE habit_id = ? ORDER BY occurred_at ASC",
+  const checkIns = await db.getAllAsync<{ occurredAt: string }>(
+    "SELECT occurredAt FROM habit_check_ins WHERE habitId = ? ORDER BY occurredAt ASC",
     [habitId]
   );
 
@@ -351,10 +351,10 @@ async function recalculateHabitStreaks(habitId: string): Promise<void> {
 
   let currentStreak = 1;
   let longestStreak = 1;
-  let lastDate = new Date(checkIns[0].occurred_at);
+  let lastDate = new Date(checkIns[0].occurredAt);
 
   for (let i = 1; i < checkIns.length; i++) {
-    const currentDate = new Date(checkIns[i].occurred_at);
+    const currentDate = new Date(checkIns[i].occurredAt);
     const daysDiff = Math.floor(
       (currentDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)
     );
@@ -380,7 +380,7 @@ async function recalculateHabitStreaks(habitId: string): Promise<void> {
   // Check if current streak is still active (within last 24h or today)
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const lastCheckInDay = new Date(lastCheckIn.occurred_at);
+  const lastCheckInDay = new Date(lastCheckIn.occurredAt);
   lastCheckInDay.setHours(0, 0, 0, 0);
   const daysSinceLastCheckIn = Math.floor(
     (today.getTime() - lastCheckInDay.getTime()) / (1000 * 60 * 60 * 24)
@@ -398,6 +398,6 @@ async function recalculateHabitStreaks(habitId: string): Promise<void> {
       last_check_in_at = ?,
       updated_at = ?
     WHERE id = ?`,
-    [currentStreak, longestStreak, lastCheckIn.occurred_at, now, habitId]
+    [currentStreak, longestStreak, lastCheckIn.occurredAt, now, habitId]
   );
 }

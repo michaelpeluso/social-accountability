@@ -55,7 +55,7 @@ M0 is infrastructure-only. NO user-facing features, NO backend deployment, NO da
 - [x] `jest.config.js` + `jest.setup.js` - testing config
 - [x] `.github/workflows/ci.yml` - CI pipeline
 - [x] `.gitignore` - proper exclusions
-- [x] `.env.example` - all env vars documented
+- [x] `.env.local` - all env vars documented
 
 **Privacy Note:** N/A (no user data yet)
 **Cost Note:** CI runs free on GitHub Actions
@@ -215,7 +215,7 @@ logger.info("User signed in", { userId: "123", email: "test@ex.com" });
 - [ ] env.ts exports all config with types
 - [ ] Required vars throw error if missing at startup
 - [ ] Optional vars have documented defaults
-- [ ] .env.example contains all variables
+- [ ] .env.local contains all variables
 - [ ] Validation works for string, number, boolean types
 - [ ] Feature flags defined (ENABLE_APPLE_AUTH, ENABLE_HEALTHKIT)
 
@@ -332,7 +332,7 @@ Before moving to M1:
 - [ ] Can navigate between screens
 - [ ] Mock auth sign-in/sign-out works
 - [ ] All directories exist per startup_guide.md
-- [ ] .env.example filled out
+- [ ] .env.local filled out
 
 ---
 

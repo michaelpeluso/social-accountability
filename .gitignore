@@ -59,3 +59,7 @@ coverage/
 *.swo
 *~
 .vscode/
+*.key
+*.csr
+*.cer
+auth_keys/

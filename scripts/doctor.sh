@@ -65,7 +65,7 @@ if [ -f ".env" ]; then
     echo "   ✅ .env file exists"
 else
     echo "   ⚠️  .env file missing"
-    echo "   Run: cp .env.example .env"
+    echo "   Run: cp .env.local .env"
 fi
 echo ""
 
