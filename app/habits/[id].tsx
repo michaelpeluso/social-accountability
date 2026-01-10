@@ -27,14 +27,18 @@ import {
   getTodayCheckIns,
   deleteCheckIn,
 } from "../../src/storage/checkIns";
-import { PILLAR_INFO } from "../../src/types/goals";
-import type { Habit, HabitCheckIn } from "../../src/types";
+import { PILLAR_INFO, PRIVACY_INFO } from "../../src/types/goals";
+import type { Habit, HabitCheckIn, Privacy, HabitFrequency } from "../../src/types";
 import {
   calculateStreak,
   getCurrentPeriodCount,
   getHabitStatus,
   getStatusMessage,
+  calculateRecoveryStatus,
 } from "../../src/logic";
+
+// Privacy options for editing
+const PRIVACY_OPTIONS: Privacy[] = ["SELF", "FRIENDS", "PUBLIC"];
 
 export default function HabitDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -44,11 +48,18 @@ export default function HabitDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showCheckInModal, setShowCheckInModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
   // Check-in form state
   const [checkInNote, setCheckInNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Edit form state
+  const [editTitle, setEditTitle] = useState("");
+  const [editPrivacy, setEditPrivacy] = useState<Privacy>("SELF");
+  const [editFrequency, setEditFrequency] = useState<HabitFrequency>("daily");
+  const [editTargetCount, setEditTargetCount] = useState("1");
 
   const loadData = useCallback(async () => {
     if (!id) return;
@@ -163,6 +174,51 @@ export default function HabitDetailScreen() {
     ]);
   }
 
+  function openEditModal() {
+    if (!habit) return;
+    setEditTitle(habit.title);
+    setEditPrivacy(habit.privacy);
+    setEditFrequency(habit.schedule.frequency);
+    setEditTargetCount(habit.schedule.targetCount.toString());
+    setShowEditModal(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!habit || !userId) return;
+    if (!editTitle.trim()) {
+      Alert.alert("Error", "Title is required");
+      return;
+    }
+
+    const targetCount = parseInt(editTargetCount, 10);
+    if (isNaN(targetCount) || targetCount < 1) {
+      Alert.alert("Error", "Target count must be at least 1");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await updateHabit(habit.id, {
+        title: editTitle.trim(),
+        privacy: editPrivacy,
+        schedule: {
+          ...habit.schedule,
+          frequency: editFrequency,
+          targetCount,
+        },
+      });
+
+      setShowEditModal(false);
+      await loadData();
+      Alert.alert("Success", "Habit updated successfully");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update habit";
+      Alert.alert("Error", message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   function formatDate(dateStr: string): string {
     const date = new Date(dateStr);
     const now = new Date();
@@ -214,7 +270,16 @@ export default function HabitDetailScreen() {
     [streakHabit, streakCheckIns]
   );
 
-  const statusMessage = useMemo(() => getStatusMessage(habitStatus), [habitStatus]);
+  // Calculate recovery status
+  const recoveryStatus = useMemo(
+    () => calculateRecoveryStatus(streakHabit, streakCheckIns),
+    [streakHabit, streakCheckIns]
+  );
+
+  const statusMessage = useMemo(
+    () => getStatusMessage(habitStatus, recoveryStatus.recoveryStreak),
+    [habitStatus, recoveryStatus.recoveryStreak]
+  );
 
   if (isLoading) {
     return (
@@ -250,9 +315,14 @@ export default function HabitDetailScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backButtonText}>Back</Text>
         </Pressable>
-        <Pressable onPress={handleArchive} style={styles.archiveButton}>
-          <Text style={styles.archiveButtonText}>Archive</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable onPress={openEditModal} style={styles.editButton}>
+            <Text style={styles.editButtonText}>Edit</Text>
+          </Pressable>
+          <Pressable onPress={handleArchive} style={styles.archiveButton}>
+            <Text style={styles.archiveButtonText}>Archive</Text>
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView
@@ -301,6 +371,17 @@ export default function HabitDetailScreen() {
             <Text style={styles.streakNumber}>{streakData.longestStreak}</Text>
             <Text style={styles.streakLabel}>Best Streak</Text>
           </View>
+          {recoveryStatus.isInRecovery && recoveryStatus.recoveryStreak > 0 && (
+            <>
+              <View style={styles.streakDivider} />
+              <View style={styles.streakItem}>
+                <Text style={[styles.streakNumber, styles.recoveryNumber]}>
+                  {recoveryStatus.recoveryStreak}
+                </Text>
+                <Text style={styles.streakLabel}>Recovery 🔥</Text>
+              </View>
+            </>
+          )}
         </View>
 
         {/* Today's/This Week's Progress */}
@@ -402,6 +483,101 @@ export default function HabitDetailScreen() {
           </View>
         </SafeAreaView>
       </Modal>
+
+      {/* Edit Habit Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Pressable onPress={() => setShowEditModal(false)}>
+              <Text style={styles.modalCancel}>Cancel</Text>
+            </Pressable>
+            <Text style={styles.modalTitle}>Edit Habit</Text>
+            <Pressable onPress={handleSaveEdit} disabled={isSubmitting}>
+              <Text style={[styles.modalSave, isSubmitting && styles.disabled]}>
+                {isSubmitting ? "Saving..." : "Save"}
+              </Text>
+            </Pressable>
+          </View>
+
+          <ScrollView style={styles.modalContent}>
+            {/* Title */}
+            <Text style={styles.label}>Title</Text>
+            <TextInput
+              style={styles.textInput}
+              value={editTitle}
+              onChangeText={setEditTitle}
+              placeholder="Enter habit title"
+              maxLength={100}
+            />
+
+            {/* Frequency */}
+            <Text style={styles.label}>Frequency</Text>
+            <View style={styles.frequencyOptions}>
+              {(["daily", "weekly"] as const).map((freq) => (
+                <Pressable
+                  key={freq}
+                  style={[
+                    styles.frequencyOption,
+                    editFrequency === freq && styles.frequencyOptionSelected,
+                  ]}
+                  onPress={() => setEditFrequency(freq)}
+                >
+                  <Text
+                    style={[
+                      styles.frequencyOptionText,
+                      editFrequency === freq && styles.frequencyOptionTextSelected,
+                    ]}
+                  >
+                    {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Target Count */}
+            <Text style={styles.label}>
+              Target (times per {editFrequency === "daily" ? "day" : "week"})
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              value={editTargetCount}
+              onChangeText={setEditTargetCount}
+              keyboardType="number-pad"
+              placeholder="1"
+            />
+
+            {/* Privacy */}
+            <Text style={styles.label}>Privacy</Text>
+            <View style={styles.privacyOptions}>
+              {PRIVACY_OPTIONS.map((privacy) => (
+                <Pressable
+                  key={privacy}
+                  style={[
+                    styles.privacyOption,
+                    editPrivacy === privacy && styles.privacyOptionSelected,
+                  ]}
+                  onPress={() => setEditPrivacy(privacy)}
+                >
+                  <Text
+                    style={[
+                      styles.privacyOptionText,
+                      editPrivacy === privacy && styles.privacyOptionTextSelected,
+                    ]}
+                  >
+                    {PRIVACY_INFO[privacy].label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.privacyDescription}>{PRIVACY_INFO[editPrivacy].description}</Text>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -431,6 +607,17 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   backButtonText: {
+    fontSize: 16,
+    color: "#007AFF",
+  },
+  headerActions: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  editButton: {
+    padding: 8,
+  },
+  editButtonText: {
     fontSize: 16,
     color: "#007AFF",
   },
@@ -549,6 +736,9 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: "bold",
     color: "#FF6B6B",
+  },
+  recoveryNumber: {
+    color: "#4CAF50",
   },
   streakLabel: {
     fontSize: 14,
@@ -721,5 +911,72 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#999",
     marginTop: 8,
+  },
+  // Edit Modal Styles
+  textInput: {
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: "#e5e5e5",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    backgroundColor: "#fff",
+  },
+  frequencyOptions: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 20,
+  },
+  frequencyOption: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e5e5",
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  frequencyOptionSelected: {
+    borderColor: "#007AFF",
+    backgroundColor: "#F0F7FF",
+  },
+  frequencyOptionText: {
+    fontSize: 16,
+    color: "#666",
+  },
+  frequencyOptionTextSelected: {
+    color: "#007AFF",
+    fontWeight: "600",
+  },
+  privacyOptions: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 8,
+  },
+  privacyOption: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e5e5",
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  privacyOptionSelected: {
+    borderColor: "#007AFF",
+    backgroundColor: "#F0F7FF",
+  },
+  privacyOptionText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  privacyOptionTextSelected: {
+    color: "#007AFF",
+    fontWeight: "600",
+  },
+  privacyDescription: {
+    fontSize: 13,
+    color: "#999",
+    marginBottom: 20,
   },
 });

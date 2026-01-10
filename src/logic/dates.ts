@@ -112,3 +112,65 @@ export function today(): Date {
 export function parseDate(dateStr: string): Date {
   return new Date(dateStr);
 }
+
+/**
+ * Check if a date is in the current week
+ */
+export function isThisWeek(date: Date | string, referenceDate: Date = new Date()): boolean {
+  return isSameWeek(date, referenceDate);
+}
+
+/**
+ * Check if a date is in the previous week
+ */
+export function isLastWeek(date: Date | string, referenceDate: Date = new Date()): boolean {
+  const lastWeekDate = subtractDays(referenceDate, 7);
+  return isSameWeek(date, lastWeekDate);
+}
+
+/**
+ * Get date range for the current week
+ */
+export function getCurrentWeekRange(referenceDate: Date = new Date()): { start: Date; end: Date } {
+  return {
+    start: startOfWeek(referenceDate),
+    end: endOfWeek(referenceDate),
+  };
+}
+
+/**
+ * Get date range for the last N days
+ */
+export function getLastNDaysRange(
+  days: number,
+  referenceDate: Date = new Date()
+): { start: Date; end: Date } {
+  return {
+    start: startOfDay(subtractDays(referenceDate, days - 1)),
+    end: startOfDay(referenceDate),
+  };
+}
+
+/**
+ * Format date for display (e.g., "Jan 5")
+ */
+export function formatShortDate(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+/**
+ * Get day of week name (e.g., "Monday")
+ */
+export function getDayName(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleDateString("en-US", { weekday: "long" });
+}
+
+/**
+ * Get short day of week name (e.g., "Mon")
+ */
+export function getShortDayName(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleDateString("en-US", { weekday: "short" });
+}
