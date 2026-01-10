@@ -176,6 +176,27 @@ throw new AppError("User not found", ErrorCode.NOT_FOUND); // ✅
 throw new Error("Something went wrong"); // ❌ Not typed
 ```
 
+### Dynamic Styles
+
+Instead of hardcoded values, use theme tokens that update when the theme changes:
+
+```tsx
+// ❌ Old way (hardcoded)
+<View style={{
+  backgroundColor: "#fff",
+  padding: 16,
+  borderRadius: 8,
+}}>
+
+// ✅ New way (dynamic)
+const { theme } = useTheme();
+<View style={{
+  backgroundColor: theme.card.background,
+  padding: theme.card.padding,
+  borderRadius: theme.card.borderRadius,
+}}>
+```
+
 ---
 
 ## Spec Navigation (Source of Truth)

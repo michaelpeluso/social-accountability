@@ -13,6 +13,7 @@ import { auth } from "../../src/services/auth";
 import { api } from "../../src/services/api";
 import { logger } from "../../src/lib/logger";
 import type { Privacy, User } from "../../src/types/user";
+import { useTheme } from "../../src/theme";
 
 const PRIVACY_OPTIONS: { value: Privacy; label: string; description: string }[] = [
   {
@@ -33,6 +34,7 @@ const PRIVACY_OPTIONS: { value: Privacy; label: string; description: string }[] 
 ];
 
 export default function PrivacySettings() {
+  const { theme } = useTheme();
   const [user, setUser] = useState<User | null>(null);
   const [selectedPrivacy, setSelectedPrivacy] = useState<Privacy>("SELF");
   const [loading, setLoading] = useState(true);
@@ -95,17 +97,17 @@ export default function PrivacySettings() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#000" />
+      <View style={[styles.centered, { backgroundColor: theme.background.primary }]}>
+        <ActivityIndicator size="large" color={theme.text.primary} />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Default Privacy</Text>
-        <Text style={styles.sectionDescription}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.background.secondary }]}>
+      <View style={[styles.section, { backgroundColor: theme.card.background }]}>
+        <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>Default Privacy</Text>
+        <Text style={[styles.sectionDescription, { color: theme.text.secondary }]}>
           New goals and habits will use this privacy level by default. You can still change privacy
           for individual items.
         </Text>
@@ -113,29 +115,55 @@ export default function PrivacySettings() {
         {PRIVACY_OPTIONS.map((option) => (
           <Pressable
             key={option.value}
-            style={[styles.option, selectedPrivacy === option.value && styles.optionSelected]}
+            style={[
+              styles.option,
+              { backgroundColor: theme.background.secondary },
+              selectedPrivacy === option.value && {
+                backgroundColor: theme.semantic.primary + "20",
+                borderWidth: 1,
+                borderColor: theme.semantic.primary,
+              },
+            ]}
             onPress={() => setSelectedPrivacy(option.value)}
           >
             <View style={styles.optionContent}>
-              <Text style={styles.optionLabel}>{option.label}</Text>
-              <Text style={styles.optionDescription}>{option.description}</Text>
+              <Text style={[styles.optionLabel, { color: theme.text.primary }]}>
+                {option.label}
+              </Text>
+              <Text style={[styles.optionDescription, { color: theme.text.secondary }]}>
+                {option.description}
+              </Text>
             </View>
-            <View style={[styles.radio, selectedPrivacy === option.value && styles.radioSelected]}>
-              {selectedPrivacy === option.value && <View style={styles.radioInner} />}
+            <View
+              style={[
+                styles.radio,
+                { borderColor: theme.border.medium },
+                selectedPrivacy === option.value && { borderColor: theme.semantic.primary },
+              ]}
+            >
+              {selectedPrivacy === option.value && (
+                <View style={[styles.radioInner, { backgroundColor: theme.semantic.primary }]} />
+              )}
             </View>
           </Pressable>
         ))}
       </View>
 
       <Pressable
-        style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+        style={[
+          styles.saveButton,
+          { backgroundColor: theme.button.primary.background },
+          saving && styles.saveButtonDisabled,
+        ]}
         onPress={handleSave}
         disabled={saving}
       >
         {saving ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={theme.button.primary.text} />
         ) : (
-          <Text style={styles.saveButtonText}>Save Changes</Text>
+          <Text style={[styles.saveButtonText, { color: theme.button.primary.text }]}>
+            Save Changes
+          </Text>
         )}
       </Pressable>
     </ScrollView>
@@ -145,7 +173,6 @@ export default function PrivacySettings() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
   },
   centered: {
     flex: 1,
@@ -153,7 +180,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   section: {
-    backgroundColor: "#fff",
     marginTop: 20,
     padding: 16,
   },
@@ -164,7 +190,6 @@ const styles = StyleSheet.create({
   },
   sectionDescription: {
     fontSize: 14,
-    color: "#666",
     marginBottom: 20,
     lineHeight: 20,
   },
@@ -173,13 +198,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 16,
     borderRadius: 8,
-    backgroundColor: "#f9f9f9",
     marginBottom: 12,
-  },
-  optionSelected: {
-    backgroundColor: "#e8f4ff",
-    borderWidth: 1,
-    borderColor: "#007AFF",
   },
   optionContent: {
     flex: 1,
@@ -191,38 +210,30 @@ const styles = StyleSheet.create({
   },
   optionDescription: {
     fontSize: 14,
-    color: "#666",
   },
   radio: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: "#ccc",
     justifyContent: "center",
     alignItems: "center",
-  },
-  radioSelected: {
-    borderColor: "#007AFF",
   },
   radioInner: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#007AFF",
   },
   saveButton: {
-    backgroundColor: "#000",
     margin: 20,
     padding: 16,
     borderRadius: 8,
     alignItems: "center",
   },
   saveButtonDisabled: {
-    backgroundColor: "#666",
+    opacity: 0.6,
   },
   saveButtonText: {
-    color: "#fff",
     fontSize: 16,
     fontWeight: "600",
   },

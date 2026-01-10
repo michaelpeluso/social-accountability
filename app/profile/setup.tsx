@@ -18,6 +18,7 @@ import { auth } from "../../src/services/auth";
 import { api } from "../../src/services/api";
 import { logger } from "../../src/lib/logger";
 import { validateDisplayName, validateBio, limits, isNearLimit } from "../../src/lib/validation";
+import { useTheme } from "../../src/theme";
 
 const MAX_BIO_LENGTH = limits.bio.max;
 const MAX_DISPLAY_NAME_LENGTH = limits.displayName.max;
@@ -25,6 +26,7 @@ const MAX_PHOTO_SIZE_MB = limits.photo.maxSizeBytes / (1024 * 1024);
 const MAX_PHOTO_SIZE_BYTES = limits.photo.maxSizeBytes;
 
 export default function ProfileSetup() {
+  const { theme } = useTheme();
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -146,21 +148,23 @@ export default function ProfileSetup() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#000" />
+      <View style={[styles.centered, { backgroundColor: theme.background.primary }]}>
+        <ActivityIndicator size="large" color={theme.text.primary} />
       </View>
     );
   }
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.background.primary }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Text style={styles.title}>Set Up Your Profile</Text>
-          <Text style={styles.subtitle}>Tell us a bit about yourself</Text>
+          <Text style={[styles.title, { color: theme.text.primary }]}>Set Up Your Profile</Text>
+          <Text style={[styles.subtitle, { color: theme.text.secondary }]}>
+            Tell us a bit about yourself
+          </Text>
         </View>
 
         <View style={styles.form}>
@@ -169,56 +173,90 @@ export default function ProfileSetup() {
               {photoUri ? (
                 <Image source={{ uri: photoUri }} style={styles.photo} />
               ) : (
-                <View style={styles.photoPlaceholder}>
-                  <Text style={styles.photoPlaceholderText}>+</Text>
+                <View
+                  style={[
+                    styles.photoPlaceholder,
+                    {
+                      backgroundColor: theme.background.secondary,
+                      borderColor: theme.border.medium,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.photoPlaceholderText, { color: theme.text.tertiary }]}>
+                    +
+                  </Text>
                 </View>
               )}
             </Pressable>
             <Pressable onPress={handlePickPhoto}>
-              <Text style={styles.photoLabel}>{photoUri ? "Change Photo" : "Add Photo"}</Text>
+              <Text style={[styles.photoLabel, { color: theme.semantic.primary }]}>
+                {photoUri ? "Change Photo" : "Add Photo"}
+              </Text>
             </Pressable>
-            <Text style={styles.photoHint}>Max {MAX_PHOTO_SIZE_MB}MB, JPG or PNG</Text>
+            <Text style={[styles.photoHint, { color: theme.text.tertiary }]}>
+              Max {MAX_PHOTO_SIZE_MB}MB, JPG or PNG
+            </Text>
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Display Name *</Text>
+            <Text style={[styles.label, { color: theme.text.primary }]}>Display Name *</Text>
             <TextInput
               style={[
                 styles.input,
+                {
+                  borderColor: theme.input.border,
+                  backgroundColor: theme.input.background,
+                  color: theme.text.primary,
+                },
                 touched.displayName && !displayNameValidation.valid && styles.inputError,
               ]}
               value={displayName}
               onChangeText={setDisplayName}
               onBlur={() => setTouched((t) => ({ ...t, displayName: true }))}
               placeholder="Your name"
+              placeholderTextColor={theme.text.tertiary}
               maxLength={MAX_DISPLAY_NAME_LENGTH}
               autoCapitalize="words"
               autoCorrect={false}
             />
             <View style={styles.fieldFooter}>
               {touched.displayName && !displayNameValidation.valid ? (
-                <Text style={styles.fieldError}>{displayNameValidation.error}</Text>
+                <Text style={[styles.fieldError, { color: theme.semantic.danger }]}>
+                  {displayNameValidation.error}
+                </Text>
               ) : (
                 <View />
               )}
-              <Text style={[styles.counter, displayNameNearLimit && styles.counterWarning]}>
+              <Text
+                style={[
+                  styles.counter,
+                  { color: theme.text.tertiary },
+                  displayNameNearLimit && { color: theme.semantic.warning },
+                ]}
+              >
                 {displayName.length}/{MAX_DISPLAY_NAME_LENGTH}
               </Text>
             </View>
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Bio (optional)</Text>
+            <Text style={[styles.label, { color: theme.text.primary }]}>Bio (optional)</Text>
             <TextInput
               style={[
                 styles.input,
                 styles.bioInput,
+                {
+                  borderColor: theme.input.border,
+                  backgroundColor: theme.input.background,
+                  color: theme.text.primary,
+                },
                 touched.bio && !bioValidation.valid && styles.inputError,
               ]}
               value={bio}
               onChangeText={setBio}
               onBlur={() => setTouched((t) => ({ ...t, bio: true }))}
               placeholder="A few words about yourself..."
+              placeholderTextColor={theme.text.tertiary}
               maxLength={MAX_BIO_LENGTH}
               multiline
               numberOfLines={4}
@@ -226,27 +264,41 @@ export default function ProfileSetup() {
             />
             <View style={styles.fieldFooter}>
               {touched.bio && !bioValidation.valid ? (
-                <Text style={styles.fieldError}>{bioValidation.error}</Text>
+                <Text style={[styles.fieldError, { color: theme.semantic.danger }]}>
+                  {bioValidation.error}
+                </Text>
               ) : (
                 <View />
               )}
-              <Text style={[styles.counter, bioNearLimit && styles.counterWarning]}>
+              <Text
+                style={[
+                  styles.counter,
+                  { color: theme.text.tertiary },
+                  bioNearLimit && { color: theme.semantic.warning },
+                ]}
+              >
                 {bio.length}/{MAX_BIO_LENGTH}
               </Text>
             </View>
           </View>
 
-          {error && <Text style={styles.error}>{error}</Text>}
+          {error && <Text style={[styles.error, { color: theme.semantic.danger }]}>{error}</Text>}
 
           <Pressable
-            style={[styles.button, (saving || !isFormValid) && styles.buttonDisabled]}
+            style={[
+              styles.button,
+              { backgroundColor: theme.button.primary.background },
+              (saving || !isFormValid) && styles.buttonDisabled,
+            ]}
             onPress={handleSave}
             disabled={saving || !isFormValid}
           >
             {saving ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={theme.button.primary.text} />
             ) : (
-              <Text style={styles.buttonText}>Save Profile</Text>
+              <Text style={[styles.buttonText, { color: theme.button.primary.text }]}>
+                Save Profile
+              </Text>
             )}
           </Pressable>
         </View>
@@ -258,7 +310,6 @@ export default function ProfileSetup() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
   },
   centered: {
     flex: 1,
@@ -280,7 +331,6 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: "#666",
   },
   form: {
     flex: 1,
@@ -303,26 +353,21 @@ const styles = StyleSheet.create({
   photoPlaceholder: {
     width: "100%",
     height: "100%",
-    backgroundColor: "#f0f0f0",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#ddd",
     borderStyle: "dashed",
     borderRadius: 50,
   },
   photoPlaceholderText: {
     fontSize: 32,
-    color: "#999",
   },
   photoLabel: {
-    color: "#007AFF",
     fontSize: 14,
     fontWeight: "500",
   },
   photoHint: {
     fontSize: 12,
-    color: "#999",
     marginTop: 4,
   },
   field: {
@@ -332,11 +377,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginBottom: 8,
-    color: "#333",
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
@@ -355,35 +398,27 @@ const styles = StyleSheet.create({
   },
   fieldError: {
     fontSize: 12,
-    color: "#ff3b30",
     flex: 1,
     marginRight: 8,
   },
   counter: {
     fontSize: 12,
-    color: "#999",
     textAlign: "right",
   },
-  counterWarning: {
-    color: "#ff9500",
-  },
   error: {
-    color: "red",
     marginBottom: 16,
     textAlign: "center",
   },
   button: {
-    backgroundColor: "#000",
     borderRadius: 8,
     padding: 16,
     alignItems: "center",
     marginTop: 16,
   },
   buttonDisabled: {
-    backgroundColor: "#666",
+    opacity: 0.6,
   },
   buttonText: {
-    color: "#fff",
     fontSize: 16,
     fontWeight: "600",
   },

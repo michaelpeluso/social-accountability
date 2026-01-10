@@ -23,6 +23,7 @@ import { auth } from "../../src/services/auth";
 import { getHabits } from "../../src/storage/habits";
 import { getUserCheckIns } from "../../src/storage/checkIns";
 import { PILLAR_INFO, ALL_PILLARS } from "../../src/types/goals";
+import { useTheme } from "../../src/theme";
 import type { Habit, HabitCheckIn } from "../../src/types";
 import {
   calculateAllPillarScores,
@@ -41,6 +42,7 @@ import {
 } from "../../src/logic";
 
 export default function DashboardScreen() {
+  const { theme } = useTheme();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [checkIns, setCheckIns] = useState<HabitCheckIn[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -220,37 +222,49 @@ export default function DashboardScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.loadingText}>Loading dashboard...</Text>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
+        <Text style={[styles.loadingText, { color: theme.text.secondary }]}>
+          Loading dashboard...
+        </Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
+      <View style={[styles.header, { borderBottomColor: theme.border.light }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>Back</Text>
+          <Text style={[styles.backButtonText, { color: theme.button.primary.background }]}>
+            Back
+          </Text>
         </Pressable>
-        <Text style={styles.title}>Dashboard</Text>
+        <Text style={[styles.title, { color: theme.text.primary }]}>Dashboard</Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView
         style={styles.content}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.text.secondary}
+          />
+        }
       >
         {/* Overall Score */}
-        <View style={styles.overallCard}>
-          <Text style={styles.overallLabel}>Overall Score</Text>
+        <View style={[styles.overallCard, { backgroundColor: theme.card.background }]}>
+          <Text style={[styles.overallLabel, { color: theme.text.secondary }]}>Overall Score</Text>
           <Text style={[styles.overallScore, { color: getScoreColor(pillarData.overall) }]}>
             {pillarData.overall}%
           </Text>
-          <Text style={styles.overallSubtext}>{habitSummary.activeHabits} active habits</Text>
+          <Text style={[styles.overallSubtext, { color: theme.text.tertiary }]}>
+            {habitSummary.activeHabits} active habits
+          </Text>
         </View>
 
         {/* Pillar Scores Grid */}
-        <Text style={styles.sectionTitle}>Life Pillars</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>Life Pillars</Text>
         <View style={styles.pillarGrid}>
           {ALL_PILLARS.map((pillar) => {
             const score = pillarData.pillars.find((p) => p.pillar === pillar);
@@ -260,12 +274,17 @@ export default function DashboardScreen() {
             return (
               <Pressable
                 key={pillar}
-                style={[styles.pillarCard, { borderLeftColor: info.color }]}
+                style={[
+                  styles.pillarCard,
+                  { borderLeftColor: info.color, backgroundColor: theme.card.background },
+                ]}
                 onPress={() => handlePillarTap(score)}
               >
                 <View style={styles.pillarHeader}>
                   <Text style={styles.pillarEmoji}>{info.emoji}</Text>
-                  <Text style={styles.pillarName}>{info.label}</Text>
+                  <Text style={[styles.pillarName, { color: theme.text.primary }]}>
+                    {info.label}
+                  </Text>
                 </View>
                 <View style={styles.pillarScoreRow}>
                   <Text style={[styles.pillarScore, { color: getScoreColor(score.score) }]}>
@@ -275,7 +294,7 @@ export default function DashboardScreen() {
                     {getTrendArrow(score.trend)}
                   </Text>
                 </View>
-                <Text style={styles.pillarMeta}>
+                <Text style={[styles.pillarMeta, { color: theme.text.tertiary }]}>
                   {score.habitCount} habit{score.habitCount !== 1 ? "s" : ""}
                 </Text>
               </Pressable>
@@ -284,44 +303,52 @@ export default function DashboardScreen() {
         </View>
 
         {/* Weekly Summary */}
-        <Text style={styles.sectionTitle}>This Week</Text>
-        <View style={styles.summaryCard}>
+        <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>This Week</Text>
+        <View style={[styles.summaryCard, { backgroundColor: theme.card.background }]}>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>{habitSummary.checkInsThisWeek}</Text>
-              <Text style={styles.summaryLabel}>Check-ins</Text>
+              <Text style={[styles.summaryValue, { color: theme.text.primary }]}>
+                {habitSummary.checkInsThisWeek}
+              </Text>
+              <Text style={[styles.summaryLabel, { color: theme.text.secondary }]}>Check-ins</Text>
             </View>
-            <View style={styles.summaryDivider} />
+            <View style={[styles.summaryDivider, { backgroundColor: theme.border.light }]} />
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>{habitSummary.completionRate}%</Text>
-              <Text style={styles.summaryLabel}>Completion</Text>
+              <Text style={[styles.summaryValue, { color: theme.text.primary }]}>
+                {habitSummary.completionRate}%
+              </Text>
+              <Text style={[styles.summaryLabel, { color: theme.text.secondary }]}>Completion</Text>
             </View>
-            <View style={styles.summaryDivider} />
+            <View style={[styles.summaryDivider, { backgroundColor: theme.border.light }]} />
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>{habitSummary.checkInsToday}</Text>
-              <Text style={styles.summaryLabel}>Today</Text>
+              <Text style={[styles.summaryValue, { color: theme.text.primary }]}>
+                {habitSummary.checkInsToday}
+              </Text>
+              <Text style={[styles.summaryLabel, { color: theme.text.secondary }]}>Today</Text>
             </View>
           </View>
         </View>
 
         {/* Weekly Activity Mini Chart */}
-        <View style={styles.activityCard}>
+        <View style={[styles.activityCard, { backgroundColor: theme.card.background }]}>
           <View style={styles.activityHeader}>
-            <Text style={styles.cardTitle}>Activity</Text>
+            <Text style={[styles.cardTitle, { color: theme.text.primary }]}>Activity</Text>
             <View style={styles.activitySelector}>
               {([7, 30, 90] as const).map((days) => (
                 <Pressable
                   key={days}
                   style={[
                     styles.activitySelectorButton,
-                    activityDays === days && styles.activitySelectorActive,
+                    { backgroundColor: theme.background.tertiary },
+                    activityDays === days && { backgroundColor: theme.button.primary.background },
                   ]}
                   onPress={() => setActivityDays(days)}
                 >
                   <Text
                     style={[
                       styles.activitySelectorText,
-                      activityDays === days && styles.activitySelectorTextActive,
+                      { color: theme.text.secondary },
+                      activityDays === days && { color: theme.button.primary.text },
                     ]}
                   >
                     {days}d
@@ -341,10 +368,16 @@ export default function DashboardScreen() {
                   <View
                     style={[
                       styles.activityBar,
-                      { height, backgroundColor: day.count > 0 ? "#4CAF50" : "#E0E0E0" },
+                      {
+                        height,
+                        backgroundColor:
+                          day.count > 0 ? theme.text.success : theme.background.tertiary,
+                      },
                     ]}
                   />
-                  <Text style={styles.activityLabel}>{dayName[0]}</Text>
+                  <Text style={[styles.activityLabel, { color: theme.text.tertiary }]}>
+                    {dayName[0]}
+                  </Text>
                 </View>
               );
             })}
@@ -354,19 +387,26 @@ export default function DashboardScreen() {
         {/* Needs Attention */}
         {needsAttention.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>Needs Attention</Text>
-            <View style={styles.attentionCard}>
+            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
+              Needs Attention
+            </Text>
+            <View style={[styles.attentionCard, { backgroundColor: "#FF9500" + "20" }]}>
               {needsAttention.slice(0, 3).map((habit) => (
                 <Pressable
                   key={habit.id}
-                  style={styles.attentionItem}
+                  style={[styles.attentionItem, { borderBottomColor: theme.border.light }]}
                   onPress={() => router.push(`/habits/${habit.id}`)}
                 >
                   <Text style={styles.attentionEmoji}>{PILLAR_INFO[habit.pillar].emoji}</Text>
-                  <Text style={styles.attentionTitle} numberOfLines={1}>
+                  <Text
+                    style={[styles.attentionTitle, { color: theme.text.primary }]}
+                    numberOfLines={1}
+                  >
                     {habit.title}
                   </Text>
-                  <Text style={styles.attentionCta}>Log</Text>
+                  <Text style={[styles.attentionCta, { color: theme.button.primary.background }]}>
+                    Log
+                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -376,19 +416,26 @@ export default function DashboardScreen() {
         {/* Top Streaks */}
         {habitSummary.topStreaks.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>Top Streaks</Text>
-            <View style={styles.streaksCard}>
+            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>Top Streaks</Text>
+            <View style={[styles.streaksCard, { backgroundColor: theme.card.background }]}>
               {habitSummary.topStreaks.map((item, index) => (
                 <Pressable
                   key={item.habitId}
-                  style={styles.streakItem}
+                  style={[styles.streakItem, { borderBottomColor: theme.border.light }]}
                   onPress={() => router.push(`/habits/${item.habitId}`)}
                 >
-                  <Text style={styles.streakRank}>#{index + 1}</Text>
-                  <Text style={styles.streakTitle} numberOfLines={1}>
+                  <Text style={[styles.streakRank, { color: theme.text.tertiary }]}>
+                    #{index + 1}
+                  </Text>
+                  <Text
+                    style={[styles.streakTitle, { color: theme.text.primary }]}
+                    numberOfLines={1}
+                  >
                     {item.title}
                   </Text>
-                  <Text style={styles.streakCount}>{item.streak} days</Text>
+                  <Text style={[styles.streakCount, { color: theme.text.success }]}>
+                    {item.streak} days
+                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -398,25 +445,37 @@ export default function DashboardScreen() {
         {/* Recovery Streaks - Show habits getting back on track */}
         {recoveryHabits.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>Getting Back on Track</Text>
-            <View style={styles.recoveryCard}>
+            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
+              Getting Back on Track
+            </Text>
+            <View style={[styles.recoveryCard, { backgroundColor: theme.card.background }]}>
               {recoveryHabits.map((item) => (
                 <Pressable
                   key={item.habitId}
-                  style={styles.recoveryItem}
+                  style={[styles.recoveryItem, { borderBottomColor: theme.border.light }]}
                   onPress={() => router.push(`/habits/${item.habitId}`)}
                 >
                   <Text style={styles.recoveryEmoji}>{PILLAR_INFO[item.pillar].emoji}</Text>
                   <View style={styles.recoveryInfo}>
-                    <Text style={styles.recoveryTitle} numberOfLines={1}>
+                    <Text
+                      style={[styles.recoveryTitle, { color: theme.text.primary }]}
+                      numberOfLines={1}
+                    >
                       {item.title}
                     </Text>
-                    <Text style={styles.recoverySubtext}>
+                    <Text style={[styles.recoverySubtext, { color: theme.text.secondary }]}>
                       {item.recovery.recoveryStreak} day
                       {item.recovery.recoveryStreak !== 1 ? "s" : ""} back on track
                     </Text>
                   </View>
-                  <Text style={styles.recoveryBadge}>{item.recovery.recoveryStreak}</Text>
+                  <Text
+                    style={[
+                      styles.recoveryBadge,
+                      { backgroundColor: theme.text.success + "20", color: theme.text.success },
+                    ]}
+                  >
+                    {item.recovery.recoveryStreak}
+                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -426,19 +485,26 @@ export default function DashboardScreen() {
         {/* Most Missed Habits */}
         {habitSummary.mostMissed.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>Needs Work</Text>
-            <View style={styles.missedCard}>
+            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>Needs Work</Text>
+            <View style={[styles.missedCard, { backgroundColor: theme.card.background }]}>
               {habitSummary.mostMissed.map((item, index) => (
                 <Pressable
                   key={item.habitId}
-                  style={styles.missedItem}
+                  style={[styles.missedItem, { borderBottomColor: theme.border.light }]}
                   onPress={() => router.push(`/habits/${item.habitId}`)}
                 >
-                  <Text style={styles.missedRank}>#{index + 1}</Text>
-                  <Text style={styles.missedTitle} numberOfLines={1}>
+                  <Text style={[styles.missedRank, { color: theme.text.tertiary }]}>
+                    #{index + 1}
+                  </Text>
+                  <Text
+                    style={[styles.missedTitle, { color: theme.text.primary }]}
+                    numberOfLines={1}
+                  >
                     {item.title}
                   </Text>
-                  <Text style={styles.missedCount}>{item.missedDays} missed</Text>
+                  <Text style={[styles.missedCount, { color: theme.text.error }]}>
+                    {item.missedDays} missed
+                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -448,8 +514,10 @@ export default function DashboardScreen() {
         {/* Peak Activity Times */}
         {peakHours.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>Best Check-in Times</Text>
-            <View style={styles.peakCard}>
+            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
+              Best Check-in Times
+            </Text>
+            <View style={[styles.peakCard, { backgroundColor: theme.card.background }]}>
               {peakHours.map((peak, index) => {
                 const hourLabel =
                   peak.hour === 0
@@ -460,10 +528,19 @@ export default function DashboardScreen() {
                         ? "12 PM"
                         : `${peak.hour - 12} PM`;
                 return (
-                  <View key={peak.hour} style={styles.peakItem}>
-                    <Text style={styles.peakRank}>#{index + 1}</Text>
-                    <Text style={styles.peakHour}>{hourLabel}</Text>
-                    <Text style={styles.peakCount}>{peak.count} check-ins</Text>
+                  <View
+                    key={peak.hour}
+                    style={[styles.peakItem, { borderBottomColor: theme.border.light }]}
+                  >
+                    <Text style={[styles.peakRank, { color: theme.text.tertiary }]}>
+                      #{index + 1}
+                    </Text>
+                    <Text style={[styles.peakHour, { color: theme.text.primary }]}>
+                      {hourLabel}
+                    </Text>
+                    <Text style={[styles.peakCount, { color: theme.text.secondary }]}>
+                      {peak.count} check-ins
+                    </Text>
                   </View>
                 );
               })}
@@ -474,8 +551,10 @@ export default function DashboardScreen() {
         {/* Completion Rate Trend */}
         {completionTrend.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>Weekly Completion Trend</Text>
-            <View style={styles.trendCard}>
+            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
+              Weekly Completion Trend
+            </Text>
+            <View style={[styles.trendCard, { backgroundColor: theme.card.background }]}>
               <View style={styles.trendChart}>
                 {completionTrend.map((week, index) => {
                   const maxRate = 100;
@@ -488,13 +567,17 @@ export default function DashboardScreen() {
                           { height, backgroundColor: getScoreColor(week.completionRate) },
                         ]}
                       />
-                      <Text style={styles.trendLabel}>W{index + 1}</Text>
+                      <Text style={[styles.trendLabel, { color: theme.text.tertiary }]}>
+                        W{index + 1}
+                      </Text>
                     </View>
                   );
                 })}
               </View>
               <View style={styles.trendLegend}>
-                <Text style={styles.trendLegendText}>Last {completionTrend.length} weeks</Text>
+                <Text style={[styles.trendLegendText, { color: theme.text.secondary }]}>
+                  Last {completionTrend.length} weeks
+                </Text>
               </View>
             </View>
           </>
@@ -503,11 +586,14 @@ export default function DashboardScreen() {
         {/* Day of Week Breakdown */}
         {dayOfWeekData.some((d) => d.count > 0) && (
           <>
-            <Text style={styles.sectionTitle}>Activity by Day</Text>
-            <View style={styles.dayOfWeekCard}>
+            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
+              Activity by Day
+            </Text>
+            <View style={[styles.dayOfWeekCard, { backgroundColor: theme.card.background }]}>
               {dayOfWeekData.map((dayData, index) => {
                 const maxCount = Math.max(...dayOfWeekData.map((d) => d.count), 1);
                 const intensity = dayData.count / maxCount;
+                const successColor = theme.text.success;
                 return (
                   <View key={index} style={styles.dayOfWeekItem}>
                     <View
@@ -516,14 +602,20 @@ export default function DashboardScreen() {
                         {
                           backgroundColor:
                             dayData.count > 0
-                              ? `rgba(76, 175, 80, ${0.3 + intensity * 0.7})`
-                              : "#E0E0E0",
+                              ? `${successColor}${Math.round((0.3 + intensity * 0.7) * 255)
+                                  .toString(16)
+                                  .padStart(2, "0")}`
+                              : theme.background.tertiary,
                         },
                       ]}
                     >
-                      <Text style={styles.dayOfWeekCount}>{dayData.count}</Text>
+                      <Text style={[styles.dayOfWeekCount, { color: theme.text.primary }]}>
+                        {dayData.count}
+                      </Text>
                     </View>
-                    <Text style={styles.dayOfWeekLabel}>{dayData.dayName}</Text>
+                    <Text style={[styles.dayOfWeekLabel, { color: theme.text.secondary }]}>
+                      {dayData.dayName}
+                    </Text>
                   </View>
                 );
               })}
@@ -533,11 +625,18 @@ export default function DashboardScreen() {
 
         {/* Empty State */}
         {habits.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>No habits yet</Text>
-            <Text style={styles.emptySubtext}>Create your first habit to start tracking</Text>
-            <Pressable style={styles.createButton} onPress={() => router.push("/habits")}>
-              <Text style={styles.createButtonText}>Create Habit</Text>
+          <View style={[styles.emptyState, { backgroundColor: theme.card.background }]}>
+            <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>No habits yet</Text>
+            <Text style={[styles.emptySubtext, { color: theme.text.secondary }]}>
+              Create your first habit to start tracking
+            </Text>
+            <Pressable
+              style={[styles.createButton, { backgroundColor: theme.button.primary.background }]}
+              onPress={() => router.push("/habits")}
+            >
+              <Text style={[styles.createButtonText, { color: theme.button.primary.text }]}>
+                Create Habit
+              </Text>
             </Pressable>
           </View>
         )}
@@ -552,13 +651,17 @@ export default function DashboardScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowPillarModal(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
+        <SafeAreaView
+          style={[styles.modalContainer, { backgroundColor: theme.background.primary }]}
+        >
+          <View style={[styles.modalHeader, { borderBottomColor: theme.border.light }]}>
             <Pressable onPress={() => setShowPillarModal(false)} style={styles.modalClose}>
-              <Text style={styles.modalCloseText}>Close</Text>
+              <Text style={[styles.modalCloseText, { color: theme.button.primary.background }]}>
+                Close
+              </Text>
             </Pressable>
             {selectedPillar && (
-              <Text style={styles.modalTitle}>
+              <Text style={[styles.modalTitle, { color: theme.text.primary }]}>
                 {PILLAR_INFO[selectedPillar.pillar].emoji}{" "}
                 {PILLAR_INFO[selectedPillar.pillar].label}
               </Text>
@@ -569,7 +672,7 @@ export default function DashboardScreen() {
           {selectedPillar && (
             <ScrollView style={styles.modalContent}>
               {/* Pillar Score Summary */}
-              <View style={styles.modalScoreCard}>
+              <View style={[styles.modalScoreCard, { backgroundColor: theme.background.tertiary }]}>
                 <Text
                   style={[styles.modalScoreValue, { color: getScoreColor(selectedPillar.score) }]}
                 >
@@ -583,41 +686,47 @@ export default function DashboardScreen() {
                       ? "Declining"
                       : "Stable"}
                 </Text>
-                <Text style={styles.modalScoreMeta}>
+                <Text style={[styles.modalScoreMeta, { color: theme.text.secondary }]}>
                   {selectedPillar.habitCount} habit{selectedPillar.habitCount !== 1 ? "s" : ""} in
                   this pillar
                 </Text>
               </View>
 
               {/* Habits in this Pillar */}
-              <Text style={styles.modalSectionTitle}>Habits</Text>
+              <Text style={[styles.modalSectionTitle, { color: theme.text.primary }]}>Habits</Text>
               {selectedPillarHabits.length > 0 ? (
-                <View style={styles.modalHabitsList}>
+                <View style={[styles.modalHabitsList, { backgroundColor: theme.card.background }]}>
                   {selectedPillarHabits.map((habit) => {
                     const habitCheckIns = checkIns.filter((c) => c.habitId === habit.id);
                     const recentCheckIns = habitCheckIns.filter((c) => isThisWeek(c.occurredAt));
                     return (
                       <Pressable
                         key={habit.id}
-                        style={styles.modalHabitItem}
+                        style={[styles.modalHabitItem, { borderBottomColor: theme.border.light }]}
                         onPress={() => {
                           setShowPillarModal(false);
                           router.push(`/habits/${habit.id}`);
                         }}
                       >
                         <View style={styles.modalHabitInfo}>
-                          <Text style={styles.modalHabitTitle}>{habit.title}</Text>
-                          <Text style={styles.modalHabitMeta}>
+                          <Text style={[styles.modalHabitTitle, { color: theme.text.primary }]}>
+                            {habit.title}
+                          </Text>
+                          <Text style={[styles.modalHabitMeta, { color: theme.text.secondary }]}>
                             {recentCheckIns.length} this week | {habit.currentStreak} day streak
                           </Text>
                         </View>
-                        <Text style={styles.modalHabitArrow}>→</Text>
+                        <Text style={[styles.modalHabitArrow, { color: theme.text.tertiary }]}>
+                          →
+                        </Text>
                       </Pressable>
                     );
                   })}
                 </View>
               ) : (
-                <Text style={styles.modalEmptyText}>No habits in this pillar yet</Text>
+                <Text style={[styles.modalEmptyText, { color: theme.text.secondary }]}>
+                  No habits in this pillar yet
+                </Text>
               )}
             </ScrollView>
           )}
@@ -630,13 +739,11 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
   },
   loadingText: {
     textAlign: "center",
     marginTop: 100,
     fontSize: 16,
-    color: "#666",
   },
   header: {
     flexDirection: "row",
@@ -645,13 +752,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
   backButton: {
     padding: 8,
   },
   backButtonText: {
-    color: "#007AFF",
     fontSize: 16,
   },
   title: {
@@ -667,7 +772,6 @@ const styles = StyleSheet.create({
   },
   // Overall Score
   overallCard: {
-    backgroundColor: "#f8f8f8",
     borderRadius: 16,
     padding: 24,
     alignItems: "center",
@@ -684,7 +788,6 @@ const styles = StyleSheet.create({
   },
   overallSubtext: {
     fontSize: 14,
-    color: "#999",
     marginTop: 8,
   },
   // Pillar Grid
@@ -702,7 +805,6 @@ const styles = StyleSheet.create({
   pillarCard: {
     flex: 1,
     minWidth: "45%",
-    backgroundColor: "#f8f8f8",
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
@@ -719,7 +821,6 @@ const styles = StyleSheet.create({
   pillarName: {
     fontSize: 14,
     fontWeight: "500",
-    color: "#333",
   },
   pillarScoreRow: {
     flexDirection: "row",
@@ -736,12 +837,10 @@ const styles = StyleSheet.create({
   },
   pillarMeta: {
     fontSize: 12,
-    color: "#999",
     marginTop: 4,
   },
   // Summary Card
   summaryCard: {
-    backgroundColor: "#f8f8f8",
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
@@ -757,21 +856,17 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#333",
   },
   summaryLabel: {
     fontSize: 12,
-    color: "#666",
     marginTop: 4,
   },
   summaryDivider: {
     width: 1,
     height: 40,
-    backgroundColor: "#e0e0e0",
   },
   // Activity Chart
   activityCard: {
-    backgroundColor: "#f8f8f8",
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
@@ -779,7 +874,6 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 16,
   },
   activityChart: {
@@ -799,11 +893,9 @@ const styles = StyleSheet.create({
   },
   activityLabel: {
     fontSize: 10,
-    color: "#999",
   },
   // Needs Attention
   attentionCard: {
-    backgroundColor: "#FFF3E0",
     borderRadius: 12,
     padding: 12,
     marginBottom: 24,
@@ -813,7 +905,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#FFE0B2",
   },
   attentionEmoji: {
     fontSize: 20,
@@ -822,16 +913,13 @@ const styles = StyleSheet.create({
   attentionTitle: {
     flex: 1,
     fontSize: 14,
-    color: "#333",
   },
   attentionCta: {
-    color: "#FF9800",
     fontWeight: "600",
     fontSize: 14,
   },
   // Top Streaks
   streaksCard: {
-    backgroundColor: "#E8F5E9",
     borderRadius: 12,
     padding: 12,
     marginBottom: 24,
@@ -841,28 +929,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#C8E6C9",
   },
   streakRank: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#4CAF50",
     marginRight: 12,
     width: 30,
   },
   streakTitle: {
     flex: 1,
     fontSize: 14,
-    color: "#333",
   },
   streakCount: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#4CAF50",
   },
   // Recovery Streaks
   recoveryCard: {
-    backgroundColor: "#E3F2FD",
     borderRadius: 12,
     padding: 12,
     marginBottom: 24,
@@ -872,7 +955,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#BBDEFB",
   },
   recoveryEmoji: {
     fontSize: 24,
@@ -884,25 +966,21 @@ const styles = StyleSheet.create({
   recoveryTitle: {
     fontSize: 14,
     fontWeight: "500",
-    color: "#333",
     marginBottom: 2,
   },
   recoverySubtext: {
     fontSize: 12,
-    color: "#666",
   },
   recoveryBadge: {
-    backgroundColor: "#2196F3",
-    color: "#fff",
     fontSize: 14,
     fontWeight: "bold",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
+    overflow: "hidden",
   },
   // Most Missed
   missedCard: {
-    backgroundColor: "#FFEBEE",
     borderRadius: 12,
     padding: 12,
     marginBottom: 24,
@@ -912,28 +990,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#FFCDD2",
   },
   missedRank: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#F44336",
     marginRight: 12,
     width: 30,
   },
   missedTitle: {
     flex: 1,
     fontSize: 14,
-    color: "#333",
   },
   missedCount: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#F44336",
   },
   // Peak Activity
   peakCard: {
-    backgroundColor: "#E8F5E9",
     borderRadius: 12,
     padding: 12,
     marginBottom: 24,
@@ -943,12 +1016,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#C8E6C9",
   },
   peakRank: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#4CAF50",
     marginRight: 12,
     width: 30,
   },
@@ -956,15 +1027,12 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: "500",
-    color: "#333",
   },
   peakCount: {
     fontSize: 14,
-    color: "#666",
   },
   // Completion Trend
   trendCard: {
-    backgroundColor: "#f8f8f8",
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
@@ -986,7 +1054,6 @@ const styles = StyleSheet.create({
   },
   trendLabel: {
     fontSize: 10,
-    color: "#999",
   },
   trendLegend: {
     marginTop: 8,
@@ -994,13 +1061,11 @@ const styles = StyleSheet.create({
   },
   trendLegendText: {
     fontSize: 12,
-    color: "#666",
   },
   // Day of Week Breakdown
   dayOfWeekCard: {
     flexDirection: "row",
     justifyContent: "space-around",
-    backgroundColor: "#f8f8f8",
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
@@ -1019,11 +1084,9 @@ const styles = StyleSheet.create({
   dayOfWeekCount: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#333",
   },
   dayOfWeekLabel: {
     fontSize: 10,
-    color: "#666",
   },
   // Activity Header & Selector
   activityHeader: {
@@ -1034,7 +1097,6 @@ const styles = StyleSheet.create({
   },
   activitySelector: {
     flexDirection: "row",
-    backgroundColor: "#E0E0E0",
     borderRadius: 8,
     padding: 2,
   },
@@ -1043,21 +1105,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 6,
   },
-  activitySelectorActive: {
-    backgroundColor: "#fff",
-  },
   activitySelectorText: {
     fontSize: 12,
-    color: "#666",
-  },
-  activitySelectorTextActive: {
-    color: "#333",
-    fontWeight: "600",
   },
   // Modal Styles
   modalContainer: {
     flex: 1,
-    backgroundColor: "#fff",
   },
   modalHeader: {
     flexDirection: "row",
@@ -1066,13 +1119,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
   modalClose: {
     padding: 8,
   },
   modalCloseText: {
-    color: "#007AFF",
     fontSize: 16,
   },
   modalTitle: {
@@ -1084,7 +1135,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   modalScoreCard: {
-    backgroundColor: "#f8f8f8",
     borderRadius: 16,
     padding: 24,
     alignItems: "center",
@@ -1100,7 +1150,6 @@ const styles = StyleSheet.create({
   },
   modalScoreMeta: {
     fontSize: 14,
-    color: "#666",
     marginTop: 8,
   },
   modalSectionTitle: {
@@ -1109,7 +1158,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   modalHabitsList: {
-    backgroundColor: "#f8f8f8",
     borderRadius: 12,
     padding: 12,
   },
@@ -1118,7 +1166,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
   },
   modalHabitInfo: {
     flex: 1,
@@ -1126,20 +1173,16 @@ const styles = StyleSheet.create({
   modalHabitTitle: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#333",
     marginBottom: 4,
   },
   modalHabitMeta: {
     fontSize: 12,
-    color: "#666",
   },
   modalHabitArrow: {
     fontSize: 18,
-    color: "#999",
   },
   modalEmptyText: {
     fontSize: 14,
-    color: "#666",
     textAlign: "center",
     paddingVertical: 24,
   },
@@ -1147,27 +1190,24 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: "center",
     paddingVertical: 48,
+    borderRadius: 12,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: "#666",
     marginBottom: 24,
     textAlign: "center",
   },
   createButton: {
-    backgroundColor: "#007AFF",
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
   createButtonText: {
-    color: "#fff",
     fontSize: 16,
     fontWeight: "600",
   },

@@ -1,6 +1,7 @@
 import { Component, ErrorInfo, ReactNode } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { logger } from "../lib/logger";
+import { colors, spacing, borderRadius, typography } from "../theme";
 
 interface Props {
   children: ReactNode;
@@ -68,35 +69,35 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 24,
-    backgroundColor: "#fff",
+    padding: spacing.lg,
+    backgroundColor: colors.white,
   },
   emoji: {
-    fontSize: 48,
-    marginBottom: 16,
+    fontSize: typography.fontSize.display + 8,
+    marginBottom: spacing.md,
   },
   title: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 8,
-    color: "#1a1a1a",
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.sm,
+    color: colors.text.primary.light,
   },
   message: {
-    fontSize: 14,
-    color: "#666",
+    fontSize: typography.fontSize.sm,
+    color: colors.darkGray,
     textAlign: "center",
-    marginBottom: 24,
-    lineHeight: 20,
+    marginBottom: spacing.lg,
+    lineHeight: typography.fontSize.sm * 1.4,
   },
   button: {
-    backgroundColor: "#007AFF",
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg - spacing.sm,
+    borderRadius: borderRadius.md,
   },
   buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    color: colors.white,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

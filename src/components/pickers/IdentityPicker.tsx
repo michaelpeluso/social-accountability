@@ -5,6 +5,7 @@
 
 import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
 import type { IdentityPreset, Pillar } from "../../types";
+import { colors, spacing, borderRadius, borderWidth, typography } from "../../theme";
 
 export interface IdentityOption {
   value: IdentityPreset;
@@ -77,33 +78,33 @@ export function IdentityPicker({
 const styles = StyleSheet.create({
   identityRow: {
     flexDirection: "row",
-    gap: 10,
-    paddingVertical: 4,
+    gap: spacing.xmd,
+    paddingVertical: spacing.xs,
   },
   identityOption: {
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#e5e5e5",
-    backgroundColor: "#fafafa",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.lg - spacing.sm, // 12px
+    borderRadius: borderRadius.lg,
+    borderWidth: borderWidth.thick,
+    borderColor: colors.borderMedium,
+    backgroundColor: colors.backgroundLight,
     minWidth: 90,
   },
   identityOptionSelected: {
-    borderColor: "#000",
-    backgroundColor: "#f5f5f5",
+    borderColor: colors.black,
+    backgroundColor: colors.backgroundMedium,
   },
   identityIcon: {
-    fontSize: 24,
-    marginBottom: 4,
+    fontSize: typography.fontSize.xxl,
+    marginBottom: spacing.xs,
   },
   identityLabel: {
     fontSize: 13,
-    fontWeight: "500",
-    color: "#666",
+    fontWeight: typography.fontWeight.medium,
+    color: colors.darkGray,
   },
   identityLabelSelected: {
-    color: "#000",
+    color: colors.black,
   },
 });

@@ -5,6 +5,7 @@
 
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import type { GoalDataSource } from "../../types";
+import { theme } from "../../theme";
 
 export interface DataSourceOption {
   value: GoalDataSource;
@@ -54,45 +55,45 @@ export function DataSourcePicker({ options, selected, onSelect }: DataSourcePick
 
 const styles = StyleSheet.create({
   dataSourceRow: {
-    gap: 10,
+    gap: theme.space.componentGap,
   },
   dataSourceOption: {
-    padding: 14,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "#e5e5e5",
-    backgroundColor: "#fafafa",
+    padding: theme.input.padding,
+    borderRadius: theme.radius.medium,
+    borderWidth: theme.input.borderWidth,
+    borderColor: theme.interactive.border,
+    backgroundColor: theme.interactive.background,
   },
   dataSourceOptionSelected: {
-    borderColor: "#000",
-    backgroundColor: "#f5f5f5",
+    borderColor: theme.interactive.borderSelected,
+    backgroundColor: theme.interactive.backgroundSelected,
   },
   dataSourceOptionDisabled: {
     opacity: 0.5,
   },
   dataSourceLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#666",
-    marginBottom: 2,
+    fontSize: theme.typography.bodySmall.fontSize,
+    fontWeight: theme.typography.button.fontWeight,
+    color: theme.text.secondary,
+    marginBottom: theme.space.inlineGap,
   },
   dataSourceLabelSelected: {
-    color: "#000",
+    color: theme.text.primary,
   },
   dataSourceLabelDisabled: {
-    color: "#999",
+    color: theme.text.tertiary,
   },
   dataSourceDesc: {
-    fontSize: 12,
-    color: "#999",
+    fontSize: theme.typography.caption.fontSize,
+    color: theme.text.tertiary,
   },
   dataSourceDescDisabled: {
-    color: "#ccc",
+    color: theme.border.light,
   },
   comingSoon: {
     fontSize: 10,
-    color: "#999",
+    color: theme.text.tertiary,
     fontStyle: "italic",
-    marginTop: 4,
+    marginTop: theme.space.inlineGap,
   },
 });

@@ -36,11 +36,13 @@ import {
   getStatusMessage,
   calculateRecoveryStatus,
 } from "../../src/logic";
+import { useTheme } from "../../src/theme";
 
 // Privacy options for editing
 const PRIVACY_OPTIONS: Privacy[] = ["SELF", "FRIENDS", "PUBLIC"];
 
 export default function HabitDetailScreen() {
+  const { theme } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [habit, setHabit] = useState<Habit | null>(null);
   const [checkIns, setCheckIns] = useState<HabitCheckIn[]>([]);
@@ -283,22 +285,24 @@ export default function HabitDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.loadingText}>Loading...</Text>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
+        <Text style={[styles.loadingText, { color: theme.text.secondary }]}>Loading...</Text>
       </SafeAreaView>
     );
   }
 
   if (!habit) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
+        <View style={[styles.header, { borderBottomColor: theme.border.light }]}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backButtonText}>Back</Text>
+            <Text style={[styles.backButtonText, { color: theme.button.primary.background }]}>
+              Back
+            </Text>
           </Pressable>
         </View>
         <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Habit not found</Text>
+          <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>Habit not found</Text>
         </View>
       </SafeAreaView>
     );
@@ -309,18 +313,22 @@ export default function HabitDetailScreen() {
   const targetMet = todayCount >= habit.schedule.targetCount;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: theme.border.light }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>Back</Text>
+          <Text style={[styles.backButtonText, { color: theme.button.primary.background }]}>
+            Back
+          </Text>
         </Pressable>
         <View style={styles.headerActions}>
           <Pressable onPress={openEditModal} style={styles.editButton}>
-            <Text style={styles.editButtonText}>Edit</Text>
+            <Text style={[styles.editButtonText, { color: theme.button.primary.background }]}>
+              Edit
+            </Text>
           </Pressable>
           <Pressable onPress={handleArchive} style={styles.archiveButton}>
-            <Text style={styles.archiveButtonText}>Archive</Text>
+            <Text style={[styles.archiveButtonText, { color: theme.text.error }]}>Archive</Text>
           </Pressable>
         </View>
       </View>

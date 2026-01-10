@@ -4,6 +4,7 @@
  */
 
 import type { Pillar } from "./index";
+import { colors } from "../theme";
 
 // Re-export types from index for convenience
 export type {
@@ -21,10 +22,10 @@ export type {
 
 // Pillar display info for UI
 export const PILLAR_INFO: Record<Pillar, { label: string; emoji: string; color: string }> = {
-  MIND: { label: "Mind", emoji: "🧠", color: "#6B5CE7" },
-  BODY: { label: "Body", emoji: "💪", color: "#FF6B6B" },
-  HEART: { label: "Heart", emoji: "❤️", color: "#FF69B4" },
-  SOUL: { label: "Soul", emoji: "✨", color: "#4ECDC4" },
+  MIND: { label: "Mind", emoji: "🧠", color: colors.pillars.MIND },
+  BODY: { label: "Body", emoji: "💪", color: colors.pillars.BODY },
+  HEART: { label: "Heart", emoji: "❤️", color: colors.pillars.HEART },
+  SOUL: { label: "Soul", emoji: "✨", color: colors.pillars.SOUL },
 };
 
 // All pillars for iteration

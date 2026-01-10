@@ -20,6 +20,7 @@ import { auth } from "../../src/services/auth";
 import { getFeedPosts } from "../../src/storage/posts";
 import type { FeedPost, FeedScope } from "../../src/types";
 import { PostCard } from "../../src/components/cards/PostCard";
+import { useTheme } from "../../src/theme";
 
 const SCOPES: { key: FeedScope; label: string }[] = [
   { key: "friends", label: "Friends" },
@@ -28,30 +29,14 @@ const SCOPES: { key: FeedScope; label: string }[] = [
 ];
 
 export default function FeedScreen() {
+  const { theme } = useTheme();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [scope, setScope] = useState<FeedScope>("friends");
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadUser();
-  }, []);
-
-  useEffect(() => {
-    if (userId) {
-      loadPosts();
-    }
-  }, [scope, userId]);
-
-  async function loadUser() {
-    const user = await auth.getUser();
-    if (user) {
-      setUserId(user.id);
-    }
-  }
-
-  async function loadPosts() {
+  const loadPosts = useCallback(async () => {
     if (!userId) return;
 
     setIsLoading(true);
@@ -64,13 +49,29 @@ export default function FeedScreen() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [userId, scope]);
+
+  useEffect(() => {
+    async function loadUser() {
+      const user = await auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      }
+    }
+    loadUser();
+  }, []);
+
+  useEffect(() => {
+    if (userId) {
+      loadPosts();
+    }
+  }, [userId, loadPosts]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     await loadPosts();
     setIsRefreshing(false);
-  }, [userId, scope]);
+  }, [loadPosts]);
 
   const handleCreatePost = () => {
     router.push("/feed/create");
@@ -81,27 +82,42 @@ export default function FeedScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: theme.border.light }]}>
         <Pressable onPress={() => router.back()}>
-          <Text style={styles.backButton}>← Back</Text>
+          <Text style={[styles.backButton, { color: theme.semantic.primary }]}>← Back</Text>
         </Pressable>
-        <Text style={styles.title}>Feed</Text>
-        <Pressable onPress={handleCreatePost} style={styles.createButton}>
-          <Text style={styles.createButtonText}>+ Post</Text>
+        <Text style={[styles.title, { color: theme.text.primary }]}>Feed</Text>
+        <Pressable
+          onPress={handleCreatePost}
+          style={[styles.createButton, { backgroundColor: theme.button.primary.background }]}
+        >
+          <Text style={[styles.createButtonText, { color: theme.button.primary.text }]}>
+            + Post
+          </Text>
         </Pressable>
       </View>
 
       {/* Scope Tabs */}
-      <View style={styles.scopeTabs}>
+      <View style={[styles.scopeTabs, { borderBottomColor: theme.border.light }]}>
         {SCOPES.map((s) => (
           <Pressable
             key={s.key}
-            style={[styles.scopeTab, scope === s.key && styles.scopeTabActive]}
+            style={[
+              styles.scopeTab,
+              { backgroundColor: theme.background.secondary },
+              scope === s.key && { backgroundColor: theme.semantic.primary },
+            ]}
             onPress={() => setScope(s.key)}
           >
-            <Text style={[styles.scopeTabText, scope === s.key && styles.scopeTabTextActive]}>
+            <Text
+              style={[
+                styles.scopeTabText,
+                { color: theme.text.secondary },
+                scope === s.key && { color: theme.button.primary.text, fontWeight: "600" as const },
+              ]}
+            >
               {s.label}
             </Text>
           </Pressable>
@@ -111,12 +127,12 @@ export default function FeedScreen() {
       {/* Posts List */}
       {isLoading && !isRefreshing ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={theme.semantic.primary} />
         </View>
       ) : posts.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyEmoji}>📭</Text>
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyText, { color: theme.text.secondary }]}>
             {scope === "mine"
               ? "You haven't posted yet"
               : scope === "friends"
@@ -124,8 +140,13 @@ export default function FeedScreen() {
                 : "No public posts yet"}
           </Text>
           {scope === "mine" && (
-            <Pressable style={styles.emptyButton} onPress={handleCreatePost}>
-              <Text style={styles.emptyButtonText}>Create Your First Post</Text>
+            <Pressable
+              style={[styles.emptyButton, { backgroundColor: theme.button.primary.background }]}
+              onPress={handleCreatePost}
+            >
+              <Text style={[styles.emptyButtonText, { color: theme.button.primary.text }]}>
+                Create Your First Post
+              </Text>
             </Pressable>
           )}
         </View>
@@ -151,7 +172,6 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
   },
   header: {
     flexDirection: "row",
@@ -160,24 +180,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
   },
   backButton: {
     fontSize: 16,
-    color: "#007AFF",
   },
   title: {
     fontSize: 20,
     fontWeight: "bold",
   },
   createButton: {
-    backgroundColor: "#007AFF",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
   },
   createButtonText: {
-    color: "#fff",
     fontSize: 14,
     fontWeight: "600",
   },
@@ -187,23 +203,16 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     gap: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
   scopeTab: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "#f5f5f5",
-  },
-  scopeTabActive: {
-    backgroundColor: "#007AFF",
   },
   scopeTabText: {
     fontSize: 14,
-    color: "#666",
   },
   scopeTabTextActive: {
-    color: "#fff",
     fontWeight: "600",
   },
   loadingContainer: {
@@ -223,18 +232,15 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: "#666",
     textAlign: "center",
     marginBottom: 24,
   },
   emptyButton: {
-    backgroundColor: "#007AFF",
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 24,
   },
   emptyButtonText: {
-    color: "#fff",
     fontSize: 16,
     fontWeight: "600",
   },

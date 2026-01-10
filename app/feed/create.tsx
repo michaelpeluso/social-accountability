@@ -20,6 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { auth } from "../../src/services/auth";
 import { createPost } from "../../src/storage/posts";
 import type { Pillar, Privacy } from "../../src/types";
+import { useTheme } from "../../src/theme";
 
 const PILLARS: { value: Pillar; label: string; emoji: string }[] = [
   { value: "MIND", label: "Mind", emoji: "🧠" },
@@ -35,6 +36,7 @@ const PRIVACY_OPTIONS: { value: Privacy; label: string; description: string }[] 
 ];
 
 export default function CreatePostScreen() {
+  const { theme } = useTheme();
   const [bodyText, setBodyText] = useState("");
   const [pillar, setPillar] = useState<Pillar>("MIND");
   const [privacy, setPrivacy] = useState<Privacy>("FRIENDS");
@@ -81,29 +83,31 @@ export default function CreatePostScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: theme.border.light }]}>
           <Pressable onPress={() => router.back()}>
-            <Text style={styles.cancelButton}>Cancel</Text>
+            <Text style={[styles.cancelButton, { color: theme.text.secondary }]}>Cancel</Text>
           </Pressable>
-          <Text style={styles.title}>New Post</Text>
+          <Text style={[styles.title, { color: theme.text.primary }]}>New Post</Text>
           <Pressable
             onPress={handleSubmit}
             disabled={isSubmitting || !bodyText.trim()}
             style={[
               styles.postButton,
+              { backgroundColor: theme.button.primary.background },
               (!bodyText.trim() || isSubmitting) && styles.postButtonDisabled,
             ]}
           >
             <Text
               style={[
                 styles.postButtonText,
-                (!bodyText.trim() || isSubmitting) && styles.postButtonTextDisabled,
+                { color: theme.button.primary.text },
+                (!bodyText.trim() || isSubmitting) && { color: theme.text.tertiary },
               ]}
             >
               {isSubmitting ? "Posting..." : "Post"}
@@ -113,33 +117,47 @@ export default function CreatePostScreen() {
 
         <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="handled">
           {/* Post Text */}
-          <View style={styles.inputSection}>
+          <View style={[styles.inputSection, { borderBottomColor: theme.border.light }]}>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, { color: theme.text.primary }]}
               placeholder="What's on your mind? Share your progress, wins, or struggles..."
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.text.tertiary}
               multiline
               maxLength={500}
               value={bodyText}
               onChangeText={setBodyText}
               autoFocus
             />
-            <Text style={styles.charCount}>{bodyText.length}/500</Text>
+            <Text style={[styles.charCount, { color: theme.text.tertiary }]}>
+              {bodyText.length}/500
+            </Text>
           </View>
 
           {/* Pillar Selection */}
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Category</Text>
+          <View style={[styles.section, { borderBottomColor: theme.border.light }]}>
+            <Text style={[styles.sectionLabel, { color: theme.text.secondary }]}>Category</Text>
             <View style={styles.pillarsRow}>
               {PILLARS.map((p) => (
                 <Pressable
                   key={p.value}
-                  style={[styles.pillarChip, pillar === p.value && styles.pillarChipActive]}
+                  style={[
+                    styles.pillarChip,
+                    { backgroundColor: theme.background.secondary },
+                    pillar === p.value && {
+                      backgroundColor: theme.semantic.primary + "20",
+                      borderWidth: 2,
+                      borderColor: theme.semantic.primary,
+                    },
+                  ]}
                   onPress={() => setPillar(p.value)}
                 >
                   <Text style={styles.pillarEmoji}>{p.emoji}</Text>
                   <Text
-                    style={[styles.pillarLabel, pillar === p.value && styles.pillarLabelActive]}
+                    style={[
+                      styles.pillarLabel,
+                      { color: theme.text.secondary },
+                      pillar === p.value && { color: theme.semantic.primary, fontWeight: "600" },
+                    ]}
                   >
                     {p.label}
                   </Text>
@@ -149,22 +167,45 @@ export default function CreatePostScreen() {
           </View>
 
           {/* Privacy Selection */}
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Who can see this?</Text>
+          <View style={[styles.section, { borderBottomColor: theme.border.light }]}>
+            <Text style={[styles.sectionLabel, { color: theme.text.secondary }]}>
+              Who can see this?
+            </Text>
             <View style={styles.privacyOptions}>
               {PRIVACY_OPTIONS.map((p) => (
                 <Pressable
                   key={p.value}
-                  style={[styles.privacyOption, privacy === p.value && styles.privacyOptionActive]}
+                  style={[
+                    styles.privacyOption,
+                    { backgroundColor: theme.background.secondary },
+                    privacy === p.value && {
+                      backgroundColor: theme.semantic.primary + "20",
+                      borderColor: theme.semantic.primary,
+                    },
+                  ]}
                   onPress={() => setPrivacy(p.value)}
                 >
                   <View style={styles.privacyHeader}>
-                    <View style={[styles.radio, privacy === p.value && styles.radioActive]}>
-                      {privacy === p.value && <View style={styles.radioDot} />}
+                    <View
+                      style={[
+                        styles.radio,
+                        { borderColor: theme.border.medium },
+                        privacy === p.value && { borderColor: theme.semantic.primary },
+                      ]}
+                    >
+                      {privacy === p.value && (
+                        <View
+                          style={[styles.radioDot, { backgroundColor: theme.semantic.primary }]}
+                        />
+                      )}
                     </View>
-                    <Text style={styles.privacyLabel}>{p.label}</Text>
+                    <Text style={[styles.privacyLabel, { color: theme.text.primary }]}>
+                      {p.label}
+                    </Text>
                   </View>
-                  <Text style={styles.privacyDescription}>{p.description}</Text>
+                  <Text style={[styles.privacyDescription, { color: theme.text.secondary }]}>
+                    {p.description}
+                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -178,7 +219,6 @@ export default function CreatePostScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
   },
   keyboardView: {
     flex: 1,
@@ -190,32 +230,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
   },
   cancelButton: {
     fontSize: 16,
-    color: "#666",
   },
   title: {
     fontSize: 17,
     fontWeight: "600",
   },
   postButton: {
-    backgroundColor: "#007AFF",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 16,
   },
   postButtonDisabled: {
-    backgroundColor: "#ccc",
+    opacity: 0.5,
   },
   postButtonText: {
-    color: "#fff",
     fontSize: 15,
     fontWeight: "600",
-  },
-  postButtonTextDisabled: {
-    color: "#999",
   },
   scrollView: {
     flex: 1,
@@ -223,7 +256,6 @@ const styles = StyleSheet.create({
   inputSection: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
   textInput: {
     fontSize: 17,
@@ -233,19 +265,16 @@ const styles = StyleSheet.create({
   },
   charCount: {
     fontSize: 12,
-    color: "#999",
     textAlign: "right",
     marginTop: 8,
   },
   section: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
   sectionLabel: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#666",
     marginBottom: 12,
   },
   pillarsRow: {
@@ -257,40 +286,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#f5f5f5",
     padding: 12,
     borderRadius: 12,
     gap: 6,
-  },
-  pillarChipActive: {
-    backgroundColor: "#e3f2fd",
-    borderWidth: 2,
-    borderColor: "#007AFF",
   },
   pillarEmoji: {
     fontSize: 16,
   },
   pillarLabel: {
     fontSize: 13,
-    color: "#666",
-  },
-  pillarLabelActive: {
-    color: "#007AFF",
-    fontWeight: "600",
   },
   privacyOptions: {
     gap: 12,
   },
   privacyOption: {
     padding: 12,
-    backgroundColor: "#f8f8f8",
     borderRadius: 12,
     borderWidth: 2,
     borderColor: "transparent",
-  },
-  privacyOptionActive: {
-    backgroundColor: "#e3f2fd",
-    borderColor: "#007AFF",
   },
   privacyHeader: {
     flexDirection: "row",
@@ -303,18 +316,13 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: "#ccc",
     justifyContent: "center",
     alignItems: "center",
-  },
-  radioActive: {
-    borderColor: "#007AFF",
   },
   radioDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#007AFF",
   },
   privacyLabel: {
     fontSize: 15,
@@ -322,7 +330,6 @@ const styles = StyleSheet.create({
   },
   privacyDescription: {
     fontSize: 13,
-    color: "#666",
     marginLeft: 32,
   },
 });

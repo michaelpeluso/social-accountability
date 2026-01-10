@@ -29,6 +29,7 @@ import {
   PrivacyPicker,
   DataSourcePicker,
 } from "../../src/components";
+import { useTheme, spacing, borderRadius, typography } from "../../src/theme";
 
 // Privacy options for goal creation
 const PRIVACY_OPTIONS: Privacy[] = ["SELF", "FRIENDS", "PUBLIC"];
@@ -62,6 +63,7 @@ const DATA_SOURCE_OPTIONS: {
 ];
 
 export default function GoalsScreen() {
+  const { theme } = useTheme();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -228,22 +230,30 @@ export default function GoalsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.loadingText}>Loading goals...</Text>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background.secondary }]}>
+        <Text style={[styles.loadingText, { color: theme.text.tertiary }]}>Loading goals...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background.secondary }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: theme.background.primary, borderBottomColor: theme.border.light },
+        ]}
+      >
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>Back</Text>
+          <Text style={[styles.backButtonText, { color: theme.semantic.primary }]}>Back</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Goals</Text>
-        <Pressable onPress={openCreateModal} style={styles.addButton}>
-          <Text style={styles.addButtonText}>+ New</Text>
+        <Text style={[styles.headerTitle, { color: theme.text.primary }]}>Goals</Text>
+        <Pressable
+          onPress={openCreateModal}
+          style={[styles.addButton, { backgroundColor: theme.button.primary.background }]}
+        >
+          <Text style={[styles.addButtonText, { color: theme.button.primary.text }]}>+ New</Text>
         </Pressable>
       </View>
 
@@ -251,19 +261,30 @@ export default function GoalsScreen() {
       {goals.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyEmoji}>🎯</Text>
-          <Text style={styles.emptyTitle}>No goals yet</Text>
-          <Text style={styles.emptySubtitle}>
+          <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>No goals yet</Text>
+          <Text style={[styles.emptySubtitle, { color: theme.text.tertiary }]}>
             Create your first goal to start tracking your progress
           </Text>
-          <Pressable style={styles.createFirstButton} onPress={openCreateModal}>
-            <Text style={styles.createFirstButtonText}>Create Goal</Text>
+          <Pressable
+            style={[styles.createFirstButton, { backgroundColor: theme.button.primary.background }]}
+            onPress={openCreateModal}
+          >
+            <Text style={[styles.createFirstButtonText, { color: theme.button.primary.text }]}>
+              Create Goal
+            </Text>
           </Pressable>
         </View>
       ) : (
         <FlatList
           data={ALL_PILLARS.filter((p) => goalsByPillar[p]?.length > 0)}
           keyExtractor={(pillar) => pillar}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              tintColor={theme.text.secondary}
+            />
+          }
           contentContainerStyle={styles.listContent}
           renderItem={({ item: pillar }) => (
             <View style={styles.pillarSection}>
@@ -274,20 +295,31 @@ export default function GoalsScreen() {
                 <Text style={[styles.pillarTitle, { color: PILLAR_INFO[pillar].color }]}>
                   {PILLAR_INFO[pillar].label}
                 </Text>
-                <Text style={styles.goalCount}>{goalsByPillar[pillar]?.length || 0}</Text>
+                <Text style={[styles.goalCount, { color: theme.text.tertiary }]}>
+                  {goalsByPillar[pillar]?.length || 0}
+                </Text>
               </View>
               {goalsByPillar[pillar]?.map((goal) => (
                 <Pressable
                   key={goal.id}
-                  style={styles.goalCard}
+                  style={[styles.goalCard, { backgroundColor: theme.card.background }]}
                   onPress={() => {
                     router.push(`/goals/${goal.id}`);
                   }}
                   onLongPress={() => handleArchiveGoal(goal.id, goal.title)}
                 >
-                  <Text style={styles.goalTitle}>{goal.title}</Text>
+                  <Text style={[styles.goalTitle, { color: theme.text.primary }]}>
+                    {goal.title}
+                  </Text>
                   <View style={styles.goalMeta}>
-                    <Text style={styles.privacyBadge}>{PRIVACY_INFO[goal.privacy].label}</Text>
+                    <Text
+                      style={[
+                        styles.privacyBadge,
+                        { color: theme.text.tertiary, backgroundColor: theme.background.secondary },
+                      ]}
+                    >
+                      {PRIVACY_INFO[goal.privacy].label}
+                    </Text>
                   </View>
                 </Pressable>
               ))}
@@ -303,14 +335,22 @@ export default function GoalsScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowCreateModal(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
+        <SafeAreaView
+          style={[styles.modalContainer, { backgroundColor: theme.background.primary }]}
+        >
+          <View style={[styles.modalHeader, { borderBottomColor: theme.border.light }]}>
             <Pressable onPress={() => setShowCreateModal(false)}>
-              <Text style={styles.modalCancel}>Cancel</Text>
+              <Text style={[styles.modalCancel, { color: theme.text.tertiary }]}>Cancel</Text>
             </Pressable>
-            <Text style={styles.modalTitle}>New Goal</Text>
+            <Text style={[styles.modalTitle, { color: theme.text.primary }]}>New Goal</Text>
             <Pressable onPress={handleCreateGoal} disabled={isSubmitting}>
-              <Text style={[styles.modalSave, isSubmitting && styles.disabled]}>
+              <Text
+                style={[
+                  styles.modalSave,
+                  { color: theme.semantic.primary },
+                  isSubmitting && styles.disabled,
+                ]}
+              >
                 {isSubmitting ? "Saving..." : "Save"}
               </Text>
             </Pressable>
@@ -319,10 +359,16 @@ export default function GoalsScreen() {
           <ScrollView style={styles.modalContent} keyboardShouldPersistTaps="handled">
             {/* Title Input */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>What&apos;s your goal?</Text>
+              <Text style={[styles.label, { color: theme.text.secondary }]}>
+                What&apos;s your goal?
+              </Text>
               <TextInput
-                style={styles.textInput}
+                style={[
+                  styles.textInput,
+                  { borderBottomColor: theme.border.light, color: theme.text.primary },
+                ]}
                 placeholder="e.g., Lose 10 pounds, Run a marathon"
+                placeholderTextColor={theme.text.tertiary}
                 value={newTitle}
                 onChangeText={setNewTitle}
                 returnKeyType="next"
@@ -332,10 +378,17 @@ export default function GoalsScreen() {
 
             {/* Description Input */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Description (optional)</Text>
+              <Text style={[styles.label, { color: theme.text.secondary }]}>
+                Description (optional)
+              </Text>
               <TextInput
-                style={[styles.textInput, styles.textArea]}
+                style={[
+                  styles.textInput,
+                  styles.textArea,
+                  { borderBottomColor: theme.border.light, color: theme.text.primary },
+                ]}
                 placeholder="Add more details about this goal"
+                placeholderTextColor={theme.text.tertiary}
                 value={newDescription}
                 onChangeText={setNewDescription}
                 multiline
@@ -344,13 +397,17 @@ export default function GoalsScreen() {
                 returnKeyType="done"
                 blurOnSubmit={true}
               />
-              <Text style={styles.charCount}>{newDescription.length}/500</Text>
+              <Text style={[styles.charCount, { color: theme.text.tertiary }]}>
+                {newDescription.length}/500
+              </Text>
             </View>
 
             {/* Identity Selector */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>What identity does this goal support?</Text>
-              <Text style={styles.hint}>
+              <Text style={[styles.label, { color: theme.text.secondary }]}>
+                What identity does this goal support?
+              </Text>
+              <Text style={[styles.hint, { color: theme.text.tertiary }]}>
                 Choose an identity or None to select a pillar directly
               </Text>
               <IdentityPicker
@@ -362,7 +419,7 @@ export default function GoalsScreen() {
 
             {/* Pillar Selector */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Pillar</Text>
+              <Text style={[styles.label, { color: theme.text.secondary }]}>Pillar</Text>
               <PillarPicker
                 selected={effectivePillar}
                 onSelect={setSelectedPillar}
@@ -375,42 +432,50 @@ export default function GoalsScreen() {
 
             {/* Start & Target Values */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Values</Text>
+              <Text style={[styles.label, { color: theme.text.secondary }]}>Values</Text>
               <View style={styles.valuesRow}>
                 <View style={styles.valueInputGroup}>
-                  <Text style={styles.valueLabel}>Start</Text>
+                  <Text style={[styles.valueLabel, { color: theme.text.tertiary }]}>Start</Text>
                   <TextInput
-                    style={styles.valueInput}
+                    style={[
+                      styles.valueInput,
+                      { borderColor: theme.border.light, color: theme.text.primary },
+                    ]}
                     value={startValue}
                     onChangeText={setStartValue}
                     keyboardType="numeric"
                     placeholder="0"
+                    placeholderTextColor={theme.text.tertiary}
                     maxLength={10}
                     returnKeyType="next"
                   />
                 </View>
-                <Text style={styles.valueArrow}>→</Text>
+                <Text style={[styles.valueArrow, { color: theme.text.tertiary }]}>→</Text>
                 <View style={styles.valueInputGroup}>
-                  <Text style={styles.valueLabel}>Target</Text>
+                  <Text style={[styles.valueLabel, { color: theme.text.tertiary }]}>Target</Text>
                   <TextInput
-                    style={styles.valueInput}
+                    style={[
+                      styles.valueInput,
+                      { borderColor: theme.border.light, color: theme.text.primary },
+                    ]}
                     value={targetValue}
                     onChangeText={setTargetValue}
                     keyboardType="numeric"
                     placeholder="100"
+                    placeholderTextColor={theme.text.tertiary}
                     maxLength={10}
                     returnKeyType="done"
                   />
                 </View>
               </View>
-              <Text style={styles.hint}>
+              <Text style={[styles.hint, { color: theme.text.tertiary }]}>
                 Unit of measurement will be selected from tracked data sources in future milestones
               </Text>
             </View>
 
             {/* Timeline */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Timeline</Text>
+              <Text style={[styles.label, { color: theme.text.secondary }]}>Timeline</Text>
               <View style={styles.datesRow}>
                 <View style={styles.dateInputGroup}>
                   <DatePicker
@@ -443,7 +508,7 @@ export default function GoalsScreen() {
                   />
                 </View>
               </View>
-              <Text style={styles.hint}>
+              <Text style={[styles.hint, { color: theme.text.tertiary }]}>
                 Start date defaults to today if not set. Leave deadline empty for an indefinite
                 goal.
               </Text>
@@ -451,7 +516,9 @@ export default function GoalsScreen() {
 
             {/* Data Source */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>How will you track progress?</Text>
+              <Text style={[styles.label, { color: theme.text.secondary }]}>
+                How will you track progress?
+              </Text>
               <DataSourcePicker
                 options={DATA_SOURCE_OPTIONS}
                 selected={dataSource}
@@ -461,7 +528,9 @@ export default function GoalsScreen() {
 
             {/* Privacy Selector */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Who can see this goal?</Text>
+              <Text style={[styles.label, { color: theme.text.secondary }]}>
+                Who can see this goal?
+              </Text>
               <PrivacyPicker
                 options={PRIVACY_OPTIONS}
                 selected={selectedPrivacy}
@@ -481,111 +550,99 @@ export default function GoalsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
   },
   loadingText: {
     textAlign: "center",
     marginTop: 100,
-    fontSize: 16,
-    color: "#666",
+    fontSize: typography.fontSize.base,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "#fff",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e5e5",
   },
   backButton: {
-    padding: 8,
+    padding: spacing.xs,
   },
   backButtonText: {
-    fontSize: 16,
-    color: "#007AFF",
+    fontSize: typography.fontSize.base,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
   },
   addButton: {
-    backgroundColor: "#000",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
   },
   addButtonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
   },
   emptyState: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 40,
+    padding: spacing.xxl,
   },
   emptyEmoji: {
     fontSize: 64,
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   emptyTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 8,
+    fontSize: typography.heading.h2.fontSize,
+    fontWeight: typography.heading.h2.fontWeight,
+    marginBottom: spacing.xs,
   },
   emptySubtitle: {
-    fontSize: 16,
-    color: "#666",
+    fontSize: typography.fontSize.base,
     textAlign: "center",
-    marginBottom: 24,
+    marginBottom: spacing.xl,
   },
   createFirstButton: {
-    backgroundColor: "#000",
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
   },
   createFirstButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
   },
   listContent: {
-    padding: 16,
+    padding: spacing.md,
   },
   pillarSection: {
-    marginBottom: 20,
+    marginBottom: spacing.lg,
   },
   pillarHeader: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    marginBottom: 8,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.xs,
   },
   pillarEmoji: {
     fontSize: 20,
-    marginRight: 8,
+    marginRight: spacing.xs,
   },
   pillarTitle: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
     flex: 1,
   },
   goalCount: {
-    fontSize: 14,
-    color: "#999",
-    fontWeight: "500",
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
   },
   goalCard: {
-    backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.xs,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -593,128 +650,114 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   goalTitle: {
-    fontSize: 16,
-    fontWeight: "500",
-    marginBottom: 8,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing.xs,
   },
   goalMeta: {
     flexDirection: "row",
   },
   privacyBadge: {
-    fontSize: 12,
-    color: "#666",
-    backgroundColor: "#f0f0f0",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+    fontSize: typography.fontSize.xs,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs,
+    borderRadius: borderRadius.sm,
   },
   // Modal styles
   modalContainer: {
     flex: 1,
-    backgroundColor: "#fff",
   },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e5e5",
   },
   modalCancel: {
-    fontSize: 16,
-    color: "#666",
+    fontSize: typography.fontSize.base,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
   },
   modalSave: {
-    fontSize: 16,
-    color: "#007AFF",
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
   },
   disabled: {
     opacity: 0.5,
   },
   modalContent: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
     paddingBottom: 0,
   },
   formGroup: {
-    marginBottom: 28,
+    marginBottom: spacing.xl,
   },
   label: {
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 10,
-    color: "#333",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.xs,
   },
   textInput: {
-    fontSize: 17,
+    fontSize: typography.fontSize.lg,
     borderBottomWidth: 2,
-    borderBottomColor: "#e5e5e5",
-    paddingVertical: 12,
+    paddingVertical: spacing.sm,
   },
   textArea: {
     minHeight: 80,
     textAlignVertical: "top",
-    paddingTop: 12,
+    paddingTop: spacing.sm,
   },
   charCount: {
-    fontSize: 12,
-    color: "#999",
+    fontSize: typography.fontSize.xs,
     textAlign: "right",
-    marginTop: 4,
+    marginTop: spacing.xxs,
   },
   hint: {
-    fontSize: 12,
-    color: "#999",
-    marginTop: 4,
-    marginBottom: 8,
+    fontSize: typography.fontSize.xs,
+    marginTop: spacing.xxs,
+    marginBottom: spacing.xs,
   },
   // Values
   valuesRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: spacing.sm,
   },
   valueInputGroup: {
     flex: 1,
   },
   valueLabel: {
-    fontSize: 12,
-    color: "#999",
-    marginBottom: 4,
+    fontSize: typography.fontSize.xs,
+    marginBottom: spacing.xxs,
   },
   valueInput: {
-    fontSize: 20,
-    fontWeight: "600",
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.semibold,
     textAlign: "center",
     borderWidth: 2,
-    borderColor: "#e5e5e5",
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
   valueArrow: {
     fontSize: 20,
-    color: "#999",
   },
   // Dates
   datesRow: {
     flexDirection: "row",
-    gap: 12,
+    gap: spacing.sm,
   },
   dateInputGroup: {
     flex: 1,
   },
   dateLabel: {
-    fontSize: 12,
-    color: "#666",
-    marginBottom: 4,
+    fontSize: typography.fontSize.xs,
+    marginBottom: spacing.xxs,
   },
 });

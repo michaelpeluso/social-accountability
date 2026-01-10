@@ -32,6 +32,7 @@ import type {
   HabitType,
   CompletionType,
 } from "../../src/types";
+import { useTheme } from "../../src/theme";
 
 const PRIVACY_OPTIONS: Privacy[] = ["SELF", "FRIENDS", "PUBLIC"];
 const FREQUENCY_OPTIONS: { value: HabitFrequency; label: string }[] = [
@@ -69,6 +70,7 @@ const EMOJI_OPTIONS = [
 ];
 
 export default function HabitsScreen() {
+  const { theme } = useTheme();
   const params = useLocalSearchParams<{ goalId?: string }>();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -265,22 +267,30 @@ export default function HabitsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.loadingText}>Loading habits...</Text>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background.secondary }]}>
+        <Text style={[styles.loadingText, { color: theme.text.secondary }]}>Loading habits...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background.secondary }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: theme.background.primary, borderBottomColor: theme.border.light },
+        ]}
+      >
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>Back</Text>
+          <Text style={[styles.backButtonText, { color: theme.semantic.primary }]}>Back</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Habits</Text>
-        <Pressable onPress={openCreateModal} style={styles.addButton}>
-          <Text style={styles.addButtonText}>+ New</Text>
+        <Text style={[styles.headerTitle, { color: theme.text.primary }]}>Habits</Text>
+        <Pressable
+          onPress={openCreateModal}
+          style={[styles.addButton, { backgroundColor: theme.button.primary.background }]}
+        >
+          <Text style={[styles.addButtonText, { color: theme.button.primary.text }]}>+ New</Text>
         </Pressable>
       </View>
 
@@ -288,17 +298,30 @@ export default function HabitsScreen() {
       {habits.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyEmoji}>🔄</Text>
-          <Text style={styles.emptyTitle}>No habits yet</Text>
-          <Text style={styles.emptySubtitle}>Create recurring habits to build consistency</Text>
-          <Pressable style={styles.createFirstButton} onPress={openCreateModal}>
-            <Text style={styles.createFirstButtonText}>Create Habit</Text>
+          <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>No habits yet</Text>
+          <Text style={[styles.emptySubtitle, { color: theme.text.secondary }]}>
+            Create recurring habits to build consistency
+          </Text>
+          <Pressable
+            style={[styles.createFirstButton, { backgroundColor: theme.button.primary.background }]}
+            onPress={openCreateModal}
+          >
+            <Text style={[styles.createFirstButtonText, { color: theme.button.primary.text }]}>
+              Create Habit
+            </Text>
           </Pressable>
         </View>
       ) : (
         <FlatList
           data={ALL_PILLARS.filter((p) => habitsByPillar[p]?.length > 0)}
           keyExtractor={(pillar) => pillar}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              tintColor={theme.text.secondary}
+            />
+          }
           contentContainerStyle={styles.listContent}
           renderItem={({ item: pillar }) => (
             <View style={styles.pillarSection}>
@@ -309,30 +332,51 @@ export default function HabitsScreen() {
                 <Text style={[styles.pillarTitle, { color: PILLAR_INFO[pillar].color }]}>
                   {PILLAR_INFO[pillar].label}
                 </Text>
-                <Text style={styles.habitCount}>{habitsByPillar[pillar]?.length || 0}</Text>
+                <Text style={[styles.habitCount, { color: theme.text.tertiary }]}>
+                  {habitsByPillar[pillar]?.length || 0}
+                </Text>
               </View>
               {habitsByPillar[pillar]?.map((habit) => (
                 <Pressable
                   key={habit.id}
-                  style={styles.habitCard}
+                  style={[styles.habitCard, { backgroundColor: theme.card.background }]}
                   onPress={() => {
                     router.push(`/habits/${habit.id}`);
                   }}
                 >
                   <View style={styles.habitHeader}>
-                    <Text style={styles.habitTitle}>{habit.title}</Text>
+                    <Text style={[styles.habitTitle, { color: theme.text.primary }]}>
+                      {habit.title}
+                    </Text>
                     {habit.currentStreak > 0 && (
-                      <View style={styles.streakBadge}>
-                        <Text style={styles.streakText}>{habit.currentStreak} day streak</Text>
+                      <View
+                        style={[
+                          styles.streakBadge,
+                          { backgroundColor: theme.semantic.danger + "20" },
+                        ]}
+                      >
+                        <Text style={[styles.streakText, { color: theme.semantic.danger }]}>
+                          {habit.currentStreak} day streak
+                        </Text>
                       </View>
                     )}
                   </View>
                   <View style={styles.habitMeta}>
-                    <Text style={styles.scheduleBadge}>
+                    <Text
+                      style={[
+                        styles.scheduleBadge,
+                        {
+                          color: theme.text.secondary,
+                          backgroundColor: theme.background.secondary,
+                        },
+                      ]}
+                    >
                       {habit.schedule.targetCount}x {habit.schedule.frequency}
                     </Text>
                     {getGoalTitle(habit.goalId) && (
-                      <Text style={styles.goalLink}>{getGoalTitle(habit.goalId)}</Text>
+                      <Text style={[styles.goalLink, { color: theme.semantic.primary }]}>
+                        {getGoalTitle(habit.goalId)}
+                      </Text>
                     )}
                   </View>
                 </Pressable>
@@ -349,14 +393,22 @@ export default function HabitsScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowCreateModal(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
+        <SafeAreaView
+          style={[styles.modalContainer, { backgroundColor: theme.background.primary }]}
+        >
+          <View style={[styles.modalHeader, { borderBottomColor: theme.border.light }]}>
             <Pressable onPress={() => setShowCreateModal(false)}>
-              <Text style={styles.modalCancel}>Cancel</Text>
+              <Text style={[styles.modalCancel, { color: theme.text.secondary }]}>Cancel</Text>
             </Pressable>
-            <Text style={styles.modalTitle}>New Habit</Text>
+            <Text style={[styles.modalTitle, { color: theme.text.primary }]}>New Habit</Text>
             <Pressable onPress={handleCreateHabit} disabled={isSubmitting}>
-              <Text style={[styles.modalSave, isSubmitting && styles.disabled]}>
+              <Text
+                style={[
+                  styles.modalSave,
+                  { color: theme.semantic.primary },
+                  isSubmitting && styles.disabled,
+                ]}
+              >
                 {isSubmitting ? "Saving..." : "Save"}
               </Text>
             </Pressable>
@@ -365,10 +417,14 @@ export default function HabitsScreen() {
           <ScrollView style={styles.modalContent}>
             {/* Title Input */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Habit name</Text>
+              <Text style={[styles.label, { color: theme.text.primary }]}>Habit name</Text>
               <TextInput
-                style={styles.textInput}
+                style={[
+                  styles.textInput,
+                  { borderBottomColor: theme.border.light, color: theme.text.primary },
+                ]}
                 placeholder="e.g., Meditate, Read, Exercise"
+                placeholderTextColor={theme.text.tertiary}
                 value={newTitle}
                 onChangeText={setNewTitle}
                 autoFocus
@@ -378,28 +434,47 @@ export default function HabitsScreen() {
 
             {/* Description Input */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Description (optional)</Text>
+              <Text style={[styles.label, { color: theme.text.primary }]}>
+                Description (optional)
+              </Text>
               <TextInput
-                style={[styles.textInput, styles.textArea]}
+                style={[
+                  styles.textInput,
+                  styles.textArea,
+                  { borderBottomColor: theme.border.light, color: theme.text.primary },
+                ]}
                 placeholder="What do you need to do?"
+                placeholderTextColor={theme.text.tertiary}
                 value={newDescription}
                 onChangeText={setNewDescription}
                 multiline
                 numberOfLines={3}
                 maxLength={500}
               />
-              <Text style={styles.charCount}>{newDescription.length}/500</Text>
+              <Text style={[styles.charCount, { color: theme.text.tertiary }]}>
+                {newDescription.length}/500
+              </Text>
             </View>
 
             {/* Icon Selector */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Icon</Text>
+              <Text style={[styles.label, { color: theme.text.primary }]}>Icon</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.emojiPicker}>
                   {EMOJI_OPTIONS.map((emoji) => (
                     <Pressable
                       key={emoji}
-                      style={[styles.emojiOption, icon === emoji && styles.emojiOptionSelected]}
+                      style={[
+                        styles.emojiOption,
+                        {
+                          borderColor: theme.border.light,
+                          backgroundColor: theme.background.secondary,
+                        },
+                        icon === emoji && [
+                          styles.emojiOptionSelected,
+                          { borderColor: theme.text.primary },
+                        ],
+                      ]}
                       onPress={() => setIcon(emoji)}
                     >
                       <Text style={styles.emojiText}>{emoji}</Text>
@@ -412,17 +487,33 @@ export default function HabitsScreen() {
             {/* Goal Selector (optional) */}
             {goals.length > 0 && (
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Link to goal (optional)</Text>
+                <Text style={[styles.label, { color: theme.text.primary }]}>
+                  Link to goal (optional)
+                </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={styles.goalPicker}>
                     <Pressable
-                      style={[styles.goalOption, !selectedGoalId && styles.goalOptionSelected]}
+                      style={[
+                        styles.goalOption,
+                        {
+                          borderColor: theme.border.light,
+                          backgroundColor: theme.background.secondary,
+                        },
+                        !selectedGoalId && [
+                          styles.goalOptionSelected,
+                          { borderColor: theme.text.primary },
+                        ],
+                      ]}
                       onPress={() => setSelectedGoalId(undefined)}
                     >
                       <Text
                         style={[
                           styles.goalOptionText,
-                          !selectedGoalId && styles.goalOptionTextSelected,
+                          { color: theme.text.secondary },
+                          !selectedGoalId && [
+                            styles.goalOptionTextSelected,
+                            { color: theme.text.primary },
+                          ],
                         ]}
                       >
                         None
@@ -433,7 +524,14 @@ export default function HabitsScreen() {
                         key={goal.id}
                         style={[
                           styles.goalOption,
-                          selectedGoalId === goal.id && styles.goalOptionSelected,
+                          {
+                            borderColor: theme.border.light,
+                            backgroundColor: theme.background.secondary,
+                          },
+                          selectedGoalId === goal.id && [
+                            styles.goalOptionSelected,
+                            { borderColor: theme.text.primary },
+                          ],
                         ]}
                         onPress={() => {
                           setSelectedGoalId(goal.id);
@@ -444,7 +542,11 @@ export default function HabitsScreen() {
                         <Text
                           style={[
                             styles.goalOptionText,
-                            selectedGoalId === goal.id && styles.goalOptionTextSelected,
+                            { color: theme.text.secondary },
+                            selectedGoalId === goal.id && [
+                              styles.goalOptionTextSelected,
+                              { color: theme.text.primary },
+                            ],
                           ]}
                           numberOfLines={1}
                         >
@@ -460,13 +562,17 @@ export default function HabitsScreen() {
             {/* Pillar Selector - only show if no goal selected */}
             {!selectedGoalId && (
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Pillar</Text>
+                <Text style={[styles.label, { color: theme.text.primary }]}>Pillar</Text>
                 <View style={styles.pillarPicker}>
                   {ALL_PILLARS.map((pillar) => (
                     <Pressable
                       key={pillar}
                       style={[
                         styles.pillarOption,
+                        {
+                          borderColor: theme.border.light,
+                          backgroundColor: theme.background.secondary,
+                        },
                         selectedPillar === pillar && {
                           backgroundColor: PILLAR_INFO[pillar].color + "30",
                           borderColor: PILLAR_INFO[pillar].color,
@@ -475,7 +581,9 @@ export default function HabitsScreen() {
                       onPress={() => setSelectedPillar(pillar)}
                     >
                       <Text style={styles.pillarEmoji}>{PILLAR_INFO[pillar].emoji}</Text>
-                      <Text style={styles.pillarOptionText}>{PILLAR_INFO[pillar].label}</Text>
+                      <Text style={[styles.pillarOptionText, { color: theme.text.secondary }]}>
+                        {PILLAR_INFO[pillar].label}
+                      </Text>
                     </Pressable>
                   ))}
                 </View>
@@ -484,26 +592,39 @@ export default function HabitsScreen() {
 
             {/* Habit Type: Build or Quit */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Habit type</Text>
+              <Text style={[styles.label, { color: theme.text.primary }]}>Habit type</Text>
               <View style={styles.typeRow}>
                 {HABIT_TYPE_OPTIONS.map((option) => (
                   <Pressable
                     key={option.value}
                     style={[
                       styles.typeOption,
-                      habitType === option.value && styles.typeOptionSelected,
+                      {
+                        borderColor: theme.border.light,
+                        backgroundColor: theme.background.secondary,
+                      },
+                      habitType === option.value && [
+                        styles.typeOptionSelected,
+                        { borderColor: theme.text.primary },
+                      ],
                     ]}
                     onPress={() => setHabitType(option.value)}
                   >
                     <Text
                       style={[
                         styles.typeLabel,
-                        habitType === option.value && styles.typeLabelSelected,
+                        { color: theme.text.secondary },
+                        habitType === option.value && [
+                          styles.typeLabelSelected,
+                          { color: theme.text.primary },
+                        ],
                       ]}
                     >
                       {option.label}
                     </Text>
-                    <Text style={styles.typeDesc}>{option.desc}</Text>
+                    <Text style={[styles.typeDesc, { color: theme.text.tertiary }]}>
+                      {option.desc}
+                    </Text>
                   </Pressable>
                 ))}
               </View>
@@ -511,21 +632,32 @@ export default function HabitsScreen() {
 
             {/* Completion Type */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>How to measure</Text>
+              <Text style={[styles.label, { color: theme.text.primary }]}>How to measure</Text>
               <View style={styles.completionRow}>
                 {COMPLETION_TYPE_OPTIONS.map((option) => (
                   <Pressable
                     key={option.value}
                     style={[
                       styles.completionOption,
-                      completionType === option.value && styles.completionOptionSelected,
+                      {
+                        borderColor: theme.border.light,
+                        backgroundColor: theme.background.secondary,
+                      },
+                      completionType === option.value && [
+                        styles.completionOptionSelected,
+                        { borderColor: theme.text.primary },
+                      ],
                     ]}
                     onPress={() => setCompletionType(option.value)}
                   >
                     <Text
                       style={[
                         styles.completionLabel,
-                        completionType === option.value && styles.completionLabelSelected,
+                        { color: theme.text.secondary },
+                        completionType === option.value && [
+                          styles.completionLabelSelected,
+                          { color: theme.text.primary },
+                        ],
                       ]}
                     >
                       {option.label}
@@ -538,21 +670,29 @@ export default function HabitsScreen() {
             {/* Target Value - COUNT */}
             {completionType === "COUNT" && (
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Target count</Text>
+                <Text style={[styles.label, { color: theme.text.primary }]}>Target count</Text>
                 <View style={styles.targetRow}>
                   <TextInput
-                    style={styles.targetInput}
+                    style={[
+                      styles.targetInput,
+                      { borderColor: theme.border.light, color: theme.text.primary },
+                    ]}
                     value={targetValue}
                     onChangeText={setTargetValue}
                     keyboardType="numeric"
                     placeholder="e.g., 30"
+                    placeholderTextColor={theme.text.tertiary}
                     maxLength={5}
                   />
                   <TextInput
-                    style={styles.unitInput}
+                    style={[
+                      styles.unitInput,
+                      { borderColor: theme.border.light, color: theme.text.primary },
+                    ]}
                     value={unit}
                     onChangeText={setUnit}
                     placeholder="reps, pages, etc."
+                    placeholderTextColor={theme.text.tertiary}
                     maxLength={20}
                   />
                 </View>
@@ -562,45 +702,69 @@ export default function HabitsScreen() {
             {/* Target Duration - Timer style HH:MM:SS */}
             {completionType === "DURATION" && (
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Target duration</Text>
+                <Text style={[styles.label, { color: theme.text.primary }]}>Target duration</Text>
                 <View style={styles.durationRow}>
                   <View style={styles.durationInputGroup}>
                     <TextInput
-                      style={styles.durationInput}
+                      style={[
+                        styles.durationInput,
+                        {
+                          borderColor: theme.border.light,
+                          backgroundColor: theme.background.secondary,
+                          color: theme.text.primary,
+                        },
+                      ]}
                       value={durationHours}
                       onChangeText={(v) => setDurationHours(v.replace(/[^0-9]/g, ""))}
                       keyboardType="numeric"
                       placeholder="0"
+                      placeholderTextColor={theme.text.tertiary}
                       maxLength={2}
                     />
-                    <Text style={styles.durationLabel}>hr</Text>
+                    <Text style={[styles.durationLabel, { color: theme.text.tertiary }]}>hr</Text>
                   </View>
-                  <Text style={styles.durationSeparator}>:</Text>
+                  <Text style={[styles.durationSeparator, { color: theme.text.secondary }]}>:</Text>
                   <View style={styles.durationInputGroup}>
                     <TextInput
-                      style={styles.durationInput}
+                      style={[
+                        styles.durationInput,
+                        {
+                          borderColor: theme.border.light,
+                          backgroundColor: theme.background.secondary,
+                          color: theme.text.primary,
+                        },
+                      ]}
                       value={durationMinutes}
                       onChangeText={(v) => setDurationMinutes(v.replace(/[^0-9]/g, ""))}
                       keyboardType="numeric"
                       placeholder="0"
+                      placeholderTextColor={theme.text.tertiary}
                       maxLength={2}
                     />
-                    <Text style={styles.durationLabel}>min</Text>
+                    <Text style={[styles.durationLabel, { color: theme.text.tertiary }]}>min</Text>
                   </View>
-                  <Text style={styles.durationSeparator}>:</Text>
+                  <Text style={[styles.durationSeparator, { color: theme.text.secondary }]}>:</Text>
                   <View style={styles.durationInputGroup}>
                     <TextInput
-                      style={styles.durationInput}
+                      style={[
+                        styles.durationInput,
+                        {
+                          borderColor: theme.border.light,
+                          backgroundColor: theme.background.secondary,
+                          color: theme.text.primary,
+                        },
+                      ]}
                       value={durationSeconds}
                       onChangeText={(v) => setDurationSeconds(v.replace(/[^0-9]/g, ""))}
                       keyboardType="numeric"
                       placeholder="0"
+                      placeholderTextColor={theme.text.tertiary}
                       maxLength={2}
                     />
-                    <Text style={styles.durationLabel}>sec</Text>
+                    <Text style={[styles.durationLabel, { color: theme.text.tertiary }]}>sec</Text>
                   </View>
                 </View>
-                <Text style={styles.durationHint}>
+                <Text style={[styles.durationHint, { color: theme.text.secondary }]}>
                   {(() => {
                     const h = parseInt(durationHours, 10) || 0;
                     const m = parseInt(durationMinutes, 10) || 0;
@@ -618,30 +782,46 @@ export default function HabitsScreen() {
 
             {/* Schedule Section */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Schedule</Text>
+              <Text style={[styles.label, { color: theme.text.primary }]}>Schedule</Text>
               <View style={styles.scheduleRow}>
                 <TextInput
-                  style={styles.countInput}
+                  style={[
+                    styles.countInput,
+                    { borderColor: theme.border.light, color: theme.text.primary },
+                  ]}
                   value={targetCount}
                   onChangeText={setTargetCount}
                   keyboardType="number-pad"
                   maxLength={2}
                 />
-                <Text style={styles.scheduleText}>times per</Text>
+                <Text style={[styles.scheduleText, { color: theme.text.secondary }]}>
+                  times per
+                </Text>
                 <View style={styles.frequencyPicker}>
                   {FREQUENCY_OPTIONS.map((option) => (
                     <Pressable
                       key={option.value}
                       style={[
                         styles.frequencyOption,
-                        frequency === option.value && styles.frequencyOptionSelected,
+                        {
+                          borderColor: theme.border.light,
+                          backgroundColor: theme.background.secondary,
+                        },
+                        frequency === option.value && [
+                          styles.frequencyOptionSelected,
+                          { borderColor: theme.text.primary },
+                        ],
                       ]}
                       onPress={() => setFrequency(option.value)}
                     >
                       <Text
                         style={[
                           styles.frequencyOptionText,
-                          frequency === option.value && styles.frequencyOptionTextSelected,
+                          { color: theme.text.secondary },
+                          frequency === option.value && [
+                            styles.frequencyOptionTextSelected,
+                            { color: theme.text.primary },
+                          ],
                         ]}
                       >
                         {option.label}
@@ -655,8 +835,18 @@ export default function HabitsScreen() {
             {/* Show selected pillar from goal */}
             {selectedGoalId && selectedGoal && (
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Pillar (from goal)</Text>
-                <View style={styles.lockedPillarBadge}>
+                <Text style={[styles.label, { color: theme.text.primary }]}>
+                  Pillar (from goal)
+                </Text>
+                <View
+                  style={[
+                    styles.lockedPillarBadge,
+                    {
+                      borderColor: theme.border.light,
+                      backgroundColor: theme.background.secondary,
+                    },
+                  ]}
+                >
                   <Text style={styles.pillarOptionEmoji}>
                     {PILLAR_INFO[selectedGoal.pillar].emoji}
                   </Text>
@@ -674,26 +864,39 @@ export default function HabitsScreen() {
 
             {/* Privacy Selector */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Who can see this habit?</Text>
+              <Text style={[styles.label, { color: theme.text.primary }]}>
+                Who can see this habit?
+              </Text>
               <View style={styles.privacyPicker}>
                 {PRIVACY_OPTIONS.map((privacy) => (
                   <Pressable
                     key={privacy}
                     style={[
                       styles.privacyOption,
-                      selectedPrivacy === privacy && styles.privacyOptionSelected,
+                      {
+                        borderColor: theme.border.light,
+                        backgroundColor: theme.background.secondary,
+                      },
+                      selectedPrivacy === privacy && [
+                        styles.privacyOptionSelected,
+                        { borderColor: theme.text.primary },
+                      ],
                     ]}
                     onPress={() => setSelectedPrivacy(privacy)}
                   >
                     <Text
                       style={[
                         styles.privacyOptionLabel,
-                        selectedPrivacy === privacy && styles.privacyOptionLabelSelected,
+                        { color: theme.text.secondary },
+                        selectedPrivacy === privacy && [
+                          styles.privacyOptionLabelSelected,
+                          { color: theme.text.primary },
+                        ],
                       ]}
                     >
                       {PRIVACY_INFO[privacy].label}
                     </Text>
-                    <Text style={styles.privacyOptionDesc}>
+                    <Text style={[styles.privacyOptionDesc, { color: theme.text.tertiary }]}>
                       {PRIVACY_INFO[privacy].description}
                     </Text>
                   </Pressable>

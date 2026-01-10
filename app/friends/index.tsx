@@ -10,13 +10,17 @@ import {
   TextInput,
   RefreshControl,
 } from "react-native";
+import { router } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "../../src/services/api";
 import { logger } from "../../src/lib/logger";
 import type { User, FriendRequest } from "../../src/types/user";
+import { useTheme } from "../../src/theme";
 
 type Tab = "friends" | "requests" | "search" | "blocked";
 
 export default function Friends() {
+  const { theme } = useTheme();
   const [tab, setTab] = useState<Tab>("friends");
   const [friends, setFriends] = useState<User[]>([]);
   const [blockedUsers, setBlockedUsers] = useState<User[]>([]);
@@ -209,20 +213,26 @@ export default function Friends() {
 
   function renderFriendItem({ item }: { item: User }) {
     return (
-      <Pressable style={styles.item} onLongPress={() => handleBlock(item.id, item.displayName)}>
+      <Pressable
+        style={[
+          styles.item,
+          { backgroundColor: theme.card.background, borderBottomColor: theme.border.light },
+        ]}
+        onLongPress={() => handleBlock(item.id, item.displayName)}
+      >
         <View style={styles.itemInfo}>
-          <Text style={styles.itemName}>{item.displayName}</Text>
+          <Text style={[styles.itemName, { color: theme.text.primary }]}>{item.displayName}</Text>
           {item.bio && (
-            <Text style={styles.itemBio} numberOfLines={1}>
+            <Text style={[styles.itemBio, { color: theme.text.secondary }]} numberOfLines={1}>
               {item.bio}
             </Text>
           )}
         </View>
         <Pressable
-          style={styles.actionButton}
+          style={[styles.actionButton, { borderColor: theme.border.medium }]}
           onPress={() => handleUnfriend(item.id, item.displayName)}
         >
-          <Text style={styles.actionButtonText}>Remove</Text>
+          <Text style={[styles.actionButtonText, { color: theme.text.secondary }]}>Remove</Text>
         </Pressable>
       </Pressable>
     );
@@ -230,17 +240,34 @@ export default function Friends() {
 
   function renderReceivedRequest({ item }: { item: FriendRequest }) {
     return (
-      <View style={styles.item}>
+      <View
+        style={[
+          styles.item,
+          { backgroundColor: theme.card.background, borderBottomColor: theme.border.light },
+        ]}
+      >
         <View style={styles.itemInfo}>
-          <Text style={styles.itemName}>{item.sender.displayName}</Text>
-          <Text style={styles.itemMeta}>Wants to be your friend</Text>
+          <Text style={[styles.itemName, { color: theme.text.primary }]}>
+            {item.sender.displayName}
+          </Text>
+          <Text style={[styles.itemMeta, { color: theme.text.tertiary }]}>
+            Wants to be your friend
+          </Text>
         </View>
         <View style={styles.requestActions}>
-          <Pressable style={styles.acceptButton} onPress={() => handleAcceptRequest(item.id)}>
-            <Text style={styles.acceptButtonText}>Accept</Text>
+          <Pressable
+            style={[styles.acceptButton, { backgroundColor: theme.semantic.primary }]}
+            onPress={() => handleAcceptRequest(item.id)}
+          >
+            <Text style={[styles.acceptButtonText, { color: theme.button.primary.text }]}>
+              Accept
+            </Text>
           </Pressable>
-          <Pressable style={styles.declineButton} onPress={() => handleDeclineRequest(item.id)}>
-            <Text style={styles.declineButtonText}>Decline</Text>
+          <Pressable
+            style={[styles.declineButton, { borderColor: theme.border.medium }]}
+            onPress={() => handleDeclineRequest(item.id)}
+          >
+            <Text style={[styles.declineButtonText, { color: theme.text.secondary }]}>Decline</Text>
           </Pressable>
         </View>
       </View>
@@ -249,13 +276,23 @@ export default function Friends() {
 
   function renderSentRequest({ item }: { item: FriendRequest }) {
     return (
-      <View style={styles.item}>
+      <View
+        style={[
+          styles.item,
+          { backgroundColor: theme.card.background, borderBottomColor: theme.border.light },
+        ]}
+      >
         <View style={styles.itemInfo}>
-          <Text style={styles.itemName}>{item.recipient.displayName}</Text>
-          <Text style={styles.itemMeta}>Request pending</Text>
+          <Text style={[styles.itemName, { color: theme.text.primary }]}>
+            {item.recipient.displayName}
+          </Text>
+          <Text style={[styles.itemMeta, { color: theme.text.tertiary }]}>Request pending</Text>
         </View>
-        <Pressable style={styles.actionButton} onPress={() => handleDeclineRequest(item.id)}>
-          <Text style={styles.actionButtonText}>Cancel</Text>
+        <Pressable
+          style={[styles.actionButton, { borderColor: theme.border.medium }]}
+          onPress={() => handleDeclineRequest(item.id)}
+        >
+          <Text style={[styles.actionButtonText, { color: theme.text.secondary }]}>Cancel</Text>
         </Pressable>
       </View>
     );
@@ -263,183 +300,343 @@ export default function Friends() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#000" />
-      </View>
+      <SafeAreaView style={[styles.centered, { backgroundColor: theme.background.primary }]}>
+        <ActivityIndicator size="large" color={theme.text.primary} />
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.tabs}>
-        <Pressable
-          style={[styles.tab, tab === "friends" && styles.tabActive]}
-          onPress={() => setTab("friends")}
-        >
-          <Text style={[styles.tabText, tab === "friends" && styles.tabTextActive]}>
-            Friends ({friends.length})
-          </Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background.secondary }]}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: theme.background.primary, borderBottomColor: theme.border.light },
+        ]}
+      >
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <Text style={[styles.backButtonText, { color: theme.semantic.primary }]}>‹ Back</Text>
         </Pressable>
-        <Pressable
-          style={[styles.tab, tab === "requests" && styles.tabActive]}
-          onPress={() => setTab("requests")}
-        >
-          <Text style={[styles.tabText, tab === "requests" && styles.tabTextActive]}>
-            Requests ({requests.received.length})
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, tab === "search" && styles.tabActive]}
-          onPress={() => setTab("search")}
-        >
-          <Text style={[styles.tabText, tab === "search" && styles.tabTextActive]}>Add</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, tab === "blocked" && styles.tabActive]}
-          onPress={() => setTab("blocked")}
-        >
-          <Text style={[styles.tabText, tab === "blocked" && styles.tabTextActive]}>Blocked</Text>
-        </Pressable>
+        <Text style={[styles.headerTitle, { color: theme.text.primary }]}>Friends</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
-      {tab === "friends" && (
-        <FlatList
-          data={friends}
-          keyExtractor={(item) => item.id}
-          renderItem={renderFriendItem}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={styles.emptyText}>No friends yet</Text>
-              <Text style={styles.emptySubtext}>Add friends to share your progress</Text>
-            </View>
-          }
-        />
-      )}
-
-      {tab === "requests" && (
-        <View style={styles.requestsContainer}>
-          {requests.received.length > 0 && (
-            <View>
-              <Text style={styles.sectionHeader}>Received</Text>
-              <FlatList
-                data={requests.received}
-                keyExtractor={(item) => item.id}
-                renderItem={renderReceivedRequest}
-                scrollEnabled={false}
-              />
-            </View>
-          )}
-          {requests.sent.length > 0 && (
-            <View>
-              <Text style={styles.sectionHeader}>Sent</Text>
-              <FlatList
-                data={requests.sent}
-                keyExtractor={(item) => item.id}
-                renderItem={renderSentRequest}
-                scrollEnabled={false}
-              />
-            </View>
-          )}
-          {requests.received.length === 0 && requests.sent.length === 0 && (
-            <View style={styles.empty}>
-              <Text style={styles.emptyText}>No pending requests</Text>
-            </View>
-          )}
+      <View style={styles.content}>
+        <View
+          style={[
+            styles.tabs,
+            { backgroundColor: theme.background.primary, borderBottomColor: theme.border.light },
+          ]}
+        >
+          <Pressable
+            style={[
+              styles.tab,
+              tab === "friends" && [styles.tabActive, { borderBottomColor: theme.text.primary }],
+            ]}
+            onPress={() => setTab("friends")}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                { color: theme.text.secondary },
+                tab === "friends" && { fontWeight: "600", color: theme.text.primary },
+              ]}
+            >
+              Friends ({friends.length})
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.tab,
+              tab === "requests" && [styles.tabActive, { borderBottomColor: theme.text.primary }],
+            ]}
+            onPress={() => setTab("requests")}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                { color: theme.text.secondary },
+                tab === "requests" && { fontWeight: "600", color: theme.text.primary },
+              ]}
+            >
+              Requests ({requests.received.length})
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.tab,
+              tab === "search" && [styles.tabActive, { borderBottomColor: theme.text.primary }],
+            ]}
+            onPress={() => setTab("search")}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                { color: theme.text.secondary },
+                tab === "search" && { fontWeight: "600", color: theme.text.primary },
+              ]}
+            >
+              Add
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.tab,
+              tab === "blocked" && [styles.tabActive, { borderBottomColor: theme.text.primary }],
+            ]}
+            onPress={() => setTab("blocked")}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                { color: theme.text.secondary },
+                tab === "blocked" && { fontWeight: "600", color: theme.text.primary },
+              ]}
+            >
+              Blocked
+            </Text>
+          </Pressable>
         </View>
-      )}
 
-      {tab === "search" && (
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <TextInput
-              style={styles.searchInput}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search by username or email"
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="search"
-              onSubmitEditing={handleSearch}
-            />
-            <Pressable style={styles.searchButton} onPress={handleSearch}>
-              {searching ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.searchButtonText}>Search</Text>
-              )}
-            </Pressable>
-          </View>
-
-          {searchResults.length > 0 ? (
-            <FlatList
-              data={searchResults}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.item}>
-                  <View style={styles.itemInfo}>
-                    <Text style={styles.itemName}>{item.displayName}</Text>
-                  </View>
-                  <Pressable style={styles.addButton} onPress={() => handleSendRequest(item.id)}>
-                    <Text style={styles.addButtonText}>Add</Text>
-                  </Pressable>
-                </View>
-              )}
-            />
-          ) : (
-            <View style={styles.empty}>
-              <Text style={styles.emptyText}>Search for friends</Text>
-              <Text style={styles.emptySubtext}>Enter a username or email to find friends</Text>
-            </View>
-          )}
-        </View>
-      )}
-
-      {tab === "blocked" && (
-        <FlatList
-          data={blockedUsers}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.item}>
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>{item.displayName}</Text>
-                <Text style={styles.itemMeta}>Blocked</Text>
+        {tab === "friends" && (
+          <FlatList
+            data={friends}
+            keyExtractor={(item) => item.id}
+            renderItem={renderFriendItem}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor={theme.text.secondary}
+              />
+            }
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={[styles.emptyText, { color: theme.text.primary }]}>
+                  No friends yet
+                </Text>
+                <Text style={[styles.emptySubtext, { color: theme.text.secondary }]}>
+                  Add friends to share your progress
+                </Text>
               </View>
+            }
+          />
+        )}
+
+        {tab === "requests" && (
+          <View style={styles.requestsContainer}>
+            {requests.received.length > 0 && (
+              <View>
+                <Text
+                  style={[
+                    styles.sectionHeader,
+                    { color: theme.text.secondary, backgroundColor: theme.background.secondary },
+                  ]}
+                >
+                  Received
+                </Text>
+                <FlatList
+                  data={requests.received}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderReceivedRequest}
+                  scrollEnabled={false}
+                />
+              </View>
+            )}
+            {requests.sent.length > 0 && (
+              <View>
+                <Text
+                  style={[
+                    styles.sectionHeader,
+                    { color: theme.text.secondary, backgroundColor: theme.background.secondary },
+                  ]}
+                >
+                  Sent
+                </Text>
+                <FlatList
+                  data={requests.sent}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderSentRequest}
+                  scrollEnabled={false}
+                />
+              </View>
+            )}
+            {requests.received.length === 0 && requests.sent.length === 0 && (
+              <View style={styles.empty}>
+                <Text style={[styles.emptyText, { color: theme.text.primary }]}>
+                  No pending requests
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {tab === "search" && (
+          <View style={styles.searchContainer}>
+            <View style={[styles.searchBar, { backgroundColor: theme.background.primary }]}>
+              <TextInput
+                style={[
+                  styles.searchInput,
+                  {
+                    borderColor: theme.input.border,
+                    backgroundColor: theme.input.background,
+                    color: theme.text.primary,
+                  },
+                ]}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search by username or email"
+                placeholderTextColor={theme.text.tertiary}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="search"
+                onSubmitEditing={handleSearch}
+              />
               <Pressable
-                style={styles.actionButton}
-                onPress={() => handleUnblock(item.id, item.displayName)}
+                style={[styles.searchButton, { backgroundColor: theme.button.primary.background }]}
+                onPress={handleSearch}
               >
-                <Text style={styles.actionButtonText}>Unblock</Text>
+                {searching ? (
+                  <ActivityIndicator size="small" color={theme.button.primary.text} />
+                ) : (
+                  <Text style={[styles.searchButtonText, { color: theme.button.primary.text }]}>
+                    Search
+                  </Text>
+                )}
               </Pressable>
             </View>
-          )}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={styles.emptyText}>No blocked users</Text>
-            </View>
-          }
-        />
-      )}
-    </View>
+
+            {searchResults.length > 0 ? (
+              <FlatList
+                data={searchResults}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <View
+                    style={[
+                      styles.item,
+                      {
+                        backgroundColor: theme.card.background,
+                        borderBottomColor: theme.border.light,
+                      },
+                    ]}
+                  >
+                    <View style={styles.itemInfo}>
+                      <Text style={[styles.itemName, { color: theme.text.primary }]}>
+                        {item.displayName}
+                      </Text>
+                    </View>
+                    <Pressable
+                      style={[
+                        styles.addButton,
+                        { backgroundColor: theme.button.primary.background },
+                      ]}
+                      onPress={() => handleSendRequest(item.id)}
+                    >
+                      <Text style={[styles.addButtonText, { color: theme.button.primary.text }]}>
+                        Add
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
+              />
+            ) : (
+              <View style={styles.empty}>
+                <Text style={[styles.emptyText, { color: theme.text.primary }]}>
+                  Search for friends
+                </Text>
+                <Text style={[styles.emptySubtext, { color: theme.text.secondary }]}>
+                  Enter a username or email to find friends
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {tab === "blocked" && (
+          <FlatList
+            data={blockedUsers}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View
+                style={[
+                  styles.item,
+                  { backgroundColor: theme.card.background, borderBottomColor: theme.border.light },
+                ]}
+              >
+                <View style={styles.itemInfo}>
+                  <Text style={[styles.itemName, { color: theme.text.primary }]}>
+                    {item.displayName}
+                  </Text>
+                  <Text style={[styles.itemMeta, { color: theme.text.tertiary }]}>Blocked</Text>
+                </View>
+                <Pressable
+                  style={[styles.actionButton, { borderColor: theme.border.medium }]}
+                  onPress={() => handleUnblock(item.id, item.displayName)}
+                >
+                  <Text style={[styles.actionButtonText, { color: theme.text.secondary }]}>
+                    Unblock
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor={theme.text.secondary}
+              />
+            }
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={[styles.emptyText, { color: theme.text.primary }]}>
+                  No blocked users
+                </Text>
+              </View>
+            }
+          />
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
   },
   centered: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  backButton: {
+    padding: 4,
+  },
+  backButtonText: {
+    fontSize: 32,
+    fontWeight: "400",
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  content: {
+    flex: 1,
+  },
   tabs: {
     flexDirection: "row",
-    backgroundColor: "#fff",
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#ddd",
   },
   tab: {
     flex: 1,
@@ -448,23 +645,18 @@ const styles = StyleSheet.create({
   },
   tabActive: {
     borderBottomWidth: 2,
-    borderBottomColor: "#000",
   },
   tabText: {
     fontSize: 14,
-    color: "#666",
   },
   tabTextActive: {
     fontWeight: "600",
-    color: "#000",
   },
   item: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
     padding: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#eee",
   },
   itemInfo: {
     flex: 1,
@@ -475,12 +667,10 @@ const styles = StyleSheet.create({
   },
   itemBio: {
     fontSize: 14,
-    color: "#666",
     marginTop: 2,
   },
   itemMeta: {
     fontSize: 12,
-    color: "#999",
     marginTop: 2,
   },
   actionButton: {
@@ -488,24 +678,20 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: "#ddd",
   },
   actionButtonText: {
     fontSize: 14,
-    color: "#666",
   },
   requestActions: {
     flexDirection: "row",
     gap: 8,
   },
   acceptButton: {
-    backgroundColor: "#007AFF",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 4,
   },
   acceptButtonText: {
-    color: "#fff",
     fontSize: 14,
     fontWeight: "500",
   },
@@ -514,20 +700,16 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: "#ddd",
   },
   declineButtonText: {
     fontSize: 14,
-    color: "#666",
   },
   addButton: {
-    backgroundColor: "#000",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 4,
   },
   addButtonText: {
-    color: "#fff",
     fontSize: 14,
     fontWeight: "500",
   },
@@ -540,11 +722,9 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: "500",
-    color: "#333",
   },
   emptySubtext: {
     fontSize: 14,
-    color: "#666",
     marginTop: 8,
     textAlign: "center",
   },
@@ -554,11 +734,9 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#666",
     textTransform: "uppercase",
     padding: 16,
     paddingBottom: 8,
-    backgroundColor: "#f5f5f5",
   },
   searchContainer: {
     flex: 1,
@@ -566,25 +744,21 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: "row",
     padding: 12,
-    backgroundColor: "#fff",
     gap: 8,
   },
   searchInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
   },
   searchButton: {
-    backgroundColor: "#000",
     paddingHorizontal: 20,
     borderRadius: 8,
     justifyContent: "center",
   },
   searchButtonText: {
-    color: "#fff",
     fontSize: 14,
     fontWeight: "500",
   },

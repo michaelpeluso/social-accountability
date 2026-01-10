@@ -17,3 +17,6 @@ export * from "./nudges";
 export * from "./badges";
 export * from "./notifications";
 export * from "./rateLimits";
+
+// Dev utilities
+export { seedDemoData, clearDemoData, hasDemoData, DEMO_USERS } from "./seedData";
