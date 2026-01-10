@@ -26,6 +26,12 @@ export default function Index() {
 
       {/* Main Actions */}
       <View style={styles.mainActions}>
+        <Pressable style={styles.primaryButton} onPress={() => router.push("/dashboard")}>
+          <Text style={styles.primaryButtonEmoji}>📊</Text>
+          <Text style={styles.primaryButtonText}>Dashboard</Text>
+          <Text style={styles.primaryButtonSubtext}>View your progress</Text>
+        </Pressable>
+
         <Pressable style={styles.primaryButton} onPress={() => router.push("/goals")}>
           <Text style={styles.primaryButtonEmoji}>🎯</Text>
           <Text style={styles.primaryButtonText}>Goals</Text>

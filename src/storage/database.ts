@@ -21,6 +21,10 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   try {
     db = await SQLite.openDatabaseAsync(DB_NAME);
     await runMigrations(db);
+
+    // Validate schema after migrations
+    await validateCriticalColumns(db);
+
     logger.info("Database initialized", { name: DB_NAME, version: CURRENT_VERSION });
     return db;
   } catch (error) {
@@ -105,6 +109,59 @@ async function applyMigration(database: SQLite.SQLiteDatabase, version: number):
   } catch (error) {
     logger.error("Migration failed", { version, error });
     throw error;
+  }
+}
+
+/**
+ * Validate critical columns exist after migrations
+ * If validation fails, log detailed error to help debug
+ */
+async function validateCriticalColumns(database: SQLite.SQLiteDatabase): Promise<void> {
+  try {
+    // Check habit_check_ins table (only if it exists)
+    const checkInsInfo = await database.getAllAsync<{ name: string }>(
+      "PRAGMA table_info(habit_check_ins)"
+    );
+
+    // If table doesn't exist yet, skip validation (migrations will create it)
+    if (checkInsInfo.length === 0) {
+      logger.info("habit_check_ins table not yet created, skipping validation");
+      return;
+    }
+
+    const checkInsColumns = checkInsInfo.map((col) => col.name);
+
+    const missingColumns: string[] = [];
+
+    if (!checkInsColumns.includes("habitId")) {
+      missingColumns.push("habit_check_ins.habitId");
+    }
+    if (!checkInsColumns.includes("userId")) {
+      missingColumns.push("habit_check_ins.userId");
+    }
+
+    if (missingColumns.length > 0) {
+      logger.error("Database schema validation failed - missing columns", {
+        missingColumns,
+        actualColumns: checkInsColumns,
+        table: "habit_check_ins",
+      });
+
+      throw new Error(
+        `Database schema corrupted. Missing columns: ${missingColumns.join(", ")}. ` +
+          `Please delete and reinstall the app to fix.`
+      );
+    }
+
+    logger.info("Database schema validation passed", {
+      checkInsColumns,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Missing columns")) {
+      throw error; // Re-throw our validation error
+    }
+    logger.error("Schema validation check failed", { error });
+    // Don't throw on validation errors - let app continue
   }
 }
 

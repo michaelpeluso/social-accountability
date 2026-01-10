@@ -8,3 +8,4 @@ export * from "./user";
 export * from "./goals";
 export * from "./habits";
 export * from "./checkIns";
+export * from "./dbDebug";
