@@ -242,3 +242,186 @@ export function getBestPerformingHabit(
 
   return habits.find((h) => h.id === best.habitId) || null;
 }
+
+/**
+ * Calculate check-ins by hour of day for heatmap
+ * Returns array of 24 elements (0-23 hours) with check-in counts
+ */
+export function getCheckInsByHour(
+  checkIns: DashboardCheckIn[],
+  days: number = 30,
+  referenceDate: Date = new Date()
+): { hour: number; count: number; avgCount: number }[] {
+  const startDate = subtractDays(referenceDate, days);
+  const relevantCheckIns = checkIns.filter((c) => new Date(c.occurredAt) >= startDate);
+
+  const hourCounts: number[] = new Array(24).fill(0);
+
+  for (const checkIn of relevantCheckIns) {
+    const hour = new Date(checkIn.occurredAt).getHours();
+    hourCounts[hour]++;
+  }
+
+  return hourCounts.map((count, hour) => ({
+    hour,
+    count,
+    avgCount: Math.round((count / days) * 10) / 10, // Avg per day, 1 decimal
+  }));
+}
+
+/**
+ * Get check-ins by day of week for heatmap
+ * Returns array of 7 elements (0=Sunday to 6=Saturday)
+ */
+export function getCheckInsByDayOfWeek(
+  checkIns: DashboardCheckIn[],
+  weeks: number = 4,
+  referenceDate: Date = new Date()
+): { day: number; dayName: string; count: number; avgCount: number }[] {
+  const days = weeks * 7;
+  const startDate = subtractDays(referenceDate, days);
+  const relevantCheckIns = checkIns.filter((c) => new Date(c.occurredAt) >= startDate);
+
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const dayCounts: number[] = new Array(7).fill(0);
+
+  for (const checkIn of relevantCheckIns) {
+    const day = new Date(checkIn.occurredAt).getDay();
+    dayCounts[day]++;
+  }
+
+  return dayCounts.map((count, day) => ({
+    day,
+    dayName: dayNames[day],
+    count,
+    avgCount: Math.round((count / weeks) * 10) / 10,
+  }));
+}
+
+/**
+ * Calculate completion rate trends over time
+ * Returns weekly completion rates for the last N weeks
+ */
+export function getCompletionRateTrend(
+  habits: DashboardHabit[],
+  checkIns: DashboardCheckIn[],
+  weeks: number = 8,
+  referenceDate: Date = new Date()
+): { weekStart: Date; completionRate: number; checkInCount: number }[] {
+  const result: { weekStart: Date; completionRate: number; checkInCount: number }[] = [];
+  const activeHabits = habits.filter((h) => !h.isArchived);
+
+  if (activeHabits.length === 0) {
+    return result;
+  }
+
+  for (let i = weeks - 1; i >= 0; i--) {
+    const weekStart = subtractDays(referenceDate, i * 7 + referenceDate.getDay());
+    const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const weekCheckIns = checkIns.filter((c) => {
+      const d = new Date(c.occurredAt);
+      return d >= weekStart && d < weekEnd;
+    });
+
+    // Calculate expected check-ins for the week
+    let totalExpected = 0;
+    let totalActual = 0;
+
+    for (const habit of activeHabits) {
+      const expected =
+        habit.schedule.frequency === "daily"
+          ? habit.schedule.targetCount * 7
+          : habit.schedule.targetCount;
+      const actual = weekCheckIns.filter((c) => c.habitId === habit.id).length;
+      totalExpected += expected;
+      totalActual += Math.min(actual, expected);
+    }
+
+    const completionRate = totalExpected > 0 ? Math.round((totalActual / totalExpected) * 100) : 0;
+
+    result.push({
+      weekStart: new Date(weekStart),
+      completionRate,
+      checkInCount: weekCheckIns.length,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Get hour x day heatmap data for best time analysis
+ * Returns 24x7 matrix of check-in density
+ */
+export interface HeatmapCell {
+  hour: number;
+  day: number;
+  count: number;
+  intensity: number; // 0-1 normalized
+}
+
+export function getTimeHeatmap(
+  checkIns: DashboardCheckIn[],
+  weeks: number = 4,
+  referenceDate: Date = new Date()
+): HeatmapCell[] {
+  const days = weeks * 7;
+  const startDate = subtractDays(referenceDate, days);
+  const relevantCheckIns = checkIns.filter((c) => new Date(c.occurredAt) >= startDate);
+
+  // Initialize 24x7 matrix
+  const matrix: number[][] = Array(24)
+    .fill(null)
+    .map(() => Array(7).fill(0));
+
+  for (const checkIn of relevantCheckIns) {
+    const date = new Date(checkIn.occurredAt);
+    const hour = date.getHours();
+    const day = date.getDay();
+    matrix[hour][day]++;
+  }
+
+  // Find max for normalization
+  let maxCount = 0;
+  for (let h = 0; h < 24; h++) {
+    for (let d = 0; d < 7; d++) {
+      if (matrix[h][d] > maxCount) maxCount = matrix[h][d];
+    }
+  }
+
+  // Flatten to array with intensity
+  const result: HeatmapCell[] = [];
+  for (let h = 0; h < 24; h++) {
+    for (let d = 0; d < 7; d++) {
+      result.push({
+        hour: h,
+        day: d,
+        count: matrix[h][d],
+        intensity: maxCount > 0 ? matrix[h][d] / maxCount : 0,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Get peak activity hours (top 3 hours with most check-ins)
+ */
+export function getPeakActivityHours(
+  checkIns: DashboardCheckIn[],
+  days: number = 30,
+  referenceDate: Date = new Date()
+): { hour: number; label: string; count: number }[] {
+  const hourData = getCheckInsByHour(checkIns, days, referenceDate);
+
+  return hourData
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3)
+    .map((h) => ({
+      hour: h.hour,
+      label: `${h.hour.toString().padStart(2, "0")}:00`,
+      count: h.count,
+    }));
+}

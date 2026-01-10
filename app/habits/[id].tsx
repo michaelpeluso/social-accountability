@@ -34,6 +34,7 @@ import {
   getCurrentPeriodCount,
   getHabitStatus,
   getStatusMessage,
+  calculateRecoveryStatus,
 } from "../../src/logic";
 
 // Privacy options for editing
@@ -269,7 +270,16 @@ export default function HabitDetailScreen() {
     [streakHabit, streakCheckIns]
   );
 
-  const statusMessage = useMemo(() => getStatusMessage(habitStatus), [habitStatus]);
+  // Calculate recovery status
+  const recoveryStatus = useMemo(
+    () => calculateRecoveryStatus(streakHabit, streakCheckIns),
+    [streakHabit, streakCheckIns]
+  );
+
+  const statusMessage = useMemo(
+    () => getStatusMessage(habitStatus, recoveryStatus.recoveryStreak),
+    [habitStatus, recoveryStatus.recoveryStreak]
+  );
 
   if (isLoading) {
     return (
@@ -361,6 +371,17 @@ export default function HabitDetailScreen() {
             <Text style={styles.streakNumber}>{streakData.longestStreak}</Text>
             <Text style={styles.streakLabel}>Best Streak</Text>
           </View>
+          {recoveryStatus.isInRecovery && recoveryStatus.recoveryStreak > 0 && (
+            <>
+              <View style={styles.streakDivider} />
+              <View style={styles.streakItem}>
+                <Text style={[styles.streakNumber, styles.recoveryNumber]}>
+                  {recoveryStatus.recoveryStreak}
+                </Text>
+                <Text style={styles.streakLabel}>Recovery 🔥</Text>
+              </View>
+            </>
+          )}
         </View>
 
         {/* Today's/This Week's Progress */}
@@ -715,6 +736,9 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: "bold",
     color: "#FF6B6B",
+  },
+  recoveryNumber: {
+    color: "#4CAF50",
   },
   streakLabel: {
     fontSize: 14,

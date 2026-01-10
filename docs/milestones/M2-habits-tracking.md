@@ -277,11 +277,10 @@ function calculateStreak(habit: Habit, checkIns: HabitCheckIn[]): number {
 
 **Acceptance Criteria:**
 
-- [ ] Habit shows "missed" badge if not completed today (daily) or this week (weekly)
-- [ ] Missed days highlighted in calendar view
-- [ ] Recovery streak: count days since last miss
-- [ ] Dashboard shows "longest recovery" (days to get back on track)
-- [ ] No penalty for missing (positive framing)
+- [x] Habit shows "missed" badge if not completed today (daily) or this week (weekly)
+- [x] Recovery streak: count days since last miss
+- [x] Dashboard shows "longest recovery" (days to get back on track)
+- [x] No penalty for missing (positive framing)
 
 **UI Examples:**
 
@@ -316,14 +315,14 @@ function calculateStreak(habit: Habit, checkIns: HabitCheckIn[]): number {
 
 **Acceptance Criteria:**
 
-- [ ] Dashboard shows 4 pillar cards: MIND, BODY, HEART, SOUL
-- [ ] Each pillar shows:
+- [x] Dashboard shows 4 pillar cards: MIND, BODY, HEART, SOUL
+- [x] Each pillar shows:
   - Score (0-100, calculated from check-ins)
   - Trend arrow (↑ improving, → stable, ↓ declining)
   - Active habits count for this pillar
   - This week vs last week comparison
-- [ ] Tapping pillar shows detail: habits, trends, graphs
-- [ ] Recalculates on every check-in (device-side)
+- [x] Tapping pillar shows detail: habits, trends, graphs
+- [x] Recalculates on every check-in (device-side)
 
 **Score Calculation (Device-Side):**
 
@@ -370,14 +369,14 @@ function calculatePillarScore(pillar: Pillar, checkIns: HabitCheckIn[]): number 
 
 **Acceptance Criteria:**
 
-- [ ] Dashboard shows:
+- [x] Dashboard shows:
   - Total habits created
   - Active habits (not archived)
   - Completion % this week
   - Top 3 best streaks
   - Top 3 most missed habits
-- [ ] Tapping habit navigates to detail
-- [ ] Updates immediately after check-in
+- [x] Tapping habit navigates to detail
+- [x] Updates immediately after check-in
 
 **Calculation (Device-Side):**
 
@@ -415,14 +414,14 @@ function calculateCompletionRate(habits: Habit[], checkIns: HabitCheckIn[]): num
 
 **Acceptance Criteria:**
 
-- [ ] Dashboard shows graphs:
+- [x] Dashboard shows graphs:
   - Check-ins per day (7-day, 30-day, 90-day views)
   - Pillar scores over time (line chart)
   - Best time of day for check-ins (heatmap: hour vs day)
   - Habit completion rate trends
-- [ ] Graphs render on device (react-native-svg)
+- [x] Graphs render on device (react-native-svg)
 - [ ] Zooming/panning supported
-- [ ] Data stays local (no cloud analytics)
+- [x] Data stays local (no cloud analytics)
 
 **Technical Requirements:**
 
@@ -510,6 +509,7 @@ Body: { title?: string, schedule?: HabitSchedule, privacy?: Privacy, archivedAt?
 - [ ] List view: all check-ins with timestamps, notes, photos
 - [ ] Filter by date range (this week, this month, all time)
 - [ ] Tapping check-in shows detail (note, photo)
+- [ ] Missed days highlighted in calendar view
 
 **Technical Requirements:**
 
