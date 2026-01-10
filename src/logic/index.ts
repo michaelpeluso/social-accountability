@@ -10,3 +10,4 @@ export * from "./recovery";
 export * from "./dates";
 export * from "./pillarScores";
 export * from "./dashboardSummary";
+export * from "./badges";

@@ -43,6 +43,12 @@ export default function Index() {
           <Text style={styles.primaryButtonText}>Habits</Text>
           <Text style={styles.primaryButtonSubtext}>Build daily routines</Text>
         </Pressable>
+
+        <Pressable style={styles.primaryButton} onPress={() => router.push("/feed")}>
+          <Text style={styles.primaryButtonEmoji}>📱</Text>
+          <Text style={styles.primaryButtonText}>Feed</Text>
+          <Text style={styles.primaryButtonSubtext}>See what friends are up to</Text>
+        </Pressable>
       </View>
 
       {/* Navigation */}

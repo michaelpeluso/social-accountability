@@ -13,3 +13,5 @@ export { PrivacyPicker } from "./PrivacyPicker";
 
 export { DataSourcePicker } from "./DataSourcePicker";
 export type { DataSourceOption } from "./DataSourcePicker";
+
+export { NudgePicker } from "./NudgePicker";

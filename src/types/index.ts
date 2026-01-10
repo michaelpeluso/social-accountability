@@ -189,22 +189,191 @@ export type Post = {
   privacy: Privacy;
   bodyText?: string;
   mediaUrl?: string;
+  // Optional link to a check-in
+  linkedCheckInId?: string;
+  linkedHabitId?: string;
+  // Edit tracking
+  editedAt?: string;
   createdAt: string;
+  syncedAt?: string;
 };
 
 export type Reaction = {
   id: string;
   postId: string;
   userId: string;
-  emoji: string;
+  emoji: ReactionEmoji;
   createdAt: string;
+  syncedAt?: string;
 };
+
+// Fixed set of allowed reaction emojis
+export type ReactionEmoji = "👏" | "🔥" | "💪" | "❤️" | "✨";
+
+export const ALLOWED_REACTIONS: ReactionEmoji[] = ["👏", "🔥", "💪", "❤️", "✨"];
 
 export type Nudge = {
   id: string;
   fromUserId: string;
   toUserId: string;
-  templateId: string;
+  templateId: NudgeTemplateId;
+  createdAt: string;
+  syncedAt?: string;
+};
+
+// Nudge templates (fixed set for positive-only messages)
+export type NudgeTemplateId =
+  | "keep-it-up"
+  | "proud-streak"
+  | "you-got-this"
+  | "dont-break-chain"
+  | "lets-do-together";
+
+export const NUDGE_TEMPLATES: Record<NudgeTemplateId, { text: string; emoji: string }> = {
+  "keep-it-up": { text: "Keep it up!", emoji: "💪" },
+  "proud-streak": { text: "Proud of your streak!", emoji: "🔥" },
+  "you-got-this": { text: "You've got this!", emoji: "✨" },
+  "dont-break-chain": { text: "Don't break the chain!", emoji: "⛓️" },
+  "lets-do-together": { text: "Let's do this together!", emoji: "🙌" },
+};
+
+// Badge Types
+export type BadgeType =
+  // Streak badges
+  | "streak-7"
+  | "streak-30"
+  | "streak-100"
+  // Milestone badges
+  | "habits-10"
+  | "checkins-100"
+  | "checkins-1000"
+  // Recovery badges
+  | "recovery-3"
+  | "recovery-7"
+  // Pillar badges
+  | "pillar-mind-90"
+  | "pillar-body-90"
+  | "pillar-heart-90"
+  | "pillar-soul-90"
+  // Social badges
+  | "reactions-50"
+  | "nudges-10";
+
+export type Badge = {
+  id: string;
+  userId: string;
+  badgeType: BadgeType;
+  earnedAt: string;
+  sharedAt?: string; // If user shared badge as post
+  syncedAt?: string;
+};
+
+export const BADGE_INFO: Record<
+  BadgeType,
+  {
+    name: string;
+    description: string;
+    emoji: string;
+    rarity: "common" | "rare" | "epic" | "legendary";
+  }
+> = {
+  "streak-7": { name: "Week Warrior", description: "7-day streak", emoji: "🔥", rarity: "common" },
+  "streak-30": {
+    name: "Monthly Master",
+    description: "30-day streak",
+    emoji: "🏆",
+    rarity: "rare",
+  },
+  "streak-100": {
+    name: "Century Club",
+    description: "100-day streak",
+    emoji: "💯",
+    rarity: "epic",
+  },
+  "habits-10": {
+    name: "Habit Builder",
+    description: "Created 10 habits",
+    emoji: "🛠️",
+    rarity: "common",
+  },
+  "checkins-100": {
+    name: "Consistent",
+    description: "100 check-ins logged",
+    emoji: "✅",
+    rarity: "common",
+  },
+  "checkins-1000": {
+    name: "Dedication",
+    description: "1000 check-ins logged",
+    emoji: "⭐",
+    rarity: "epic",
+  },
+  "recovery-3": {
+    name: "Comeback Kid",
+    description: "Recovered after 3-day miss",
+    emoji: "💪",
+    rarity: "common",
+  },
+  "recovery-7": {
+    name: "Resilient",
+    description: "Recovered after 7-day miss",
+    emoji: "🦸",
+    rarity: "rare",
+  },
+  "pillar-mind-90": {
+    name: "Sharp Mind",
+    description: "90% MIND completion for a month",
+    emoji: "🧠",
+    rarity: "rare",
+  },
+  "pillar-body-90": {
+    name: "Peak Physical",
+    description: "90% BODY completion for a month",
+    emoji: "💪",
+    rarity: "rare",
+  },
+  "pillar-heart-90": {
+    name: "Big Heart",
+    description: "90% HEART completion for a month",
+    emoji: "❤️",
+    rarity: "rare",
+  },
+  "pillar-soul-90": {
+    name: "Soulful",
+    description: "90% SOUL completion for a month",
+    emoji: "✨",
+    rarity: "rare",
+  },
+  "reactions-50": {
+    name: "Supporter",
+    description: "Gave 50 reactions",
+    emoji: "👏",
+    rarity: "common",
+  },
+  "nudges-10": {
+    name: "Cheerleader",
+    description: "Sent 10 nudges",
+    emoji: "📣",
+    rarity: "common",
+  },
+};
+
+// Notification Types
+export type NotificationType =
+  | "REACTION_RECEIVED"
+  | "NUDGE_RECEIVED"
+  | "BADGE_EARNED"
+  | "FRIEND_POSTED"
+  | "HABIT_REMINDER";
+
+export type AppNotification = {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  data?: Record<string, string>; // Navigation data
+  read: boolean;
   createdAt: string;
 };
 
@@ -257,13 +426,40 @@ export type CreatePostRequest = {
   bodyText?: string;
   mediaUrl?: string;
   circleId?: string;
+  linkedCheckInId?: string;
+  linkedHabitId?: string;
 };
 
 export type CreateReactionRequest = {
-  emoji: string;
+  postId: string;
+  emoji: ReactionEmoji;
 };
 
 export type CreateNudgeRequest = {
   toUserId: string;
-  templateId: string;
+  templateId: NudgeTemplateId;
 };
+
+export type CreateBadgeRequest = {
+  userId: string;
+  badgeType: BadgeType;
+};
+
+// Feed types
+export type FeedScope = "friends" | "discover" | "mine";
+
+export type FeedPost = Post & {
+  authorName: string;
+  authorAvatarUrl?: string;
+  reactions: { emoji: ReactionEmoji; count: number; userReacted: boolean }[];
+  linkedHabitTitle?: string;
+  linkedCheckInDate?: string;
+};
+
+// Rate limit constants
+export const RATE_LIMITS = {
+  POSTS_PER_DAY: 20,
+  REACTIONS_PER_DAY: 100,
+  NUDGES_PER_PAIR_PER_DAY: 3,
+  NUDGES_TOTAL_PER_DAY: 10,
+} as const;
