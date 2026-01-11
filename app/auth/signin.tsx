@@ -16,6 +16,8 @@ import { auth, isAppleAuthAvailable } from "../../src/services/auth";
 import { api } from "../../src/services/api";
 import { logger } from "../../src/lib/logger";
 import { useTheme } from "../../src/theme";
+import { spacing, borderRadius } from "../../src/theme/spacing";
+import { typography } from "../../src/theme/typography";
 
 export default function SignIn() {
   const { theme } = useTheme();
@@ -203,19 +205,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 32,
+    padding: spacing.xl,
   },
   header: {
     alignItems: "center",
     marginTop: 80,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "700",
-    marginBottom: 8,
+    fontSize: typography.fontSize.xxxl,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
   },
   buttonContainer: {
     width: "100%",
@@ -228,29 +230,29 @@ const styles = StyleSheet.create({
   mockButton: {
     width: 280,
     height: 50,
-    borderRadius: 8,
+    borderRadius: borderRadius.md,
     justifyContent: "center",
     alignItems: "center",
   },
   mockButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
   },
   error: {
-    marginTop: 16,
+    marginTop: spacing.md,
     textAlign: "center",
   },
   footer: {
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     textAlign: "center",
-    marginBottom: 32,
+    marginBottom: spacing.xl,
   },
   forgotButton: {
-    marginTop: 24,
-    padding: 8,
+    marginTop: spacing.lg,
+    padding: spacing.sm,
   },
   forgotText: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
   },
   modalContainer: {
     flex: 1,
@@ -259,41 +261,41 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
+    padding: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
   },
   modalClose: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
   },
   modalContent: {
-    padding: 24,
+    padding: spacing.lg,
   },
   recoveryDescription: {
-    fontSize: 14,
-    marginBottom: 24,
+    fontSize: typography.fontSize.sm,
+    marginBottom: spacing.lg,
     lineHeight: 20,
   },
   recoveryInput: {
     borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 16,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    fontSize: typography.fontSize.base,
+    marginBottom: spacing.md,
   },
   recoveryButton: {
-    padding: 16,
-    borderRadius: 8,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
     alignItems: "center",
   },
   recoveryButtonDisabled: {
     opacity: 0.5,
   },
   recoveryButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

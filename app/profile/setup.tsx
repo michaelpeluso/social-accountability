@@ -19,6 +19,8 @@ import { api } from "../../src/services/api";
 import { logger } from "../../src/lib/logger";
 import { validateDisplayName, validateBio, limits, isNearLimit } from "../../src/lib/validation";
 import { useTheme } from "../../src/theme";
+import { spacing, borderRadius } from "../../src/theme/spacing";
+import { typography } from "../../src/theme/typography";
 
 const MAX_BIO_LENGTH = limits.bio.max;
 const MAX_DISPLAY_NAME_LENGTH = limits.displayName.max;
@@ -318,33 +320,33 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    padding: 24,
+    padding: spacing.lg,
   },
   header: {
     marginTop: 40,
-    marginBottom: 32,
+    marginBottom: spacing.xl,
   },
   title: {
     fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 8,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
   },
   form: {
     flex: 1,
   },
   photoSection: {
     alignItems: "center",
-    marginBottom: 32,
+    marginBottom: spacing.xl,
   },
   photoContainer: {
     width: 100,
     height: 100,
-    borderRadius: 50,
+    borderRadius: borderRadius.full,
     overflow: "hidden",
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   photo: {
     width: "100%",
@@ -357,32 +359,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 2,
     borderStyle: "dashed",
-    borderRadius: 50,
+    borderRadius: borderRadius.full,
   },
   photoPlaceholderText: {
-    fontSize: 32,
+    fontSize: typography.fontSize.xxxl,
   },
   photoLabel: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
   },
   photoHint: {
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: typography.fontSize.xs,
+    marginTop: spacing.xs,
   },
   field: {
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
   label: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 8,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.sm,
   },
   input: {
     borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    fontSize: typography.fontSize.base,
   },
   inputError: {
     borderColor: "#ff3b30",
@@ -394,32 +396,32 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
   fieldError: {
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     flex: 1,
-    marginRight: 8,
+    marginRight: spacing.sm,
   },
   counter: {
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     textAlign: "right",
   },
   error: {
-    marginBottom: 16,
+    marginBottom: spacing.md,
     textAlign: "center",
   },
   button: {
-    borderRadius: 8,
-    padding: 16,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
     alignItems: "center",
-    marginTop: 16,
+    marginTop: spacing.md,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

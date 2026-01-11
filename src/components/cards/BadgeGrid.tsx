@@ -5,6 +5,8 @@
 
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import type { BadgeWithInfo } from "../../storage/badges";
+import { spacing, borderRadius } from "../../theme/spacing";
+import { typography } from "../../theme/typography";
 
 type BadgeGridProps = {
   badges: BadgeWithInfo[];
@@ -135,31 +137,31 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
-    padding: 16,
+    gap: borderRadius.lg,
+    padding: spacing.md,
   },
   badgeCard: {
     width: "30%",
     aspectRatio: 1,
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
     borderWidth: 2,
-    padding: 8,
+    padding: borderRadius.md,
     alignItems: "center",
     justifyContent: "center",
   },
   badgeEmoji: {
     fontSize: 28,
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   badgeName: {
     fontSize: 11,
-    fontWeight: "600",
+    fontWeight: typography.fontWeight.semibold,
     textAlign: "center",
   },
   badgeRarity: {
     fontSize: 8,
     color: "#999",
-    marginTop: 2,
+    marginTop: spacing.xxs,
   },
 
   // Empty State
@@ -169,71 +171,71 @@ const styles = StyleSheet.create({
   },
   emptyEmoji: {
     fontSize: 48,
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   emptyText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
     color: "#666",
-    marginBottom: 8,
+    marginBottom: borderRadius.md,
   },
   emptySubtext: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
     color: "#999",
     textAlign: "center",
   },
 
   // Detail Styles
   detailContainer: {
-    padding: 24,
-    borderRadius: 16,
+    padding: spacing.lg,
+    borderRadius: spacing.md,
     alignItems: "center",
-    margin: 16,
+    margin: spacing.md,
   },
   detailEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
+    fontSize: typography.fontSize.hero,
+    marginBottom: spacing.md,
   },
   detailName: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 8,
+    fontSize: typography.fontSize.xxl,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: borderRadius.md,
   },
   detailDescription: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
     color: "#666",
     textAlign: "center",
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   rarityBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 16,
+    paddingHorizontal: borderRadius.lg,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.md,
   },
   rarityBadgeText: {
     color: "#fff",
-    fontSize: 12,
-    fontWeight: "bold",
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
   },
   earnedDate: {
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     color: "#888",
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   shareButton: {
     backgroundColor: "#007AFF",
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 20,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: borderRadius.lg,
+    borderRadius: borderRadius.xxl,
   },
   shareButtonText: {
     color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
   },
   sharedText: {
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     color: "#4caf50",
     fontStyle: "italic",
   },
@@ -242,33 +244,33 @@ const styles = StyleSheet.create({
   summaryContainer: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    padding: spacing.md,
     backgroundColor: "#f8f8f8",
-    borderRadius: 12,
-    margin: 16,
+    borderRadius: borderRadius.lg,
+    margin: spacing.md,
   },
   summaryEmoji: {
-    fontSize: 32,
-    marginRight: 12,
+    fontSize: typography.fontSize.xxxl,
+    marginRight: borderRadius.lg,
   },
   summaryContent: {
     flex: 1,
   },
   summaryTotal: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
   },
   summaryBreakdown: {
     flexDirection: "row",
-    gap: 8,
-    marginTop: 4,
+    gap: borderRadius.md,
+    marginTop: spacing.xs,
   },
   summaryRarity: {
-    fontSize: 12,
-    fontWeight: "500",
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
   },
   summaryArrow: {
-    fontSize: 18,
+    fontSize: typography.fontSize.lg,
     color: "#999",
   },
 });

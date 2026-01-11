@@ -21,6 +21,8 @@ import { auth } from "../../src/services/auth";
 import { createPost } from "../../src/storage/posts";
 import type { Pillar, Privacy } from "../../src/types";
 import { useTheme } from "../../src/theme";
+import { spacing, borderRadius } from "../../src/theme/spacing";
+import { typography } from "../../src/theme/typography";
 
 const PILLARS: { value: Pillar; label: string; emoji: string }[] = [
   { value: "MIND", label: "Mind", emoji: "🧠" },
@@ -227,89 +229,89 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
   },
   cancelButton: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
   },
   title: {
-    fontSize: 17,
-    fontWeight: "600",
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
   },
   postButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.xl,
   },
   postButtonDisabled: {
     opacity: 0.5,
   },
   postButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
   },
   scrollView: {
     flex: 1,
   },
   inputSection: {
-    padding: 16,
+    padding: spacing.md,
     borderBottomWidth: 1,
   },
   textInput: {
-    fontSize: 17,
+    fontSize: typography.fontSize.md,
     lineHeight: 24,
     minHeight: 120,
     textAlignVertical: "top",
   },
   charCount: {
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     textAlign: "right",
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   section: {
-    padding: 16,
+    padding: spacing.md,
     borderBottomWidth: 1,
   },
   sectionLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 12,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.sm,
   },
   pillarsRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: spacing.sm,
   },
   pillarChip: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    padding: 12,
-    borderRadius: 12,
-    gap: 6,
+    padding: spacing.sm,
+    borderRadius: borderRadius.lg,
+    gap: spacing.xs + 2,
   },
   pillarEmoji: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
   },
   pillarLabel: {
     fontSize: 13,
   },
   privacyOptions: {
-    gap: 12,
+    gap: spacing.sm,
   },
   privacyOption: {
-    padding: 12,
-    borderRadius: 12,
+    padding: spacing.sm,
+    borderRadius: borderRadius.lg,
     borderWidth: 2,
     borderColor: "transparent",
   },
   privacyHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    marginBottom: 4,
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
   },
   radio: {
     width: 20,
@@ -325,8 +327,8 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   privacyLabel: {
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
   },
   privacyDescription: {
     fontSize: 13,

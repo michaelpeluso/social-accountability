@@ -21,6 +21,8 @@ import { getFeedPosts } from "../../src/storage/posts";
 import type { FeedPost, FeedScope } from "../../src/types";
 import { PostCard } from "../../src/components/cards/PostCard";
 import { useTheme } from "../../src/theme";
+import { spacing, borderRadius } from "../../src/theme/spacing";
+import { typography } from "../../src/theme/typography";
 
 const SCOPES: { key: FeedScope; label: string }[] = [
   { key: "friends", label: "Friends" },
@@ -177,43 +179,43 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
   },
   backButton: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
   },
   title: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
   },
   createButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: borderRadius.xl,
   },
   createButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
   },
   scopeTabs: {
     flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
     borderBottomWidth: 1,
   },
   scopeTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.xxl,
   },
   scopeTabText: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
   },
   scopeTabTextActive: {
-    fontWeight: "600",
+    fontWeight: typography.fontWeight.semibold,
   },
   loadingContainer: {
     flex: 1,
@@ -224,27 +226,27 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 40,
+    padding: spacing.xxl - 8,
   },
   emptyEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
+    fontSize: typography.fontSize.hero,
+    marginBottom: spacing.md,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
     textAlign: "center",
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
   emptyButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 24,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.xxxl,
   },
   emptyButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
   },
   listContent: {
-    padding: 16,
+    padding: spacing.md,
   },
 });

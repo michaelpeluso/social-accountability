@@ -7,6 +7,8 @@ import { useState } from "react";
 import { View, Text, StyleSheet, Pressable, Modal, Alert } from "react-native";
 import { NUDGE_TEMPLATES, type NudgeTemplateId } from "../../types";
 import { sendNudge, getNudgeRateLimitStatus } from "../../storage/nudges";
+import { spacing, borderRadius } from "../../theme/spacing";
+import { typography } from "../../theme/typography";
 
 type NudgePickerProps = {
   visible: boolean;
@@ -126,71 +128,71 @@ const styles = StyleSheet.create({
   },
   container: {
     backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 40,
+    borderTopLeftRadius: borderRadius.xxl,
+    borderTopRightRadius: borderRadius.xxl,
+    padding: borderRadius.xxl,
+    paddingBottom: spacing.xxl - 8,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   title: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
   },
   closeButton: {
-    padding: 8,
+    padding: spacing.sm,
   },
   closeButtonText: {
-    fontSize: 18,
+    fontSize: typography.fontSize.lg,
     color: "#666",
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
     color: "#666",
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   rateLimitInfo: {
     backgroundColor: "#f5f5f5",
-    padding: 8,
-    borderRadius: 8,
-    marginBottom: 16,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
   },
   rateLimitText: {
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     color: "#666",
     textAlign: "center",
   },
   templates: {
-    gap: 12,
-    marginBottom: 20,
+    gap: spacing.xmd + 2,
+    marginBottom: borderRadius.xxl,
   },
   templateOption: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    padding: spacing.md,
     backgroundColor: "#f8f8f8",
-    borderRadius: 12,
-    gap: 12,
+    borderRadius: borderRadius.lg,
+    gap: spacing.xmd + 2,
   },
   templateEmoji: {
-    fontSize: 24,
+    fontSize: typography.fontSize.xxl,
   },
   templateText: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
     flex: 1,
   },
   cancelButton: {
     alignItems: "center",
-    padding: 16,
+    padding: spacing.md,
     backgroundColor: "#f0f0f0",
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
   },
   cancelButtonText: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
     color: "#666",
   },
 });

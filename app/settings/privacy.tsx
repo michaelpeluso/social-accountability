@@ -14,6 +14,8 @@ import { api } from "../../src/services/api";
 import { logger } from "../../src/lib/logger";
 import type { Privacy, User } from "../../src/types/user";
 import { useTheme } from "../../src/theme";
+import { spacing, borderRadius } from "../../src/theme/spacing";
+import { typography } from "../../src/theme/typography";
 
 const PRIVACY_OPTIONS: { value: Privacy; label: string; description: string }[] = [
   {
@@ -181,40 +183,40 @@ const styles = StyleSheet.create({
   },
   section: {
     marginTop: 20,
-    padding: 16,
+    padding: spacing.md,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 8,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.sm,
   },
   sectionDescription: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
     marginBottom: 20,
     lineHeight: 20,
   },
   option: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
   },
   optionContent: {
     flex: 1,
   },
   optionLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 4,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.xs,
   },
   optionDescription: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
   },
   radio: {
     width: 24,
     height: 24,
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
     borderWidth: 2,
     justifyContent: "center",
     alignItems: "center",
@@ -222,19 +224,19 @@ const styles = StyleSheet.create({
   radioInner: {
     width: 12,
     height: 12,
-    borderRadius: 6,
+    borderRadius: spacing.xs + 2,
   },
   saveButton: {
     margin: 20,
-    padding: 16,
-    borderRadius: 8,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
     alignItems: "center",
   },
   saveButtonDisabled: {
     opacity: 0.6,
   },
   saveButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

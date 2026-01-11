@@ -6,6 +6,8 @@
 import { useState } from "react";
 import { View, Text, StyleSheet, Pressable, Image } from "react-native";
 import type { FeedPost, ReactionEmoji } from "../../types";
+import { spacing, borderRadius } from "../../theme/spacing";
+import { typography } from "../../theme/typography";
 import { ALLOWED_REACTIONS } from "../../types";
 import { toggleReaction } from "../../storage/reactions";
 import { formatRelativeTime } from "../../logic/dates";
@@ -138,9 +140,9 @@ export function PostCard({ post, onPress, currentUserId }: PostCardProps) {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: borderRadius.lg,
     borderWidth: 1,
     borderColor: "#eee",
     shadowColor: "#000",
@@ -152,7 +154,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: borderRadius.lg,
   },
   avatar: {
     width: 40,
@@ -161,7 +163,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+    marginRight: borderRadius.lg,
   },
   avatarImage: {
     width: 40,
@@ -170,38 +172,38 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: "#fff",
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
   },
   authorInfo: {
     flex: 1,
   },
   authorName: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: typography.fontWeight.semibold,
     color: "#000",
   },
   timestamp: {
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     color: "#888",
-    marginTop: 2,
+    marginTop: spacing.xxs,
   },
   pillarBadge: {
     backgroundColor: "#f0f0f0",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: borderRadius.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
   },
   pillarText: {
     fontSize: 11,
     color: "#666",
-    fontWeight: "500",
+    fontWeight: typography.fontWeight.medium,
   },
   linkedHabit: {
     backgroundColor: "#e8f5e9",
-    padding: 8,
-    borderRadius: 8,
-    marginBottom: 12,
+    padding: borderRadius.md,
+    borderRadius: borderRadius.md,
+    marginBottom: borderRadius.lg,
   },
   linkedHabitText: {
     fontSize: 13,
@@ -211,27 +213,27 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: "#333",
-    marginBottom: 12,
+    marginBottom: borderRadius.lg,
   },
   media: {
     width: "100%",
     height: 200,
-    borderRadius: 8,
-    marginBottom: 12,
+    borderRadius: borderRadius.md,
+    marginBottom: borderRadius.lg,
   },
   reactionsBar: {
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 12,
+    paddingTop: borderRadius.lg,
     borderTopWidth: 1,
     borderTopColor: "#f0f0f0",
   },
   reactButton: {
-    paddingHorizontal: 12,
+    paddingHorizontal: borderRadius.lg,
     paddingVertical: 6,
     backgroundColor: "#f5f5f5",
-    borderRadius: 16,
-    marginRight: 8,
+    borderRadius: spacing.md,
+    marginRight: borderRadius.md,
   },
   reactButtonText: {
     fontSize: 13,
@@ -244,10 +246,10 @@ const styles = StyleSheet.create({
   reactionChip: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: borderRadius.md,
+    paddingVertical: spacing.xs,
     backgroundColor: "#f5f5f5",
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
   },
   reactionChipActive: {
     backgroundColor: "#e3f2fd",
@@ -255,22 +257,22 @@ const styles = StyleSheet.create({
     borderColor: "#007AFF",
   },
   reactionEmoji: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
   },
   reactionCount: {
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     color: "#666",
-    marginLeft: 4,
+    marginLeft: spacing.xs,
   },
   reactionPicker: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 16,
-    paddingTop: 12,
-    paddingBottom: 4,
+    gap: spacing.md,
+    paddingTop: borderRadius.lg,
+    paddingBottom: spacing.xs,
   },
   reactionPickerItem: {
-    padding: 8,
+    padding: borderRadius.md,
   },
   reactionPickerEmoji: {
     fontSize: 28,
@@ -280,6 +282,6 @@ const styles = StyleSheet.create({
     color: "#999",
     fontStyle: "italic",
     textAlign: "right",
-    marginTop: 8,
+    marginTop: borderRadius.md,
   },
 });

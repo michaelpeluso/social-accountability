@@ -729,6 +729,288 @@ enum ChallengeType {
 
 ---
 
+### 5.10 Habit Signals (Ribbons + Warnings)
+
+Story:
+As a user, I want clear visual signals on my habits so I can instantly see what’s going well (ribbons) and what needs attention (warnings) without reading metrics.
+
+Overview:
+Habit Signals are lightweight visual markers attached to habit icons. These attributes should linked to the habit, so it shows in the habit menu but also will be listed in its own ribbon/warning sections on the dashboard.
+
+- Ribbons = positive achievements
+- Warnings = negative or risk states
+- A habit can show only ONE signal at a time (either a ribbon OR a warning)
+- Signals are relative, not absolute
+
+Visual System:
+
+Ribbons (Positive):
+[icon]
+horizontal colored ribbon across icon
+short label (1 word)
+muted positive color
+
+Warnings (Negative):
+[icon]
+small triangle or flag in bottom-right
+short label (1 word)
+yellow = early risk, red = confirmed issue
+
+Acceptance Criteria:
+
+- Habit shows either a ribbon OR a warning, never both
+- Signals are computed weekly (default), optionally monthly
+- Signals are relative across the user’s habits
+- No numbers or percentages shown
+- Tap signal opens habit insight detail
+- Signals auto-update and auto-clear
+- Signals respect habit privacy settings
+
+Ribbon Set (Positive):
+
+- Consistent
+- Longest
+- Completed
+- Recovered
+- High-Effort
+
+Warning Set (Negative):
+
+- Avoided
+- Lapsed
+- Missed
+- Reset
+- Low-Effort
+
+Ribbon ↔ Warning Mapping:
+Consistent ↔ Avoided
+Longest ↔ Lapsed
+Completed ↔ Missed
+Recovered ↔ Reset
+High-Effort ↔ Low-Effort
+
+Signal Selection Logic (Device-Side):
+
+function assignHabitSignals(habits, window) {
+const stats = computeHabitStats(habits, window);
+
+const positives = {
+consistent: maxBy(stats, 'completionRate'),
+longest: maxBy(stats, 'currentStreak'),
+completed: maxBy(stats, 'completionCount'),
+recovered: maxBy(stats, 'recoveryCount'),
+highEffort: maxBy(stats, 'avgIntensity'),
+};
+
+const negatives = {
+avoided: minBy(stats, 'completionRate'),
+lapsed: minBy(stats, 'daysSinceLapse'),
+missed: maxBy(stats, 'missCount'),
+reset: maxBy(stats, 'resetCount'),
+lowEffort: minBy(stats, 'avgIntensity'),
+};
+
+return resolveConflicts(positives, negatives);
+}
+
+Rules:
+
+- Minimum data threshold required
+- If difference is insignificant, no signal shown
+- BREAK habits prefer recovery framing
+- Warnings override ribbons when both apply
+
+Dashboard Example:
+Gym → Consistent
+Reading → Longest
+No Social Media → Avoided
+Meditation → Lapsed
+
+Interaction:
+
+- Tap ribbon: “This was your most consistent habit this week”
+- Tap warning: “This habit was most missed this week”
+- No forced actions or shame language
+
+Privacy:
+
+- Signals inherit habit visibility
+- No metrics exposed via signals
+- Warnings never auto-posted socially
+
+Why:
+Separating ribbons (wins) from warnings (attention signals) keeps achievements meaningful, reduces shame, and makes the dashboard instantly readable.
+
+Cost: $0
+
+---
+
+### 5.11 Habit Spectrum (Coupled Analytics Bar)
+
+Story:
+As a user, I want to see a simple visual spectrum on each habit page so I can understand where this habit falls between positive and negative extremes at a glance.
+
+Overview:
+The Habit Spectrum is a horizontal gradient bar shown on each habit detail page.
+It visualizes a habit’s position between two coupled attributes (positive ↔ negative). When clicked, take user to the scoreboard page that shows all habits and their spectrums.
+
+The spectrum is descriptive, not judgmental.
+
+Visual Format:
+consistent ─────●───── avoided
+
+- Left label = positive attribute
+- Right label = negative attribute
+- Dot position = relative placement within window
+- No numbers shown
+
+Acceptance Criteria:
+
+- Each habit page displays 1–3 spectrum bars
+- Each spectrum uses paired opposites
+- Dot position updates automatically per time window
+- Labels are static and consistent across habits
+- Bars are read-only (no interaction required)
+
+Coupled Attribute Pairs:
+
+- Consistent ↔ Avoided
+- Longest ↔ Lapsed
+- Completed ↔ Missed
+- Recovered ↔ Reset
+- High-Effort ↔ Low-Effort
+
+Bar Behavior:
+
+- Dot is centered when habit is neutral
+- Dot shifts left as positive signal strengthens
+- Dot shifts right as negative signal strengthens
+- Bars animate smoothly on update
+
+Selection Logic:
+
+- Pairs shown depend on habit type (BUILD vs BREAK)
+- Maximum of 3 bars per habit page
+- Bars chosen based on strongest signals for that habit
+
+Computation Logic:
+
+function computeHabitSpectrum(habit, window) {
+return {
+consistency: normalize(habit.completionRate),
+streak: normalize(habit.currentStreak),
+completion: normalize(habit.completionCount),
+recovery: normalize(habit.recoveryScore),
+effort: normalize(habit.avgIntensity),
+};
+}
+
+Normalization Rules:
+
+- Values scaled to -1.0 → +1.0
+- 0 = neutral baseline
+- Negative values lean toward right-side label
+- Positive values lean toward left-side label
+
+Example Habit Page:
+Habit: Morning Workout
+
+Consistency:
+consistent ─────●───── avoided
+
+Effort:
+high-effort ───●────── low-effort
+
+Streak:
+longest ───────●─── lapsed
+
+Interaction:
+
+- Tap bar opens explanation tooltip
+- Tooltip explains what moves the dot
+- No raw metrics shown
+
+Privacy:
+
+- Spectrum bars visible only to habit owner
+- Shared views show ribbons/warnings only
+- No spectrum values exposed socially
+
+Why:
+The spectrum bar conveys nuance better than binary states, helping users understand trends without numbers or shame.
+
+Cost: $0
+
+---
+
+### 5.12 Spectrum Highlights (Top Signals)
+
+Story:
+As a user, I want the most important positive and negative habits for a selected spectrum to be highlighted at the top of the scoreboard so I can instantly see my best and worst habits before scanning the full list.
+
+Overview:
+Spectrum Highlights are two pinned habit cards shown at the top of a Habit Spectrum Scoreboard.
+
+- One represents the positive extreme (ribbon habit)
+- One represents the negative extreme (warning habit)
+
+These are the same habits that receive ribbons or warnings elsewhere in the app.
+
+Placement:
+
+- Always pinned at the top of the Spectrum Scoreboard
+- Displayed before the full sorted list
+- Visually separated from the rest of the list
+
+Visual Layout:
+
+BEST
+[icon] Morning Workout
+━━ CONSISTENT ━━
+
+NEEDS ATTENTION
+[icon] No Late Scrolling
+⚠️ AVOIDED
+
+All Habits (Sorted)
+[icon] Reading consistent ───●──── avoided
+[icon] Journaling consistent ─────●── avoided
+[icon] Meditation consistent ───────● avoided
+
+Acceptance Criteria:
+
+- Exactly two highlight slots shown when data exists
+- Positive slot shows habit with ribbon
+- Negative slot shows habit with warning
+- If only one extreme exists, show only one slot
+- If no clear extremes, hide highlight section entirely
+- Highlights update with time window changes
+
+Logic:
+
+- Highlight habits are selected using the same logic as ribbons/warnings
+- No additional calculations required
+- Highlights are read-only and informational
+
+Interaction:
+
+- Tap highlighted habit → opens habit detail page
+- Tap ribbon or warning → opens spectrum explanation
+- No actions (no dismiss, no hide)
+
+Privacy:
+
+- Highlights inherit habit visibility
+- Never shown in shared or social views
+- No metrics or ranks exposed
+
+Why:
+Pinning the strongest positive and negative signals at the top reduces cognitive load, guides attention, and makes the scoreboard instantly useful without forcing users to interpret the full list.
+
+Cost: $0
+
+---
+
 ## Validation Checklist
 
 - [ ] BUILD/BREAK habits created with different icons
@@ -736,6 +1018,7 @@ enum ChallengeType {
 - [ ] Habit stacking detected and displayed
 - [ ] HealthKit permission requested and steps tracked
 - [ ] Challenges created, joined, leaderboard updates
+- [ ] Habit Signals
 
 ---
 

@@ -10,6 +10,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { seedDemoData, clearDemoData, hasDemoData } from "@/storage";
 import { useTheme } from "@/theme";
+import { spacing, borderRadius } from "@/theme/spacing";
+import { typography } from "@/theme/typography";
 
 export default function DevToolsScreen() {
   const { theme } = useTheme();
@@ -200,44 +202,44 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    padding: 16,
+    padding: spacing.md,
     borderBottomWidth: 1,
     flexDirection: "row",
     alignItems: "center",
   },
   backButton: {
-    padding: 4,
-    marginRight: 12,
+    padding: spacing.xs,
+    marginRight: spacing.sm,
   },
   backButtonText: {
-    fontSize: 32,
-    fontWeight: "400",
+    fontSize: typography.fontSize.xxxl,
+    fontWeight: typography.fontWeight.normal,
   },
   headerContent: {
     flex: 1,
   },
   title: {
-    fontSize: 24,
-    fontWeight: "700",
+    fontSize: typography.fontSize.xxl,
+    fontWeight: typography.fontWeight.bold,
     marginBottom: 2,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
   },
   scrollContent: {
     flex: 1,
   },
   section: {
-    padding: 16,
+    padding: spacing.md,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 8,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.sm,
   },
   button: {
-    padding: 16,
-    borderRadius: 12,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
     alignItems: "center",
   },
   buttonSecondary: {
@@ -248,37 +250,37 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   buttonText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
   },
   buttonTextSecondary: {},
   buttonDescription: {
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     opacity: 0.8,
     marginTop: 2,
   },
   statusBox: {
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
+    margin: spacing.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
     borderLeftWidth: 4,
   },
   statusText: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
   },
   infoBox: {
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
+    margin: spacing.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
     borderLeftWidth: 4,
   },
   infoTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 8,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.sm,
   },
   infoText: {
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     marginBottom: 2,
   },
 });

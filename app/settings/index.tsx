@@ -20,6 +20,8 @@ import { auth } from "../../src/services/auth";
 import { api } from "../../src/services/api";
 import { logger } from "../../src/lib/logger";
 import { useTheme } from "../../src/theme";
+import { spacing, borderRadius } from "../../src/theme/spacing";
+import { typography } from "../../src/theme/typography";
 import type { User } from "../../src/types/user";
 
 export default function Settings() {
@@ -426,20 +428,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backButton: {
-    padding: 4,
+    padding: spacing.xs,
   },
   backButtonText: {
-    fontSize: 32,
-    fontWeight: "400",
+    fontSize: typography.fontSize.xxxl,
+    fontWeight: typography.fontWeight.normal,
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: "600",
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
   },
   headerSpacer: {
     width: 40,
@@ -451,24 +453,24 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   sectionTitle: {
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
     textTransform: "uppercase",
-    padding: 16,
-    paddingBottom: 8,
+    padding: spacing.md,
+    paddingBottom: spacing.sm,
   },
   item: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 16,
+    padding: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   itemDisabled: {
     opacity: 0.5,
   },
   itemText: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
   },
   itemRow: {
     flex: 1,
@@ -477,21 +479,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   itemValue: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
     maxWidth: 180,
   },
   chevron: {
-    fontSize: 20,
+    fontSize: typography.fontSize.xl,
   },
   dangerText: {
     color: "#ff3b30",
   },
   signOutButton: {
-    padding: 16,
+    padding: spacing.md,
     alignItems: "center",
   },
   signOutText: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
   },
   modalContainer: {
     flex: 1,
@@ -500,35 +502,35 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
+    padding: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
   },
   modalClose: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
   },
   modalContent: {
-    padding: 24,
+    padding: spacing.lg,
   },
   warningText: {
-    fontSize: 16,
-    marginBottom: 12,
+    fontSize: typography.fontSize.base,
+    marginBottom: spacing.sm,
     lineHeight: 22,
   },
   warningList: {
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
   warningItem: {
-    fontSize: 14,
-    marginBottom: 4,
+    fontSize: typography.fontSize.sm,
+    marginBottom: spacing.xs,
   },
   graceNotice: {
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
     borderWidth: 1,
   },
   graceNoticeText: {
@@ -536,31 +538,31 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   exportFirstButton: {
-    padding: 12,
+    padding: spacing.sm,
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: spacing.md,
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: borderRadius.md,
   },
   exportFirstText: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
   },
   confirmLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 8,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.sm,
   },
   confirmInput: {
     borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 24,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    fontSize: typography.fontSize.base,
+    marginBottom: spacing.lg,
   },
   deleteButton: {
-    padding: 16,
-    borderRadius: 8,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
     alignItems: "center",
   },
   deleteButtonDisabled: {
@@ -568,7 +570,7 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

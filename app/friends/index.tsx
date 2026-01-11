@@ -16,6 +16,8 @@ import { api } from "../../src/services/api";
 import { logger } from "../../src/lib/logger";
 import type { User, FriendRequest } from "../../src/types/user";
 import { useTheme } from "../../src/theme";
+import { spacing, borderRadius } from "../../src/theme/spacing";
+import { typography } from "../../src/theme/typography";
 
 type Tab = "friends" | "requests" | "search" | "blocked";
 
@@ -613,20 +615,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backButton: {
-    padding: 4,
+    padding: spacing.xs,
   },
   backButtonText: {
-    fontSize: 32,
-    fontWeight: "400",
+    fontSize: typography.fontSize.xxxl,
+    fontWeight: typography.fontWeight.normal,
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: "600",
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
   },
   headerSpacer: {
     width: 40,
@@ -640,126 +642,126 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    padding: 16,
+    padding: spacing.md,
     alignItems: "center",
   },
   tabActive: {
     borderBottomWidth: 2,
   },
   tabText: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
   },
   tabTextActive: {
-    fontWeight: "600",
+    fontWeight: typography.fontWeight.semibold,
   },
   item: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    padding: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   itemInfo: {
     flex: 1,
   },
   itemName: {
-    fontSize: 16,
-    fontWeight: "500",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
   },
   itemBio: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
     marginTop: 2,
   },
   itemMeta: {
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     marginTop: 2,
   },
   actionButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: borderRadius.sm,
     borderWidth: 1,
   },
   actionButtonText: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
   },
   requestActions: {
     flexDirection: "row",
-    gap: 8,
+    gap: spacing.sm,
   },
   acceptButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: borderRadius.sm,
   },
   acceptButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
   },
   declineButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: borderRadius.sm,
     borderWidth: 1,
   },
   declineButtonText: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
   },
   addButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
   },
   addButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
   },
   empty: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 40,
+    padding: spacing.xxl - 8,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: "500",
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.medium,
   },
   emptySubtext: {
-    fontSize: 14,
-    marginTop: 8,
+    fontSize: typography.fontSize.sm,
+    marginTop: spacing.sm,
     textAlign: "center",
   },
   requestsContainer: {
     flex: 1,
   },
   sectionHeader: {
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
     textTransform: "uppercase",
-    padding: 16,
-    paddingBottom: 8,
+    padding: spacing.md,
+    paddingBottom: spacing.sm,
   },
   searchContainer: {
     flex: 1,
   },
   searchBar: {
     flexDirection: "row",
-    padding: 12,
-    gap: 8,
+    padding: spacing.sm,
+    gap: spacing.sm,
   },
   searchInput: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    fontSize: typography.fontSize.base,
   },
   searchButton: {
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    paddingHorizontal: spacing.lg - 4,
+    borderRadius: borderRadius.md,
     justifyContent: "center",
   },
   searchButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
   },
 });
