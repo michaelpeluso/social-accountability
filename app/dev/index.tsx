@@ -9,6 +9,7 @@ import { View, Text, StyleSheet, Pressable, Alert, ScrollView } from "react-nati
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { seedDemoData, clearDemoData, hasDemoData } from "@/storage";
+import { auth } from "@/services/auth";
 import { useTheme } from "@/theme";
 import { spacing, borderRadius } from "@/theme/spacing";
 import { typography } from "@/theme/typography";
@@ -22,7 +23,9 @@ export default function DevToolsScreen() {
     setLoading(true);
     setStatus("Seeding data...");
     try {
-      const result = await seedDemoData();
+      // Get current user to seed data for them
+      const user = await auth.getUser();
+      const result = await seedDemoData(user?.id);
       setStatus(result.message);
       Alert.alert("Success", result.message);
     } catch (error) {
@@ -111,7 +114,7 @@ export default function DevToolsScreen() {
               Seed Demo Data
             </Text>
             <Text style={[styles.buttonDescription, { color: theme.button.primary.text }]}>
-              Creates 4 users, 4 habits, 7 check-ins, 2 posts
+              Creates 4 users, 3 goals, 6 habits, 40+ check-ins, 4 posts
             </Text>
           </Pressable>
 

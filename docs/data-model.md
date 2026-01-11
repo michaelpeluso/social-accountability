@@ -104,7 +104,7 @@ enum ReactionEmoji {
   FIRE = "🔥",
   STRONG = "💪",
   HEART = "❤️",
-  SPARKLES = "✨",
+  SPARKLES = "🔥",
 }
 ```
 
@@ -157,7 +157,7 @@ const PRESET_IDENTITIES = [
 
   // SOUL
   { name: "Artist", pillar: "SOUL", icon: "🎭" },
-  { name: "Spiritual Seeker", pillar: "SOUL", icon: "✨" },
+  { name: "Spiritual Seeker", pillar: "SOUL", icon: "🔥" },
   { name: "Meditator", pillar: "SOUL", icon: "🧘‍♂️" },
   { name: "Nature Lover", pillar: "SOUL", icon: "🌿" },
 ];
@@ -251,6 +251,96 @@ const PRESET_IDENTITIES = [
 
 - Bidirectional: Creates 2 records (A→B and B→A)
 - isCloseFriend is one-way (A marks B as close, doesn't mean B marks A)
+
+---
+
+### Circle (M8)
+
+```typescript
+{
+  id: string (uuid)
+  ownerUserId: string               // Creator and admin
+  name: string (100 char max)       // "Gym Buddies", "Family", "Work Friends"
+  description?: string (500 char max)
+  privacy: 'INVITE_ONLY' | 'PUBLIC' // INVITE_ONLY = members only, PUBLIC = discoverable
+  createdAt: timestamp
+  archivedAt?: timestamp            // Soft delete
+}
+```
+
+**Indexes:**
+
+- PRIMARY KEY (id)
+- INDEX (ownerUserId, archivedAt)
+- INDEX (privacy) - for discovery
+
+**Purpose:** Private groups with dedicated feeds and group chat (distinct from friends)
+
+**Notes:**
+
+- Users can create multiple Circles for different contexts
+- Each Circle has its own feed (posts scoped to circleId)
+- Each Circle has its own group chat (CircleMessage)
+- Only Circle members can see Circle content
+
+---
+
+### CircleMember (M8)
+
+```typescript
+{
+  circleId: string;
+  userId: string;
+  role: "OWNER" | "MEMBER"; // OWNER = full admin, MEMBER = regular participant
+  joinedAt: timestamp;
+}
+```
+
+**Indexes:**
+
+- PRIMARY KEY (circleId, userId)
+- INDEX (userId) - for "my circles"
+- INDEX (circleId, role)
+
+**Notes:**
+
+- OWNER can: remove members, delete posts/messages, archive Circle, transfer ownership
+- MEMBER can: post to Circle feed, send Circle messages, leave Circle
+- Only accepted friends can be invited to Circles
+
+---
+
+### CircleMessage (M8)
+
+```typescript
+{
+  id: string (uuid)
+  circleId: string
+  fromUserId: string
+  body: string (2000 char max)      // Message text
+  mediaUrl?: string                 // Optional image/video
+  mediaType?: 'photo' | 'video' | 'audio' // Optional - type of media
+  createdAt: timestamp
+  deletedAt?: timestamp             // Soft delete
+  syncedAt?: timestamp
+}
+```
+
+**Indexes:**
+
+- PRIMARY KEY (id)
+- INDEX (circleId, createdAt DESC) - for pagination
+- INDEX (fromUserId)
+- INDEX (deletedAt) - for filtering deleted messages
+
+**Purpose:** Persistent group chat for Circle members
+
+**Notes:**
+
+- Messages are permanent (unless deleted by owner or author)
+- Server must validate Circle membership before returning messages
+- Supports pagination (load latest 50, then older messages)
+- Future: read receipts, typing indicators, threaded replies
 
 ---
 
@@ -489,8 +579,13 @@ const PRESET_IDENTITIES = [
   privacy: Privacy
   bodyText?: string (500 char max)
   mediaUrl?: string                 // Cloudinary URL
+  mediaType?: 'photo' | 'video' | 'chart' // M3 - type of media
   tags: string[]                    // M2 - ['workout', 'progress']
+  postTypeTags?: string[]           // M3 - ['win', 'struggle', 'question', 'reflection'] or custom
   linkedCheckInId?: string          // Optional link to HabitCheckIn
+  linkedObjectId?: string           // M3 - Optional link to habit/goal/milestone/module
+  linkedObjectType?: 'habit' | 'goal' | 'milestone' | 'module' // M3 - Type of linked object
+  contextLocation?: string          // M3 - Location category name (e.g., 'gym', 'home', 'work')
   createdAt: timestamp
 }
 ```
@@ -527,6 +622,7 @@ const PRESET_IDENTITIES = [
   pillar: Pillar
   privacy: Privacy
   mediaUrl: string                  // Required - always has photo/video
+  mediaType: 'photo' | 'video'      // Required - type of media
   caption?: string (280 char max)   // Optional short caption
   tags: string[]                    // M2 - same as Post/Habit
   linkedCheckInId?: string          // Creates HabitCheckIn atomically
@@ -657,6 +753,66 @@ DELETE FROM stories WHERE expiresAt < NOW()
 
 ---
 
+### SavedLocation (M5)
+
+```typescript
+enum LocationCategory {
+  HOME = 'HOME',
+  WORK = 'WORK',
+  SCHOOL = 'SCHOOL',
+  GYM = 'GYM',
+  LIBRARY = 'LIBRARY',
+  CHURCH = 'CHURCH',
+  SOCIAL = 'SOCIAL',
+  ENTERTAINMENT = 'ENTERTAINMENT',
+  CUSTOM = 'CUSTOM'
+}
+
+{
+  id: string (uuid)
+  userId: string
+  name: string                      // User-assigned name: "My Gym", "Office", "Park"
+  category: LocationCategory        // Preset or CUSTOM
+  latitude: number                  // Encrypted at rest
+  longitude: number                 // Encrypted at rest
+  radius: number                    // Meters (e.g., 100m)
+  icon?: string                     // Optional emoji
+  useInContextChips: boolean        // Show in post context (defaults false)
+  createdAt: timestamp
+  updatedAt: timestamp
+}
+```
+
+**Indexes:**
+
+- PRIMARY KEY (id)
+- INDEX (userId)
+- INDEX (userId, useInContextChips) - for post context suggestions
+
+**Privacy:**
+
+- Coordinates encrypted at rest with AES-256
+- Never synced to server in plain text
+- Only category name exposed in posts (never coordinates)
+- User controls which locations appear in context chips
+
+**Purpose:** User-defined locations for triggers and post context
+
+**Examples:**
+
+- "24 Hour Fitness" → GYM category, shows in post context if enabled
+- "Office" → WORK category, used for work/life balance analytics
+- "Riverside Trail" → OUTDOORS category, custom location for outdoor workouts
+
+**Notes:**
+
+- M5: Used for location-based triggers (HabitTrigger)
+- M3: Optionally used for post context chips (category name only, never coords)
+- User must explicitly create locations (no auto-detection)
+- Can delete anytime (cascades to HabitTrigger configs)
+
+---
+
 ### HabitTrigger (M5)
 
 ```typescript
@@ -682,9 +838,7 @@ enum TriggerAction {
   config: {
     // Type-specific configuration
     location?: {
-      latitude: number,
-      longitude: number,
-      radius: number (meters),        // e.g., 100m around gym
+      savedLocationId: string,        // Reference to SavedLocation
       onEnter: boolean,               // Fire when entering
       onExit: boolean                 // Fire when exiting
     }
@@ -735,15 +889,15 @@ enum TriggerAction {
 **Example Flows:**
 
 ```typescript
-// Gym entry
+// Gym entry (references SavedLocation)
 {
   type: 'LOCATION',
   action: 'PROMPT_STORY',
   config: {
-    location: { lat: 40.7, lng: -74.0, radius: 100, onEnter: true }
+    location: { savedLocationId: 'uuid-my-gym', onEnter: true }
   }
 }
-// "At the gym? Share your workout!"
+// "At 24 Hour Fitness? Share your workout!"
 
 // Morning meditation
 {
@@ -891,7 +1045,7 @@ enum BadgeTier {
   - 🧠 Mind badges (100+ MIND check-ins)
   - 💪 Body badges (100+ BODY check-ins)
   - ❤️ Heart badges (100+ HEART check-ins)
-  - ✨ Soul badges (100+ SOUL check-ins)
+  - 🔥 Soul badges (100+ SOUL check-ins)
   - 🌈 Balanced (25+ in ALL pillars)
 
 - **Social Badges** (M3):

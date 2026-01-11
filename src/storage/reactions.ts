@@ -1,7 +1,7 @@
 /**
  * Reactions Storage Module
  * Handles CRUD operations for post reactions (M3)
- * Fixed emoji set: 👏 🔥 💪 ❤️ ✨
+ * Fixed emoji set: 👍 ❤️ 👏 🔥 📈
  */
 
 import { execute, query, queryFirst } from "./database";
@@ -9,6 +9,8 @@ import { logger } from "../lib/logger";
 import type { Reaction, ReactionEmoji, CreateReactionRequest } from "../types";
 import { ALLOWED_REACTIONS, RATE_LIMITS } from "../types";
 import { checkRateLimit, incrementRateLimit } from "./rateLimits";
+import { notifyReactionReceived } from "./notifications";
+import { showNotificationAlert } from "../services/notificationAlert";
 
 /**
  * Add a reaction to a post (toggle behavior - adds if not exists, removes if exists)
@@ -69,6 +71,32 @@ export async function toggleReaction(
   );
 
   await incrementRateLimit(userId, "reaction", null);
+
+  // Notify post owner (unless they're reacting to their own post)
+  const post = await queryFirst<{ authorUserId: string }>(
+    "SELECT authorUserId FROM posts WHERE id = ?",
+    [postId]
+  );
+
+  if (post && post.authorUserId !== userId) {
+    // Get reactor's name
+    const reactor = await queryFirst<{ displayName: string }>(
+      "SELECT displayName FROM users WHERE id = ?",
+      [userId]
+    );
+    const reactorName = reactor?.displayName || "Someone";
+
+    // Create notification record
+    const notification = await notifyReactionReceived(
+      post.authorUserId,
+      reactorName,
+      emoji,
+      postId
+    );
+
+    // Show alert to simulate system notification
+    showNotificationAlert(notification);
+  }
 
   logger.info("Reaction added", { postId, userId, emoji });
   return { action: "added", reaction };

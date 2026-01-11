@@ -9,6 +9,8 @@ import { logger } from "../lib/logger";
 import type { Nudge, NudgeTemplateId, CreateNudgeRequest } from "../types";
 import { NUDGE_TEMPLATES, RATE_LIMITS } from "../types";
 import { checkRateLimit, incrementRateLimit, getRateLimitCount } from "./rateLimits";
+import { notifyNudgeReceived } from "./notifications";
+import { showNotificationAlert } from "../services/notificationAlert";
 
 /**
  * Send a nudge to a friend
@@ -88,6 +90,25 @@ export async function sendNudge(
     // Increment both rate limits
     await incrementRateLimit(fromUserId, "nudge_pair", toUserId);
     await incrementRateLimit(fromUserId, "nudge_total", null);
+
+    // Get sender's name for the notification
+    const sender = await queryFirst<{ displayName: string }>(
+      "SELECT displayName FROM users WHERE id = ?",
+      [fromUserId]
+    );
+    const senderName = sender?.displayName || "A friend";
+    const template = NUDGE_TEMPLATES[templateId];
+
+    // Create notification record for recipient
+    const notification = await notifyNudgeReceived(
+      toUserId,
+      senderName,
+      template.text,
+      template.emoji
+    );
+
+    // Show alert to simulate system notification
+    showNotificationAlert(notification);
 
     logger.info("Nudge sent", { nudgeId: id, fromUserId, toUserId, templateId });
     return nudge;

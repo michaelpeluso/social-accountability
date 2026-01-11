@@ -3,7 +3,7 @@
  */
 
 import { checkSpecificBadge, checkAndAwardBadges } from "../../src/logic/badges";
-import { queryFirst } from "../../src/storage/database";
+import { query, queryFirst } from "../../src/storage/database";
 import { hasBadge, awardBadge } from "../../src/storage/badges";
 import type { BadgeType } from "../../src/types";
 
@@ -31,7 +31,9 @@ const TEST_USER = "badge_logic_user";
 
 describe("Badge Logic", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
+    // Default mock for query to return empty array (for pillar badge checks)
+    (query as jest.Mock).mockResolvedValue([]);
   });
 
   describe("checkSpecificBadge", () => {

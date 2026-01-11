@@ -34,7 +34,7 @@ const TEST_USER_2 = "nudge_receiver";
 
 describe("Nudges Storage", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     (checkRateLimit as jest.Mock).mockResolvedValue(true);
     (incrementRateLimit as jest.Mock).mockResolvedValue(undefined);
   });
@@ -49,15 +49,6 @@ describe("Nudges Storage", () => {
       (checkRateLimit as jest.Mock).mockResolvedValueOnce(true); // total limit
 
       (execute as jest.Mock).mockResolvedValue({ lastInsertRowId: 1 });
-
-      // Mock final nudge retrieval
-      (queryFirst as jest.Mock).mockResolvedValueOnce({
-        id: "nudge-1",
-        fromUserId: TEST_USER_1,
-        toUserId: TEST_USER_2,
-        templateId: "keep-it-up",
-        createdAt: new Date().toISOString(),
-      });
 
       const result = await sendNudge(TEST_USER_1, {
         toUserId: TEST_USER_2,
@@ -87,7 +78,10 @@ describe("Nudges Storage", () => {
 
     it("should not allow nudging non-friends", async () => {
       // Mock friendship check - return null (not friends)
-      (queryFirst as jest.Mock).mockResolvedValue(null);
+      // Re-setup rate limits after clearing
+      (queryFirst as jest.Mock).mockResolvedValueOnce(null);
+      (checkRateLimit as jest.Mock).mockResolvedValue(true);
+      (incrementRateLimit as jest.Mock).mockResolvedValue(undefined);
 
       const result = await sendNudge(TEST_USER_1, {
         toUserId: "non_friend_user",

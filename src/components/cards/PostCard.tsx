@@ -1,15 +1,17 @@
 /**
  * PostCard Component
  * Displays a single post in the feed with reactions
+ * Reactions are always visible, comments expand on click
  */
 
 import { useState } from "react";
-import { View, Text, StyleSheet, Pressable, Image } from "react-native";
-import type { FeedPost, ReactionEmoji } from "../../types";
+import { View, Text, StyleSheet, Pressable, Image, TextInput } from "react-native";
+import type { FeedPost, ReactionEmoji, Comment } from "../../types";
 import { spacing, borderRadius } from "../../theme/spacing";
 import { typography } from "../../theme/typography";
 import { ALLOWED_REACTIONS } from "../../types";
 import { toggleReaction } from "../../storage/reactions";
+import { createComment, getPostComments } from "../../storage/comments";
 import { formatRelativeTime } from "../../logic/dates";
 
 type PostCardProps = {
@@ -20,7 +22,47 @@ type PostCardProps = {
 
 export function PostCard({ post, onPress, currentUserId }: PostCardProps) {
   const [reactions, setReactions] = useState(post.reactions);
-  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [userReaction, setUserReaction] = useState<ReactionEmoji | null>(
+    // Find the user's current reaction (should be only one)
+    post.reactions.find((r) => r.userReacted)?.emoji ?? null
+  );
+  const [showCommentInput, setShowCommentInput] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentsLoaded, setCommentsLoaded] = useState(false);
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+
+  const handleToggleComments = async () => {
+    const newShow = !showCommentInput;
+    setShowCommentInput(newShow);
+
+    // Load comments when expanding
+    if (newShow && !commentsLoaded) {
+      const loadedComments = await getPostComments(post.id);
+      setComments(loadedComments);
+      setCommentsLoaded(true);
+    }
+  };
+
+  const handleSubmitComment = async () => {
+    if (!commentText.trim() || isSubmittingComment) return;
+
+    setIsSubmittingComment(true);
+    const result = await createComment(currentUserId, {
+      postId: post.id,
+      bodyText: commentText.trim(),
+    });
+    setIsSubmittingComment(false);
+
+    if ("error" in result) {
+      console.error("Failed to create comment:", result.error);
+      return;
+    }
+
+    // Add the new comment to the list
+    setComments((prev) => [...prev, result]);
+    setCommentText("");
+  };
 
   const handleReaction = async (emoji: ReactionEmoji) => {
     const result = await toggleReaction(currentUserId, { postId: post.id, emoji });
@@ -30,30 +72,50 @@ export function PostCard({ post, onPress, currentUserId }: PostCardProps) {
       return;
     }
 
-    // Update local state
+    // Update local state - user can only have one reaction at a time
     setReactions((prev) => {
-      const existing = prev.find((r) => r.emoji === emoji);
-      if (result.action === "added") {
-        if (existing) {
-          return prev.map((r) =>
-            r.emoji === emoji ? { ...r, count: r.count + 1, userReacted: true } : r
-          );
-        }
-        return [...prev, { emoji, count: 1, userReacted: true }];
-      } else {
-        if (existing && existing.count === 1) {
-          return prev.filter((r) => r.emoji !== emoji);
-        }
-        return prev.map((r) =>
-          r.emoji === emoji ? { ...r, count: r.count - 1, userReacted: false } : r
-        );
+      let updated = [...prev];
+
+      // If user had a previous reaction, decrement its count
+      if (userReaction && userReaction !== emoji) {
+        updated = updated
+          .map((r) =>
+            r.emoji === userReaction
+              ? { ...r, count: Math.max(0, r.count - 1), userReacted: false }
+              : r
+          )
+          .filter((r) => r.count > 0);
       }
+
+      if (result.action === "added") {
+        // Add or increment the new reaction
+        const existingIndex = updated.findIndex((r) => r.emoji === emoji);
+        if (existingIndex >= 0) {
+          updated[existingIndex] = {
+            ...updated[existingIndex],
+            count:
+              userReaction === emoji
+                ? updated[existingIndex].count
+                : updated[existingIndex].count + 1,
+            userReacted: true,
+          };
+        } else {
+          updated.push({ emoji, count: 1, userReacted: true });
+        }
+        setUserReaction(emoji);
+      } else {
+        // Remove the reaction
+        updated = updated
+          .map((r) =>
+            r.emoji === emoji ? { ...r, count: Math.max(0, r.count - 1), userReacted: false } : r
+          )
+          .filter((r) => r.count > 0);
+        setUserReaction(null);
+      }
+
+      return updated;
     });
-
-    setShowReactionPicker(false);
   };
-
-  const totalReactions = reactions.reduce((sum, r) => sum + r.count, 0);
 
   return (
     <Pressable style={styles.container} onPress={onPress}>
@@ -82,6 +144,46 @@ export function PostCard({ post, onPress, currentUserId }: PostCardProps) {
         </View>
       )}
 
+      {/* Post Type Tags (Suggested Tags) */}
+      {post.postTypeTags && post.postTypeTags.length > 0 && (
+        <View style={styles.postTypeTags}>
+          {post.postTypeTags.map((tag) => (
+            <View key={tag} style={styles.postTypeTag}>
+              <Text style={styles.postTypeTagText}>
+                {tag === "win"
+                  ? "🏆"
+                  : tag === "struggle"
+                    ? "💭"
+                    : tag === "question"
+                      ? "❓"
+                      : "🪞"}{" "}
+                {tag}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Custom Tags */}
+      {post.customTags && post.customTags.length > 0 && (
+        <View style={styles.customTags}>
+          {post.customTags.map((tag) => (
+            <Text key={tag} style={styles.customTag}>
+              #{tag}
+            </Text>
+          ))}
+        </View>
+      )}
+
+      {/* Location Context (only location, not time - time is shown in header) */}
+      {post.contextLocation && (
+        <View style={styles.contextChips}>
+          <View style={styles.contextChip}>
+            <Text style={styles.contextChipText}>📍 {post.contextLocation}</Text>
+          </View>
+        </View>
+      )}
+
       {/* Post Body */}
       {post.bodyText && <Text style={styles.bodyText}>{post.bodyText}</Text>}
 
@@ -90,44 +192,84 @@ export function PostCard({ post, onPress, currentUserId }: PostCardProps) {
         <Image source={{ uri: post.mediaUrl }} style={styles.media} resizeMode="cover" />
       )}
 
-      {/* Reactions Bar */}
+      {/* Reactions Bar - Always visible */}
       <View style={styles.reactionsBar}>
-        <Pressable
-          style={styles.reactButton}
-          onPress={() => setShowReactionPicker(!showReactionPicker)}
-        >
-          <Text style={styles.reactButtonText}>
-            {totalReactions > 0 ? `${totalReactions} 👏` : "React"}
+        {/* All reaction options always visible */}
+        <View style={styles.reactionOptions}>
+          {ALLOWED_REACTIONS.map((emoji) => {
+            const reactionData = reactions.find((r) => r.emoji === emoji);
+            const isActive = userReaction === emoji;
+            return (
+              <Pressable
+                key={emoji}
+                style={[styles.reactionOption, isActive && styles.reactionOptionActive]}
+                onPress={() => handleReaction(emoji)}
+              >
+                <Text style={styles.reactionOptionEmoji}>{emoji}</Text>
+                {reactionData && reactionData.count > 0 && (
+                  <Text
+                    style={[
+                      styles.reactionOptionCount,
+                      isActive && styles.reactionOptionCountActive,
+                    ]}
+                  >
+                    {reactionData.count}
+                  </Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Comment Button */}
+        <Pressable style={styles.commentButton} onPress={handleToggleComments}>
+          <Text style={styles.commentButtonText}>
+            💬 {comments.length > 0 ? comments.length : "Comment"}
           </Text>
         </Pressable>
-
-        {/* Current reactions */}
-        <View style={styles.reactionsList}>
-          {reactions.map((r) => (
-            <Pressable
-              key={r.emoji}
-              style={[styles.reactionChip, r.userReacted && styles.reactionChipActive]}
-              onPress={() => handleReaction(r.emoji)}
-            >
-              <Text style={styles.reactionEmoji}>{r.emoji}</Text>
-              <Text style={styles.reactionCount}>{r.count}</Text>
-            </Pressable>
-          ))}
-        </View>
       </View>
 
-      {/* Reaction Picker */}
-      {showReactionPicker && (
-        <View style={styles.reactionPicker}>
-          {ALLOWED_REACTIONS.map((emoji) => (
+      {/* Comment Section (dropdown on click) */}
+      {showCommentInput && (
+        <View style={styles.commentInputContainer}>
+          {/* Existing Comments */}
+          {comments.length > 0 && (
+            <View style={styles.commentsList}>
+              {comments.map((comment) => (
+                <View key={comment.id} style={styles.commentItem}>
+                  <Text style={styles.commentAuthor}>{comment.authorName ?? "User"}</Text>
+                  <Text style={styles.commentBody}>{comment.bodyText}</Text>
+                  <Text style={styles.commentTime}>{formatRelativeTime(comment.createdAt)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Comment Input */}
+          <TextInput
+            style={styles.commentInput}
+            placeholder="Add a comment (50 char max)..."
+            placeholderTextColor="#999"
+            value={commentText}
+            onChangeText={(text) => setCommentText(text.slice(0, 50))}
+            maxLength={50}
+            multiline={false}
+          />
+          <View style={styles.commentActions}>
+            <Text style={styles.commentCharCount}>{commentText.length}/50</Text>
             <Pressable
-              key={emoji}
-              style={styles.reactionPickerItem}
-              onPress={() => handleReaction(emoji)}
+              style={[
+                styles.commentSendButton,
+                (!commentText.trim() || isSubmittingComment) && styles.commentSendButtonDisabled,
+              ]}
+              disabled={!commentText.trim() || isSubmittingComment}
+              onPress={handleSubmitComment}
             >
-              <Text style={styles.reactionPickerEmoji}>{emoji}</Text>
+              <Text style={styles.commentSendButtonText}>
+                {isSubmittingComment ? "..." : "Send"}
+              </Text>
             </Pressable>
-          ))}
+          </View>
         </View>
       )}
 
@@ -209,6 +351,50 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#2e7d32",
   },
+  postTypeTags: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  postTypeTag: {
+    backgroundColor: "#fff3e0",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: borderRadius.md,
+  },
+  postTypeTagText: {
+    fontSize: 12,
+    color: "#e65100",
+    fontWeight: "500" as const,
+  },
+  customTags: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  customTag: {
+    fontSize: 13,
+    color: "#007AFF",
+    fontWeight: "500" as const,
+  },
+  contextChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  contextChip: {
+    backgroundColor: "#f3e5f5",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: borderRadius.md,
+  },
+  contextChipText: {
+    fontSize: 12,
+    color: "#7b1fa2",
+  },
   bodyText: {
     fontSize: 15,
     lineHeight: 22,
@@ -224,58 +410,112 @@ const styles = StyleSheet.create({
   reactionsBar: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingTop: borderRadius.lg,
     borderTopWidth: 1,
     borderTopColor: "#f0f0f0",
   },
-  reactButton: {
-    paddingHorizontal: borderRadius.lg,
-    paddingVertical: 6,
-    backgroundColor: "#f5f5f5",
-    borderRadius: spacing.md,
-    marginRight: borderRadius.md,
-  },
-  reactButtonText: {
-    fontSize: 13,
-    color: "#666",
-  },
-  reactionsList: {
+  reactionOptions: {
     flexDirection: "row",
-    gap: 6,
+    gap: spacing.xs,
   },
-  reactionChip: {
+  reactionOption: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: borderRadius.md,
+    paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    backgroundColor: "#f5f5f5",
     borderRadius: borderRadius.lg,
+    backgroundColor: "#f5f5f5",
   },
-  reactionChipActive: {
+  reactionOptionActive: {
     backgroundColor: "#e3f2fd",
     borderWidth: 1,
     borderColor: "#007AFF",
   },
-  reactionEmoji: {
-    fontSize: typography.fontSize.sm,
+  reactionOptionEmoji: {
+    fontSize: typography.fontSize.md,
   },
-  reactionCount: {
+  reactionOptionCount: {
     fontSize: typography.fontSize.xs,
     color: "#666",
-    marginLeft: spacing.xs,
+    marginLeft: spacing.xxs,
   },
-  reactionPicker: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: spacing.md,
-    paddingTop: borderRadius.lg,
+  reactionOptionCountActive: {
+    color: "#007AFF",
+    fontWeight: typography.fontWeight.semibold,
+  },
+  commentButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: "#f5f5f5",
+    borderRadius: borderRadius.lg,
+  },
+  commentButtonText: {
+    fontSize: 13,
+    color: "#666",
+  },
+  commentInputContainer: {
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: "#f9f9f9",
+    borderRadius: borderRadius.md,
+  },
+  commentsList: {
+    marginBottom: spacing.sm,
+  },
+  commentItem: {
+    marginBottom: spacing.xs,
     paddingBottom: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
   },
-  reactionPickerItem: {
-    padding: borderRadius.md,
+  commentAuthor: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: "#333",
   },
-  reactionPickerEmoji: {
-    fontSize: 28,
+  commentBody: {
+    fontSize: typography.fontSize.sm,
+    color: "#444",
+    marginTop: 2,
+  },
+  commentTime: {
+    fontSize: 10,
+    color: "#999",
+    marginTop: 2,
+  },
+  commentInput: {
+    fontSize: typography.fontSize.sm,
+    color: "#333",
+    padding: spacing.xs,
+    backgroundColor: "#fff",
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  commentActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: spacing.xs,
+  },
+  commentCharCount: {
+    fontSize: typography.fontSize.xs,
+    color: "#999",
+  },
+  commentSendButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    backgroundColor: "#007AFF",
+    borderRadius: borderRadius.md,
+  },
+  commentSendButtonDisabled: {
+    backgroundColor: "#ccc",
+  },
+  commentSendButtonText: {
+    fontSize: typography.fontSize.sm,
+    color: "#fff",
+    fontWeight: typography.fontWeight.medium,
   },
   editedText: {
     fontSize: 11,

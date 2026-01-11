@@ -25,7 +25,7 @@ export const PILLAR_INFO: Record<Pillar, { label: string; emoji: string; color: 
   MIND: { label: "Mind", emoji: "🧠", color: colors.pillars.MIND },
   BODY: { label: "Body", emoji: "💪", color: colors.pillars.BODY },
   HEART: { label: "Heart", emoji: "❤️", color: colors.pillars.HEART },
-  SOUL: { label: "Soul", emoji: "✨", color: colors.pillars.SOUL },
+  SOUL: { label: "Soul", emoji: "🔥", color: colors.pillars.SOUL },
 };
 
 // All pillars for iteration

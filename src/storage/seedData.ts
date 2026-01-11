@@ -64,127 +64,395 @@ export async function clearDemoData(): Promise<void> {
     `DELETE FROM habits WHERE userId IN (${demoIds.map(() => "?").join(",")})`,
     demoIds
   );
+  await execute(`DELETE FROM goals WHERE userId IN (${demoIds.map(() => "?").join(",")})`, demoIds);
   await execute(
-    `DELETE FROM friendships WHERE userId IN (${demoIds.map(() => "?").join(",")})`,
-    demoIds
+    `DELETE FROM friendships WHERE userId IN (${demoIds.map(() => "?").join(",")}) OR friendId IN (${demoIds.map(() => "?").join(",")})`,
+    [...demoIds, ...demoIds]
   );
   await execute(`DELETE FROM users WHERE id IN (${demoIds.map(() => "?").join(",")})`, demoIds);
 
-  logger.info("Demo data cleared");
+  logger.info("Demo data cleared successfully");
 }
 
 /**
  * Seed demo data for testing
  * Safe to call multiple times (checks for existing data)
+ *
+ * @param currentUserId - Optional: Use current authenticated user ID instead of DEMO_USERS.MAIN
+ *                        This allows seeding data for the currently logged-in user
  */
-export async function seedDemoData(): Promise<{ success: boolean; message: string }> {
+export async function seedDemoData(
+  currentUserId?: string
+): Promise<{ success: boolean; message: string }> {
   try {
-    // Check if already seeded
-    if (await hasDemoData()) {
-      return { success: true, message: "Demo data already exists" };
-    }
-
     const now = new Date().toISOString();
 
-    // 1. Users
-    const users = [
-      { id: DEMO_USERS.MAIN, name: "You (Demo)", bio: "Testing the app" },
-      { id: DEMO_USERS.FRIEND_ALICE, name: "Alice", bio: "Marathon runner" },
-      { id: DEMO_USERS.FRIEND_BOB, name: "Bob", bio: "Mindfulness enthusiast" },
-      { id: DEMO_USERS.PENDING_CAROL, name: "Carol", bio: "New to habits" },
-    ];
+    // Use current user ID if provided, otherwise use demo main user
+    const mainUserId = currentUserId || DEMO_USERS.MAIN;
+    const isCurrentUser = !!currentUserId;
 
-    for (const user of users) {
-      await execute(
-        `INSERT INTO users (id, displayName, bio, defaultPrivacy, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
-        [user.id, user.name, user.bio, "FRIENDS", daysAgo(30), now]
-      );
+    // 1. Users (only create demo users if not using current user)
+    if (!isCurrentUser) {
+      const users = [
+        { id: DEMO_USERS.MAIN, name: "You (Demo)", bio: "Testing the app" },
+        { id: DEMO_USERS.FRIEND_ALICE, name: "Alice", bio: "Marathon runner" },
+        { id: DEMO_USERS.FRIEND_BOB, name: "Bob", bio: "Mindfulness enthusiast" },
+        { id: DEMO_USERS.PENDING_CAROL, name: "Carol", bio: "New to habits" },
+      ];
+
+      for (const user of users) {
+        await execute(
+          `INSERT OR REPLACE INTO users (id, displayName, bio, defaultPrivacy, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+          [user.id, user.name, user.bio, "FRIENDS", daysAgo(30), now]
+        );
+      }
+    } else {
+      // Create demo friend users only
+      const friends = [
+        { id: DEMO_USERS.FRIEND_ALICE, name: "Alice", bio: "Marathon runner" },
+        { id: DEMO_USERS.FRIEND_BOB, name: "Bob", bio: "Mindfulness enthusiast" },
+        { id: DEMO_USERS.PENDING_CAROL, name: "Carol", bio: "New to habits" },
+      ];
+
+      for (const friend of friends) {
+        await execute(
+          `INSERT OR REPLACE INTO users (id, displayName, bio, defaultPrivacy, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+          [friend.id, friend.name, friend.bio, "FRIENDS", daysAgo(30), now]
+        );
+      }
     }
 
     // 2. Friendships
     await execute(
-      `INSERT INTO friendships (id, userId, friendId, status, createdAt) VALUES (?, ?, ?, ?, ?)`,
-      [genId("fr"), DEMO_USERS.MAIN, DEMO_USERS.FRIEND_ALICE, "ACCEPTED", daysAgo(20)]
+      `INSERT OR REPLACE INTO friendships (id, userId, friendId, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+      [genId("fr"), mainUserId, DEMO_USERS.FRIEND_ALICE, "ACCEPTED", daysAgo(20), now]
     );
     await execute(
-      `INSERT INTO friendships (id, userId, friendId, status, createdAt) VALUES (?, ?, ?, ?, ?)`,
-      [genId("fr"), DEMO_USERS.MAIN, DEMO_USERS.FRIEND_BOB, "ACCEPTED", daysAgo(15)]
+      `INSERT OR REPLACE INTO friendships (id, userId, friendId, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+      [genId("fr"), mainUserId, DEMO_USERS.FRIEND_BOB, "ACCEPTED", daysAgo(15), now]
     );
     await execute(
-      `INSERT INTO friendships (id, userId, friendId, status, createdAt) VALUES (?, ?, ?, ?, ?)`,
-      [genId("fr"), DEMO_USERS.PENDING_CAROL, DEMO_USERS.MAIN, "PENDING", daysAgo(1)]
+      `INSERT OR REPLACE INTO friendships (id, userId, friendId, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+      [genId("fr"), DEMO_USERS.PENDING_CAROL, mainUserId, "PENDING", daysAgo(1), now]
     );
 
-    // 3. Habits
+    // 3. Goals (all for main user)
+    const goals = [
+      {
+        id: genId("goal"),
+        userId: mainUserId,
+        title: "Run a 5K",
+        pillar: "BODY",
+        description: "Complete my first 5K race",
+        targetValue: 5,
+      },
+      {
+        id: genId("goal"),
+        userId: mainUserId,
+        title: "Read 12 books this year",
+        pillar: "MIND",
+        description: "Expand my knowledge through reading",
+        targetValue: 12,
+      },
+      {
+        id: genId("goal"),
+        userId: DEMO_USERS.FRIEND_ALICE,
+        title: "Complete a marathon",
+        pillar: "BODY",
+        description: "Train for and finish a full marathon",
+        targetValue: 42.2,
+      },
+    ];
+
+    for (const goal of goals) {
+      await execute(
+        `INSERT OR REPLACE INTO goals (id, userId, title, pillar, description, targetValue, currentValue, dataSource, privacy, isArchived, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          goal.id,
+          goal.userId,
+          goal.title,
+          goal.pillar,
+          goal.description,
+          goal.targetValue,
+          0,
+          "MANUAL",
+          "FRIENDS",
+          0,
+          daysAgo(25),
+          now,
+        ]
+      );
+    }
+
+    // 4. Habits (with all required columns, main user habits)
     const habits = [
-      { id: genId("habit"), userId: DEMO_USERS.MAIN, title: "Morning Meditation", pillar: "SOUL" },
-      { id: genId("habit"), userId: DEMO_USERS.MAIN, title: "Read 30 min", pillar: "MIND" },
-      { id: genId("habit"), userId: DEMO_USERS.MAIN, title: "Gym Session", pillar: "BODY" },
-      { id: genId("habit"), userId: DEMO_USERS.FRIEND_ALICE, title: "Morning Run", pillar: "BODY" },
+      {
+        id: genId("habit"),
+        userId: mainUserId,
+        goalId: goals[0].id,
+        title: "Morning Meditation",
+        pillar: "SOUL",
+        description: "10 minutes of mindfulness",
+        icon: "🧘",
+        habitType: "BUILD",
+      },
+      {
+        id: genId("habit"),
+        userId: mainUserId,
+        goalId: goals[1].id,
+        title: "Read 30 min",
+        pillar: "MIND",
+        description: "Daily reading habit",
+        icon: "📚",
+        habitType: "BUILD",
+      },
+      {
+        id: genId("habit"),
+        userId: mainUserId,
+        goalId: goals[0].id,
+        title: "Gym Session",
+        pillar: "BODY",
+        description: "Strength training",
+        icon: "💪",
+        habitType: "BUILD",
+      },
+      {
+        id: genId("habit"),
+        userId: mainUserId,
+        title: "No Social Media After 9pm",
+        pillar: "MIND",
+        description: "Better sleep hygiene",
+        icon: "📱",
+        habitType: "BREAK",
+      },
+      {
+        id: genId("habit"),
+        userId: DEMO_USERS.FRIEND_ALICE,
+        goalId: goals[2].id,
+        title: "Morning Run",
+        pillar: "BODY",
+        description: "5K training runs",
+        icon: "🏃‍♀️",
+        habitType: "BUILD",
+      },
+      {
+        id: genId("habit"),
+        userId: DEMO_USERS.FRIEND_BOB,
+        title: "Gratitude Journal",
+        pillar: "SOUL",
+        description: "Write 3 things I'm grateful for",
+        icon: "📝",
+        habitType: "BUILD",
+      },
     ];
 
     for (const habit of habits) {
       const schedule = JSON.stringify({ frequency: "DAILY", targetCount: 1 });
       await execute(
-        `INSERT INTO habits (id, userId, title, pillar, schedule, privacy, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [habit.id, habit.userId, habit.title, habit.pillar, schedule, "PUBLIC", daysAgo(20)]
+        `INSERT OR REPLACE INTO habits (
+          id, userId, goalId, title, pillar, description, icon, habitType, completionType,
+          schedule, privacy, isArchived, currentStreak, longestStreak, recoveryStreak, graceDays,
+          createdAt, updatedAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          habit.id,
+          habit.userId,
+          habit.goalId || null,
+          habit.title,
+          habit.pillar,
+          habit.description,
+          habit.icon,
+          habit.habitType,
+          "BINARY",
+          schedule,
+          "PUBLIC",
+          0,
+          0,
+          0,
+          0,
+          0,
+          daysAgo(20),
+          now,
+        ]
       );
     }
 
-    // 4. Check-ins (7-day streak for meditation)
+    // 5. Check-ins (create realistic patterns)
     const meditationHabit = habits[0];
-    for (let i = 1; i <= 7; i++) {
+    const readingHabit = habits[1];
+    const gymHabit = habits[2];
+    const aliceRunHabit = habits[4];
+
+    // Meditation: perfect 10-day streak
+    for (let i = 0; i < 10; i++) {
       await execute(
-        `INSERT INTO habit_check_ins (id, habitId, userId, occurredAt, source, createdAt) VALUES (?, ?, ?, ?, ?, ?)`,
-        [genId("ci"), meditationHabit.id, DEMO_USERS.MAIN, daysAgo(i), "MANUAL", daysAgo(i)]
+        `INSERT OR REPLACE INTO habit_check_ins (id, habitId, userId, occurredAt, source, note, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          genId("ci"),
+          meditationHabit.id,
+          mainUserId,
+          daysAgo(i),
+          "MANUAL",
+          i === 0 ? "Feeling great!" : null,
+          daysAgo(i),
+        ]
       );
     }
 
-    // 5. Posts
+    // Reading: 7 out of 10 days (realistic pattern)
+    for (let i = 0; i < 10; i++) {
+      if (i !== 3 && i !== 7) {
+        // missed 2 days
+        await execute(
+          `INSERT OR REPLACE INTO habit_check_ins (id, habitId, userId, occurredAt, source, createdAt) VALUES (?, ?, ?, ?, ?, ?)`,
+          [genId("ci"), readingHabit.id, mainUserId, daysAgo(i), "MANUAL", daysAgo(i)]
+        );
+      }
+    }
+
+    // Gym: 3x per week (Mon/Wed/Fri pattern)
+    for (let i = 0; i < 14; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dayOfWeek = date.getDay();
+      if (dayOfWeek === 1 || dayOfWeek === 3 || dayOfWeek === 5) {
+        // Mon, Wed, Fri
+        await execute(
+          `INSERT OR REPLACE INTO habit_check_ins (id, habitId, userId, occurredAt, source, note, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            genId("ci"),
+            gymHabit.id,
+            mainUserId,
+            daysAgo(i),
+            "MANUAL",
+            i === 0 ? "New PR on bench press!" : null,
+            daysAgo(i),
+          ]
+        );
+      }
+    }
+
+    // Alice's runs: 5 days per week
+    for (let i = 0; i < 10; i++) {
+      if (i !== 2 && i !== 6) {
+        // 2 rest days per week
+        await execute(
+          `INSERT OR REPLACE INTO habit_check_ins (id, habitId, userId, occurredAt, source, createdAt) VALUES (?, ?, ?, ?, ?, ?)`,
+          [genId("ci"), aliceRunHabit.id, DEMO_USERS.FRIEND_ALICE, daysAgo(i), "MANUAL", daysAgo(i)]
+        );
+      }
+    }
+
+    // 6. Posts (main user and friends)
     const posts = [
       {
         id: genId("post"),
-        userId: DEMO_USERS.MAIN,
-        text: "7-day meditation streak!",
+        userId: mainUserId,
+        text: "🎉 10-day meditation streak! Feeling more centered and focused each day. Anyone else meditating?",
         privacy: "FRIENDS",
+        pillar: "SOUL",
+      },
+      {
+        id: genId("post"),
+        userId: mainUserId,
+        text: "New PR on bench press today! 💪 The consistency is paying off.",
+        privacy: "FRIENDS",
+        pillar: "BODY",
       },
       {
         id: genId("post"),
         userId: DEMO_USERS.FRIEND_ALICE,
-        text: "Marathon training week 4 complete!",
+        text: "Marathon training week 4 complete! 🏃‍♀️ Ran 50km this week. Legs are tired but spirits are high!",
         privacy: "PUBLIC",
+        pillar: "BODY",
+      },
+      {
+        id: genId("post"),
+        userId: DEMO_USERS.FRIEND_BOB,
+        text: "Started a gratitude journal this week. Small wins feel bigger when you write them down. 🔥",
+        privacy: "FRIENDS",
+        pillar: "SOUL",
       },
     ];
 
     for (const post of posts) {
       await execute(
-        `INSERT INTO posts (id, authorUserId, bodyText, pillar, privacy, createdAt) VALUES (?, ?, ?, ?, ?, ?)`,
-        [post.id, post.userId, post.text, "MIND", post.privacy, daysAgo(1)]
+        `INSERT OR REPLACE INTO posts (id, authorUserId, bodyText, pillar, privacy, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          post.id,
+          post.userId,
+          post.text,
+          post.pillar,
+          post.privacy,
+          daysAgo(Math.floor(Math.random() * 3)),
+          now,
+        ]
       );
     }
 
-    // 6. Reaction on main user's post
+    // 7. Reactions (using new emoji set: 👍❤️👏🔥📈)
     await execute(
-      `INSERT INTO reactions (id, postId, userId, emoji, createdAt) VALUES (?, ?, ?, ?, ?)`,
-      [genId("react"), posts[0].id, DEMO_USERS.FRIEND_ALICE, "🎉", now]
+      `INSERT OR REPLACE INTO reactions (id, postId, userId, emoji, createdAt) VALUES (?, ?, ?, ?, ?)`,
+      [genId("react"), posts[0].id, DEMO_USERS.FRIEND_ALICE, "👏", daysAgo(1)]
+    );
+    await execute(
+      `INSERT OR REPLACE INTO reactions (id, postId, userId, emoji, createdAt) VALUES (?, ?, ?, ?, ?)`,
+      [genId("react"), posts[0].id, DEMO_USERS.FRIEND_BOB, "❤️", daysAgo(1)]
+    );
+    await execute(
+      `INSERT OR REPLACE INTO reactions (id, postId, userId, emoji, createdAt) VALUES (?, ?, ?, ?, ?)`,
+      [genId("react"), posts[1].id, DEMO_USERS.FRIEND_ALICE, "🔥", now]
+    );
+    await execute(
+      `INSERT OR REPLACE INTO reactions (id, postId, userId, emoji, createdAt) VALUES (?, ?, ?, ?, ?)`,
+      [genId("react"), posts[2].id, mainUserId, "📈", daysAgo(1)]
     );
 
-    // 7. Notification
+    // 8. Notifications (using new emoji set, for main user)
     await execute(
-      `INSERT INTO notifications (id, userId, type, title, body, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         genId("notif"),
-        DEMO_USERS.MAIN,
-        "REACTION",
+        mainUserId,
+        "REACTION_RECEIVED",
         "New reaction",
-        "Alice reacted to your post",
+        "Alice reacted 👏 to your post",
         0,
-        now,
+        daysAgo(1),
+      ]
+    );
+    await execute(
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        genId("notif"),
+        mainUserId,
+        "REACTION_RECEIVED",
+        "New reaction",
+        "Bob reacted ❤️ to your post",
+        0,
+        daysAgo(1),
+      ]
+    );
+    await execute(
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        genId("notif"),
+        mainUserId,
+        "FRIEND_REQUEST",
+        "New friend request",
+        "Carol wants to be friends",
+        0,
+        daysAgo(1),
       ]
     );
 
-    logger.info("Demo data seeded successfully");
-    return { success: true, message: "Demo data created: 4 users, 4 habits, 7 check-ins, 2 posts" };
+    logger.info("Demo data seeded successfully", { mainUserId, isCurrentUser });
+    return {
+      success: true,
+      message: isCurrentUser
+        ? `Demo data created for your account: 2 goals, 4 habits, 40+ check-ins, 2 posts, friend data`
+        : "Demo data created: 4 users, 3 goals, 6 habits, 40+ check-ins, 4 posts, 4 reactions",
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     logger.error("Failed to seed demo data", { error: message });

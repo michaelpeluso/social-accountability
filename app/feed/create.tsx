@@ -1,9 +1,10 @@
 /**
  * Create Post Screen (M3)
  * Form for creating a new post with text, pillar, and privacy
+ * Includes Advanced options: post type tags, linked object, context
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -19,7 +20,9 @@ import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { auth } from "../../src/services/auth";
 import { createPost } from "../../src/storage/posts";
-import type { Pillar, Privacy } from "../../src/types";
+import { getHabits } from "../../src/storage/habits";
+import { getGoals } from "../../src/storage/goals";
+import type { Pillar, Privacy, PostTypeTag, LinkedObjectType, Habit, Goal } from "../../src/types";
 import { useTheme } from "../../src/theme";
 import { spacing, borderRadius } from "../../src/theme/spacing";
 import { typography } from "../../src/theme/typography";
@@ -28,7 +31,7 @@ const PILLARS: { value: Pillar; label: string; emoji: string }[] = [
   { value: "MIND", label: "Mind", emoji: "🧠" },
   { value: "BODY", label: "Body", emoji: "💪" },
   { value: "HEART", label: "Heart", emoji: "❤️" },
-  { value: "SOUL", label: "Soul", emoji: "✨" },
+  { value: "SOUL", label: "Soul", emoji: "🔥" },
 ];
 
 const PRIVACY_OPTIONS: { value: Privacy; label: string; description: string }[] = [
@@ -37,12 +40,103 @@ const PRIVACY_OPTIONS: { value: Privacy; label: string; description: string }[] 
   { value: "SELF", label: "Only Me", description: "Private, just for you" },
 ];
 
+const POST_TYPE_TAGS: { value: PostTypeTag; label: string; emoji: string }[] = [
+  { value: "win", label: "Win", emoji: "🏆" },
+  { value: "struggle", label: "Struggle", emoji: "💭" },
+  { value: "question", label: "Question", emoji: "❓" },
+  { value: "reflection", label: "Reflection", emoji: "🪞" },
+];
+
+type LinkedObject = {
+  id: string;
+  title: string;
+  type: LinkedObjectType;
+};
+
 export default function CreatePostScreen() {
   const { theme } = useTheme();
   const [bodyText, setBodyText] = useState("");
   const [pillar, setPillar] = useState<Pillar>("MIND");
   const [privacy, setPrivacy] = useState<Privacy>("FRIENDS");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Advanced options
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [postTypeTags, setPostTypeTags] = useState<PostTypeTag[]>([]);
+  const [customTags, setCustomTags] = useState<string[]>([]);
+  const [customTagInput, setCustomTagInput] = useState("");
+  const [customTagError, setCustomTagError] = useState<string | null>(null);
+  const [linkedObject, setLinkedObject] = useState<LinkedObject | null>(null);
+  const [showObjectPicker, setShowObjectPicker] = useState(false);
+
+  // Media upload state (placeholder for future implementation - use _ prefix to suppress warnings)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [mediaUri, _setMediaUri] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [mediaType, _setMediaType] = useState<"photo" | "video" | null>(null);
+
+  // Available objects to link
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+
+  useEffect(() => {
+    async function loadData() {
+      const user = await auth.getUser();
+      if (user) {
+        const userHabits = await getHabits(user.id);
+        const userGoals = await getGoals(user.id);
+        setHabits(userHabits);
+        setGoals(userGoals);
+      }
+    }
+    loadData();
+  }, []);
+
+  const togglePostTypeTag = (tag: PostTypeTag) => {
+    setPostTypeTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const addCustomTag = () => {
+    const input = customTagInput.trim();
+
+    // Require # prefix
+    if (!input.startsWith("#")) {
+      setCustomTagError("Tags must start with #");
+      return;
+    }
+
+    const tag = input.slice(1).trim(); // Remove # prefix for storage
+
+    if (!tag) {
+      setCustomTagError("Enter a tag after #");
+      return;
+    }
+
+    if (customTags.includes(tag)) {
+      setCustomTagError("Tag already added");
+      return;
+    }
+
+    if (customTags.length >= 5) {
+      setCustomTagError("Maximum 5 tags allowed");
+      return;
+    }
+
+    setCustomTags((prev) => [...prev, tag]);
+    setCustomTagInput("");
+    setCustomTagError(null);
+  };
+
+  const removeCustomTag = (tag: string) => {
+    setCustomTags((prev) => prev.filter((t) => t !== tag));
+  };
+
+  const selectLinkedObject = (obj: LinkedObject) => {
+    setLinkedObject(obj);
+    setShowObjectPicker(false);
+  };
 
   const handleSubmit = async () => {
     if (!bodyText.trim()) {
@@ -68,6 +162,15 @@ export default function CreatePostScreen() {
         bodyText: bodyText.trim(),
         pillar,
         privacy,
+        // Media (when available)
+        mediaUrl: mediaUri ?? undefined,
+        mediaType: mediaType ?? undefined,
+        // Advanced options
+        postTypeTags: postTypeTags.length > 0 ? postTypeTags : undefined,
+        customTags: customTags.length > 0 ? customTags : undefined,
+        linkedObjectId: linkedObject?.id,
+        linkedObjectType: linkedObject?.type,
+        linkedHabitId: linkedObject?.type === "habit" ? linkedObject.id : undefined,
       });
 
       if ("error" in result) {
@@ -135,39 +238,6 @@ export default function CreatePostScreen() {
             </Text>
           </View>
 
-          {/* Pillar Selection */}
-          <View style={[styles.section, { borderBottomColor: theme.border.light }]}>
-            <Text style={[styles.sectionLabel, { color: theme.text.secondary }]}>Category</Text>
-            <View style={styles.pillarsRow}>
-              {PILLARS.map((p) => (
-                <Pressable
-                  key={p.value}
-                  style={[
-                    styles.pillarChip,
-                    { backgroundColor: theme.background.secondary },
-                    pillar === p.value && {
-                      backgroundColor: theme.semantic.primary + "20",
-                      borderWidth: 2,
-                      borderColor: theme.semantic.primary,
-                    },
-                  ]}
-                  onPress={() => setPillar(p.value)}
-                >
-                  <Text style={styles.pillarEmoji}>{p.emoji}</Text>
-                  <Text
-                    style={[
-                      styles.pillarLabel,
-                      { color: theme.text.secondary },
-                      pillar === p.value && { color: theme.semantic.primary, fontWeight: "600" },
-                    ]}
-                  >
-                    {p.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
           {/* Privacy Selection */}
           <View style={[styles.section, { borderBottomColor: theme.border.light }]}>
             <Text style={[styles.sectionLabel, { color: theme.text.secondary }]}>
@@ -212,6 +282,244 @@ export default function CreatePostScreen() {
               ))}
             </View>
           </View>
+
+          {/* Advanced Toggle */}
+          <Pressable
+            style={[styles.advancedToggle, { borderBottomColor: theme.border.light }]}
+            onPress={() => setShowAdvanced(!showAdvanced)}
+          >
+            <Text style={[styles.advancedToggleText, { color: theme.semantic.primary }]}>
+              {showAdvanced ? "▼ Hide Advanced Options" : "▶ Show Advanced Options"}
+            </Text>
+          </Pressable>
+
+          {/* Advanced Options */}
+          {showAdvanced && (
+            <>
+              {/* Category (Pillar) Selection */}
+              <View style={[styles.section, { borderBottomColor: theme.border.light }]}>
+                <Text style={[styles.sectionLabel, { color: theme.text.secondary }]}>Category</Text>
+                <View style={styles.pillarsRow}>
+                  {PILLARS.map((p) => (
+                    <Pressable
+                      key={p.value}
+                      style={[
+                        styles.pillarChip,
+                        { backgroundColor: theme.background.secondary },
+                        pillar === p.value && {
+                          backgroundColor: theme.semantic.primary + "20",
+                          borderWidth: 2,
+                          borderColor: theme.semantic.primary,
+                        },
+                      ]}
+                      onPress={() => setPillar(p.value)}
+                    >
+                      <Text style={styles.pillarEmoji}>{p.emoji}</Text>
+                      <Text
+                        style={[
+                          styles.pillarLabel,
+                          { color: theme.text.secondary },
+                          pillar === p.value && {
+                            color: theme.semantic.primary,
+                            fontWeight: "600",
+                          },
+                        ]}
+                      >
+                        {p.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              {/* Post Type Tags (Suggested) */}
+              <View style={[styles.section, { borderBottomColor: theme.border.light }]}>
+                <Text style={[styles.sectionLabel, { color: theme.text.secondary }]}>
+                  Suggested Tags (optional)
+                </Text>
+                <View style={styles.tagsRow}>
+                  {POST_TYPE_TAGS.map((tag) => (
+                    <Pressable
+                      key={tag.value}
+                      style={[
+                        styles.tagChip,
+                        { backgroundColor: theme.background.secondary },
+                        postTypeTags.includes(tag.value) && {
+                          backgroundColor: theme.semantic.primary + "20",
+                          borderWidth: 2,
+                          borderColor: theme.semantic.primary,
+                        },
+                      ]}
+                      onPress={() => togglePostTypeTag(tag.value)}
+                    >
+                      <Text style={styles.tagEmoji}>{tag.emoji}</Text>
+                      <Text
+                        style={[
+                          styles.tagLabel,
+                          { color: theme.text.secondary },
+                          postTypeTags.includes(tag.value) && { color: theme.semantic.primary },
+                        ]}
+                      >
+                        {tag.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              {/* Custom Tags */}
+              <View style={[styles.section, { borderBottomColor: theme.border.light }]}>
+                <Text style={[styles.sectionLabel, { color: theme.text.secondary }]}>
+                  Custom Tags (max 5, must start with #)
+                </Text>
+                <View style={styles.customTagsRow}>
+                  {customTags.map((tag) => (
+                    <Pressable
+                      key={tag}
+                      style={[
+                        styles.customTagChip,
+                        { backgroundColor: theme.semantic.primary + "20" },
+                      ]}
+                      onPress={() => removeCustomTag(tag)}
+                    >
+                      <Text style={[styles.customTagText, { color: theme.semantic.primary }]}>
+                        #{tag} ×
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                {customTags.length < 5 && (
+                  <View style={styles.customTagInputRow}>
+                    <TextInput
+                      style={[
+                        styles.customTagInput,
+                        {
+                          color: theme.text.primary,
+                          borderColor: customTagError ? theme.semantic.danger : theme.border.medium,
+                        },
+                      ]}
+                      placeholder="#your-tag"
+                      placeholderTextColor={theme.text.tertiary}
+                      value={customTagInput}
+                      onChangeText={(text) => {
+                        setCustomTagInput(text);
+                        setCustomTagError(null);
+                      }}
+                      onSubmitEditing={addCustomTag}
+                      maxLength={25}
+                    />
+                    <Pressable
+                      style={[styles.addTagButton, { backgroundColor: theme.semantic.primary }]}
+                      onPress={addCustomTag}
+                    >
+                      <Text style={styles.addTagButtonText}>Add</Text>
+                    </Pressable>
+                  </View>
+                )}
+                {customTagError && (
+                  <Text style={[styles.errorText, { color: theme.semantic.danger }]}>
+                    {customTagError}
+                  </Text>
+                )}
+              </View>
+
+              {/* Link to Habit/Goal */}
+              <View style={[styles.section, { borderBottomColor: theme.border.light }]}>
+                <Text style={[styles.sectionLabel, { color: theme.text.secondary }]}>
+                  Link to (optional)
+                </Text>
+                {linkedObject ? (
+                  <View style={styles.linkedObjectRow}>
+                    <View
+                      style={[
+                        styles.linkedObjectChip,
+                        { backgroundColor: theme.semantic.primary + "20" },
+                      ]}
+                    >
+                      <Text style={[styles.linkedObjectText, { color: theme.semantic.primary }]}>
+                        {linkedObject.type === "habit" ? "🎯" : "🏆"} {linkedObject.title}
+                      </Text>
+                    </View>
+                    <Pressable onPress={() => setLinkedObject(null)}>
+                      <Text style={[styles.removeLink, { color: theme.semantic.danger }]}>
+                        Remove
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Pressable
+                    style={[styles.selectObjectButton, { borderColor: theme.border.medium }]}
+                    onPress={() => setShowObjectPicker(!showObjectPicker)}
+                  >
+                    <Text style={[styles.selectObjectText, { color: theme.text.secondary }]}>
+                      Select a habit or goal...
+                    </Text>
+                  </Pressable>
+                )}
+
+                {/* Object Picker */}
+                {showObjectPicker && (
+                  <View
+                    style={[styles.objectPicker, { backgroundColor: theme.background.secondary }]}
+                  >
+                    {habits.length > 0 && (
+                      <>
+                        <Text style={[styles.objectPickerLabel, { color: theme.text.tertiary }]}>
+                          Habits
+                        </Text>
+                        {habits.slice(0, 5).map((habit) => (
+                          <Pressable
+                            key={habit.id}
+                            style={styles.objectPickerItem}
+                            onPress={() =>
+                              selectLinkedObject({
+                                id: habit.id,
+                                title: habit.title,
+                                type: "habit",
+                              })
+                            }
+                          >
+                            <Text
+                              style={[styles.objectPickerItemText, { color: theme.text.primary }]}
+                            >
+                              🎯 {habit.title}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </>
+                    )}
+                    {goals.length > 0 && (
+                      <>
+                        <Text style={[styles.objectPickerLabel, { color: theme.text.tertiary }]}>
+                          Goals
+                        </Text>
+                        {goals.slice(0, 5).map((goal) => (
+                          <Pressable
+                            key={goal.id}
+                            style={styles.objectPickerItem}
+                            onPress={() =>
+                              selectLinkedObject({ id: goal.id, title: goal.title, type: "goal" })
+                            }
+                          >
+                            <Text
+                              style={[styles.objectPickerItemText, { color: theme.text.primary }]}
+                            >
+                              🏆 {goal.title}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </>
+                    )}
+                    {habits.length === 0 && goals.length === 0 && (
+                      <Text style={[styles.noObjectsText, { color: theme.text.tertiary }]}>
+                        No habits or goals yet
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </View>
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -333,5 +641,126 @@ const styles = StyleSheet.create({
   privacyDescription: {
     fontSize: 13,
     marginLeft: 32,
+  },
+  advancedToggle: {
+    padding: spacing.md,
+    borderBottomWidth: 1,
+  },
+  advancedToggleText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+  },
+  tagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  tagChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.lg,
+    gap: spacing.xs,
+  },
+  tagEmoji: {
+    fontSize: typography.fontSize.sm,
+  },
+  tagLabel: {
+    fontSize: typography.fontSize.sm,
+  },
+  customTagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  customTagChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+  },
+  customTagText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+  },
+  customTagInputRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  customTagInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    fontSize: typography.fontSize.sm,
+  },
+  addTagButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+    justifyContent: "center",
+  },
+  addTagButtonText: {
+    color: "#fff",
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+  },
+  linkedObjectRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  linkedObjectChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  linkedObjectText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+  },
+  removeLink: {
+    fontSize: typography.fontSize.sm,
+  },
+  selectObjectButton: {
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  selectObjectText: {
+    fontSize: typography.fontSize.sm,
+  },
+  objectPicker: {
+    marginTop: spacing.sm,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+  },
+  objectPickerLabel: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  objectPickerItem: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  objectPickerItemText: {
+    fontSize: typography.fontSize.sm,
+  },
+  noObjectsText: {
+    fontSize: typography.fontSize.sm,
+    fontStyle: "italic",
+    padding: spacing.sm,
+  },
+  errorText: {
+    fontSize: typography.fontSize.xs,
+    marginTop: spacing.xs,
   },
 });

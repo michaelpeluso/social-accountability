@@ -5,6 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { auth } from "../src/services/auth";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
 import { ThemeProvider, useTheme } from "../src/theme";
+import { printDatabaseDiagnostics } from "../src/storage/databaseDebug";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
@@ -15,6 +16,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     checkAuth();
+    // Run database diagnostics in development
+    if (__DEV__) {
+      printDatabaseDiagnostics().catch((error) =>
+        console.error("Database diagnostics failed:", error)
+      );
+    }
   }, []);
 
   async function checkAuth() {

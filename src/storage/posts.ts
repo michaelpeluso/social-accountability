@@ -6,9 +6,35 @@
 
 import { execute, query, queryFirst } from "./database";
 import { logger } from "../lib/logger";
-import type { Post, CreatePostRequest, FeedPost, FeedScope, ReactionEmoji } from "../types";
+import type {
+  Post,
+  CreatePostRequest,
+  FeedPost,
+  FeedScope,
+  ReactionEmoji,
+  PostTypeTag,
+} from "../types";
 import { checkRateLimit, incrementRateLimit } from "./rateLimits";
 import { RATE_LIMITS } from "../types";
+
+/**
+ * Parse JSON array fields from database row
+ */
+function parsePostJsonFields<T extends Partial<Post>>(post: T): T {
+  return {
+    ...post,
+    postTypeTags: post.postTypeTags
+      ? ((typeof post.postTypeTags === "string"
+          ? JSON.parse(post.postTypeTags)
+          : post.postTypeTags) as PostTypeTag[])
+      : undefined,
+    customTags: post.customTags
+      ? ((typeof post.customTags === "string"
+          ? JSON.parse(post.customTags)
+          : post.customTags) as string[])
+      : undefined,
+  };
+}
 
 /**
  * Create a new post
@@ -36,15 +62,25 @@ export async function createPost(
     privacy: request.privacy,
     bodyText: request.bodyText,
     mediaUrl: request.mediaUrl,
+    // M3: Advanced options
+    mediaType: request.mediaType,
+    postTypeTags: request.postTypeTags,
+    customTags: request.customTags,
     linkedCheckInId: request.linkedCheckInId,
     linkedHabitId: request.linkedHabitId,
+    linkedObjectId: request.linkedObjectId,
+    linkedObjectType: request.linkedObjectType,
+    contextTimeOfDay: request.contextTimeOfDay,
+    contextLocation: request.contextLocation,
     createdAt: now,
   };
 
   try {
     await execute(
-      `INSERT INTO posts (id, authorUserId, circleId, pillar, privacy, bodyText, mediaUrl, linkedCheckInId, linkedHabitId, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO posts (id, authorUserId, circleId, pillar, privacy, bodyText, mediaUrl,
+       mediaType, postTypeTags, customTags, linkedCheckInId, linkedHabitId,
+       linkedObjectId, linkedObjectType, contextTimeOfDay, contextLocation, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         post.id,
         post.authorUserId,
@@ -53,8 +89,15 @@ export async function createPost(
         post.privacy,
         post.bodyText ?? null,
         post.mediaUrl ?? null,
+        post.mediaType ?? null,
+        post.postTypeTags ? JSON.stringify(post.postTypeTags) : null,
+        post.customTags ? JSON.stringify(post.customTags) : null,
         post.linkedCheckInId ?? null,
         post.linkedHabitId ?? null,
+        post.linkedObjectId ?? null,
+        post.linkedObjectType ?? null,
+        post.contextTimeOfDay ?? null,
+        post.contextLocation ?? null,
         post.createdAt,
       ]
     );
@@ -73,7 +116,8 @@ export async function createPost(
  * Get a single post by ID
  */
 export async function getPostById(postId: string): Promise<Post | null> {
-  return queryFirst<Post>("SELECT * FROM posts WHERE id = ?", [postId]);
+  const post = await queryFirst<Post>("SELECT * FROM posts WHERE id = ?", [postId]);
+  return post ? parsePostJsonFields(post) : null;
 }
 
 /**
@@ -232,12 +276,13 @@ export async function getFeedPosts(
     params
   );
 
-  // Fetch reactions for each post
+  // Fetch reactions for each post and parse JSON fields
   const postsWithReactions: FeedPost[] = await Promise.all(
     posts.map(async (post) => {
       const reactions = await getPostReactionSummary(post.id, userId);
+      const parsedPost = parsePostJsonFields(post);
       return {
-        ...post,
+        ...parsedPost,
         reactions,
       };
     })
@@ -278,27 +323,31 @@ export async function getPostsByUser(
   viewerId: string,
   limit = 20
 ): Promise<Post[]> {
+  let posts: Post[];
+
   // If viewing own posts, show all
   if (userId === viewerId) {
-    return query<Post>(
+    posts = await query<Post>(
       "SELECT * FROM posts WHERE authorUserId = ? ORDER BY createdAt DESC LIMIT ?",
+      [userId, limit]
+    );
+  } else {
+    // Otherwise, check friendship and privacy
+    const friendship = await queryFirst<{ status: string }>(
+      "SELECT status FROM friendships WHERE userId = ? AND friendId = ? AND status = 'ACCEPTED'",
+      [viewerId, userId]
+    );
+
+    const isFriend = !!friendship;
+    const privacyFilter = isFriend ? "privacy IN ('FRIENDS', 'PUBLIC')" : "privacy = 'PUBLIC'";
+
+    posts = await query<Post>(
+      `SELECT * FROM posts WHERE authorUserId = ? AND ${privacyFilter} ORDER BY createdAt DESC LIMIT ?`,
       [userId, limit]
     );
   }
 
-  // Otherwise, check friendship and privacy
-  const friendship = await queryFirst<{ status: string }>(
-    "SELECT status FROM friendships WHERE userId = ? AND friendId = ? AND status = 'ACCEPTED'",
-    [viewerId, userId]
-  );
-
-  const isFriend = !!friendship;
-  const privacyFilter = isFriend ? "privacy IN ('FRIENDS', 'PUBLIC')" : "privacy = 'PUBLIC'";
-
-  return query<Post>(
-    `SELECT * FROM posts WHERE authorUserId = ? AND ${privacyFilter} ORDER BY createdAt DESC LIMIT ?`,
-    [userId, limit]
-  );
+  return posts.map(parsePostJsonFields);
 }
 
 /**

@@ -33,7 +33,7 @@ const TEST_POST_ID = "test_post_123";
 
 describe("Reactions Storage", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     (checkRateLimit as jest.Mock).mockResolvedValue(true);
     (incrementRateLimit as jest.Mock).mockResolvedValue(undefined);
   });
@@ -113,7 +113,7 @@ describe("Reactions Storage", () => {
           id: "r2",
           postId: TEST_POST_ID,
           userId: "user2",
-          emoji: "✨",
+          emoji: "🔥",
           createdAt: new Date().toISOString(),
         },
       ];
@@ -131,7 +131,7 @@ describe("Reactions Storage", () => {
         id: "r1",
         postId: TEST_POST_ID,
         userId: TEST_USER,
-        emoji: "💪",
+        emoji: "👍",
         createdAt: new Date().toISOString(),
       };
 
@@ -139,7 +139,7 @@ describe("Reactions Storage", () => {
 
       const reaction = await getUserReaction(TEST_POST_ID, TEST_USER);
       expect(reaction).not.toBeNull();
-      expect(reaction?.emoji).toBe("💪");
+      expect(reaction?.emoji).toBe("👍");
     });
 
     it("should return null if user hasn't reacted", async () => {

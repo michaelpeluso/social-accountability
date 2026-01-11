@@ -213,3 +213,23 @@ export async function notifyHabitReminder(
     screen: "habits",
   });
 }
+
+/**
+ * Create a notification for receiving a comment on your post
+ */
+export async function notifyCommentReceived(
+  userId: string,
+  commenterName: string,
+  commentText: string,
+  postId: string
+): Promise<AppNotification> {
+  // Truncate comment preview if too long
+  const preview = commentText.length > 30 ? `${commentText.slice(0, 30)}...` : commentText;
+  return createNotification(
+    userId,
+    "COMMENT_RECEIVED",
+    "New Comment",
+    `${commenterName}: "${preview}"`,
+    { postId, screen: "feed" }
+  );
+}

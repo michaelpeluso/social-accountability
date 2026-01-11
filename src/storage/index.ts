@@ -13,6 +13,7 @@ export * from "./dbDebug";
 // M3 Social modules
 export * from "./posts";
 export * from "./reactions";
+export * from "./comments";
 export * from "./nudges";
 export * from "./badges";
 export * from "./notifications";

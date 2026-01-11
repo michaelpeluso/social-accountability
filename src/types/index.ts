@@ -7,6 +7,13 @@ export type CompletionType = "BINARY" | "COUNT" | "DURATION"; // How to measure 
 export type CheckInSource = "MANUAL" | "INTEGRATION";
 export type CircleRole = "OWNER" | "MEMBER";
 
+// M3: Advanced Post Options
+export type MediaType = "photo" | "video" | "chart";
+export type PostTypeTag = "win" | "struggle" | "question" | "reflection";
+export type TimeOfDay = "morning" | "afternoon" | "evening" | "night";
+export type LocationCategory = "home" | "work" | "gym" | "outdoors";
+export type LinkedObjectType = "habit" | "goal" | "milestone" | "module";
+
 // Goal Types
 export type GoalDataSource = "MANUAL" | "HABIT_DERIVED" | "INTEGRATION";
 
@@ -51,7 +58,10 @@ export type Circle = {
   id: string;
   ownerUserId: string;
   name: string;
+  description?: string; // Circle description (max 500 chars)
+  privacy: "INVITE_ONLY" | "PUBLIC"; // Circle privacy
   createdAt: string;
+  archivedAt?: string;
 };
 
 export type CircleMember = {
@@ -59,6 +69,18 @@ export type CircleMember = {
   userId: string;
   role: CircleRole;
   createdAt: string;
+};
+
+export type CircleMessage = {
+  id: string;
+  circleId: string;
+  fromUserId: string;
+  body: string; // Message text (max 2000 chars)
+  mediaUrl?: string; // Optional image/video
+  mediaType?: "photo" | "video" | "audio"; // Optional - type of media
+  createdAt: string;
+  deletedAt?: string; // Soft delete
+  syncedAt?: string;
 };
 
 export type Identity = {
@@ -189,13 +211,41 @@ export type Post = {
   privacy: Privacy;
   bodyText?: string;
   mediaUrl?: string;
+  // M3: Advanced options
+  mediaType?: MediaType; // Type of media (photo/video/chart)
+  postTypeTags?: PostTypeTag[]; // win, struggle, question, reflection
+  customTags?: string[]; // User-defined tags (with # prefix)
   // Optional link to a check-in
   linkedCheckInId?: string;
   linkedHabitId?: string;
+  // M3: Link to any object type
+  linkedObjectId?: string;
+  linkedObjectType?: LinkedObjectType;
+  // M3: Context chips (optional, privacy-controlled)
+  contextTimeOfDay?: TimeOfDay;
+  contextLocation?: string; // Location category name (not coordinates)
   // Edit tracking
   editedAt?: string;
   createdAt: string;
   syncedAt?: string;
+};
+
+export type CreatePostRequest = {
+  circleId?: string;
+  pillar: Pillar;
+  privacy: Privacy;
+  bodyText?: string;
+  mediaUrl?: string;
+  // M3: Advanced options
+  mediaType?: MediaType;
+  postTypeTags?: PostTypeTag[];
+  customTags?: string[];
+  linkedCheckInId?: string;
+  linkedHabitId?: string;
+  linkedObjectId?: string;
+  linkedObjectType?: LinkedObjectType;
+  contextTimeOfDay?: TimeOfDay;
+  contextLocation?: string;
 };
 
 export type Reaction = {
@@ -208,9 +258,28 @@ export type Reaction = {
 };
 
 // Fixed set of allowed reaction emojis
-export type ReactionEmoji = "👏" | "🔥" | "💪" | "❤️" | "✨";
+export type ReactionEmoji = "👍" | "❤️" | "👏" | "🔥" | "📈";
 
-export const ALLOWED_REACTIONS: ReactionEmoji[] = ["👏", "🔥", "💪", "❤️", "✨"];
+export type Comment = {
+  id: string;
+  postId: string;
+  userId: string;
+  bodyText: string; // Max 50 chars
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+  syncedAt?: string;
+  // Joined fields
+  authorName?: string;
+  authorPhotoUrl?: string;
+};
+
+export type CreateCommentRequest = {
+  postId: string;
+  bodyText: string;
+};
+
+export const ALLOWED_REACTIONS: ReactionEmoji[] = ["👍", "❤️", "👏", "🔥", "📈"];
 
 export type Nudge = {
   id: string;
@@ -232,7 +301,7 @@ export type NudgeTemplateId =
 export const NUDGE_TEMPLATES: Record<NudgeTemplateId, { text: string; emoji: string }> = {
   "keep-it-up": { text: "Keep it up!", emoji: "💪" },
   "proud-streak": { text: "Proud of your streak!", emoji: "🔥" },
-  "you-got-this": { text: "You've got this!", emoji: "✨" },
+  "you-got-this": { text: "You've got this!", emoji: "🔥" },
   "dont-break-chain": { text: "Don't break the chain!", emoji: "⛓️" },
   "lets-do-together": { text: "Let's do this together!", emoji: "🙌" },
 };
@@ -341,7 +410,7 @@ export const BADGE_INFO: Record<
   "pillar-soul-90": {
     name: "Soulful",
     description: "90% SOUL completion for a month",
-    emoji: "✨",
+    emoji: "🔥",
     rarity: "rare",
   },
   "reactions-50": {
@@ -361,10 +430,15 @@ export const BADGE_INFO: Record<
 // Notification Types
 export type NotificationType =
   | "REACTION_RECEIVED"
+  | "COMMENT_RECEIVED"
   | "NUDGE_RECEIVED"
   | "BADGE_EARNED"
   | "FRIEND_POSTED"
-  | "HABIT_REMINDER";
+  | "HABIT_REMINDER"
+  | "CIRCLE_POST"
+  | "CIRCLE_MESSAGE"
+  | "CIRCLE_INVITE"
+  | "CIRCLE_MEMBER_JOINED";
 
 export type AppNotification = {
   id: string;
@@ -420,16 +494,6 @@ export type CreateCheckInRequest = {
   evidenceRef?: string;
 };
 
-export type CreatePostRequest = {
-  pillar: Pillar;
-  privacy: Privacy;
-  bodyText?: string;
-  mediaUrl?: string;
-  circleId?: string;
-  linkedCheckInId?: string;
-  linkedHabitId?: string;
-};
-
 export type CreateReactionRequest = {
   postId: string;
   emoji: ReactionEmoji;
@@ -460,6 +524,7 @@ export type FeedPost = Post & {
 export const RATE_LIMITS = {
   POSTS_PER_DAY: 20,
   REACTIONS_PER_DAY: 100,
+  COMMENTS_PER_DAY: 50,
   NUDGES_PER_PAIR_PER_DAY: 3,
   NUDGES_TOTAL_PER_DAY: 10,
 } as const;
