@@ -172,6 +172,11 @@ export default function PostDetailScreen() {
       <Stack.Screen
         options={{
           title: "Post",
+          headerLeft: () => (
+            <Pressable onPress={() => router.back()} style={styles.headerButton}>
+              <Text style={styles.headerButtonText}>← Back</Text>
+            </Pressable>
+          ),
           headerRight: () =>
             isOwnPost ? (
               <View style={styles.headerButtons}>
@@ -192,10 +197,27 @@ export default function PostDetailScreen() {
         {/* Post Content */}
         <View style={styles.postCard}>
           <View style={styles.postHeader}>
+            <Pressable
+              style={styles.authorSection}
+              onPress={() => post && router.push(`/profile/${post.authorUserId}`)}
+            >
+              <View style={styles.avatar}>
+                {post.authorAvatarUrl ? (
+                  <Image source={{ uri: post.authorAvatarUrl }} style={styles.avatarImage} />
+                ) : (
+                  <Text style={styles.avatarText}>
+                    {post.authorName?.charAt(0)?.toUpperCase() ?? "?"}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.authorInfo}>
+                <Text style={styles.authorName}>{post.authorName ?? "Unknown"}</Text>
+                <Text style={styles.timestamp}>{formatRelativeTime(post.createdAt)}</Text>
+              </View>
+            </Pressable>
             <View style={styles.pillarBadge}>
               <Text style={styles.pillarText}>{post.pillar}</Text>
             </View>
-            <Text style={styles.timestamp}>{formatRelativeTime(post.createdAt)}</Text>
           </View>
 
           {/* Media */}
@@ -263,9 +285,28 @@ export default function PostDetailScreen() {
 
           {comments.map((comment) => (
             <View key={comment.id} style={styles.commentItem}>
-              <Text style={styles.commentAuthor}>{comment.authorName ?? "User"}</Text>
-              <Text style={styles.commentBody}>{comment.bodyText}</Text>
-              <Text style={styles.commentTime}>{formatRelativeTime(comment.createdAt)}</Text>
+              <Pressable
+                style={styles.commentHeader}
+                onPress={() => router.push(`/profile/${comment.userId}`)}
+              >
+                <View style={styles.commentAvatar}>
+                  {comment.authorAvatarUrl ? (
+                    <Image
+                      source={{ uri: comment.authorAvatarUrl }}
+                      style={styles.commentAvatarImage}
+                    />
+                  ) : (
+                    <Text style={styles.commentAvatarText}>
+                      {comment.authorName?.charAt(0)?.toUpperCase() ?? "?"}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.commentContent}>
+                  <Text style={styles.commentAuthor}>{comment.authorName ?? "User"}</Text>
+                  <Text style={styles.commentBody}>{comment.bodyText}</Text>
+                  <Text style={styles.commentTime}>{formatRelativeTime(comment.createdAt)}</Text>
+                </View>
+              </Pressable>
             </View>
           ))}
 
@@ -335,6 +376,38 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: spacing.sm,
+  },
+  authorSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#007AFF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: spacing.sm,
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  avatarText: {
+    color: "#fff",
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  authorInfo: {
+    flex: 1,
+  },
+  authorName: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: "#333",
   },
   pillarBadge: {
     backgroundColor: "#007AFF",
@@ -444,6 +517,32 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
+  },
+  commentHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  commentAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#007AFF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: spacing.xs,
+  },
+  commentAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  commentAvatarText: {
+    color: "#fff",
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  commentContent: {
+    flex: 1,
   },
   commentAuthor: {
     fontSize: typography.fontSize.sm,

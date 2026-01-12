@@ -19,7 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { auth } from "../../src/services/auth";
 import { getFeedPosts } from "../../src/storage/posts";
 import type { FeedPost, FeedScope } from "../../src/types";
-import { PostCard } from "../../src/components/cards/PostCard";
+import { PostCard } from "../../src/components/cards";
 import { useTheme } from "../../src/theme";
 import { spacing, borderRadius } from "../../src/theme/spacing";
 import { typography } from "../../src/theme/typography";
@@ -81,6 +81,10 @@ export default function FeedScreen() {
 
   const handlePostPress = (postId: string) => {
     router.push(`/feed/${postId}`);
+  };
+
+  const handleAuthorPress = (authorId: string) => {
+    router.push(`/profile/${authorId}`);
   };
 
   return (
@@ -160,6 +164,7 @@ export default function FeedScreen() {
             <PostCard
               post={item}
               onPress={() => handlePostPress(item.id)}
+              onAuthorPress={() => handleAuthorPress(item.authorUserId)}
               currentUserId={userId ?? ""}
             />
           )}

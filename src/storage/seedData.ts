@@ -408,27 +408,56 @@ export async function seedDemoData(
       [genId("react"), posts[2].id, mainUserId, "📈", daysAgo(1)]
     );
 
-    // 8. Notifications (using new emoji set, for main user)
+    // 8. Comments (on posts)
     await execute(
-      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO comments (id, postId, authorUserId, bodyText, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        genId("comment"),
+        posts[0].id,
+        DEMO_USERS.FRIEND_ALICE,
+        "Love this! Keep it up! 🙌",
+        daysAgo(1),
+        now,
+      ]
+    );
+    await execute(
+      `INSERT OR REPLACE INTO comments (id, postId, authorUserId, bodyText, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+      [genId("comment"), posts[2].id, mainUserId, "Amazing progress Alice! 🏃‍♀️", daysAgo(1), now]
+    );
+
+    // 9. Nudges (encouragement between friends)
+    await execute(
+      `INSERT OR REPLACE INTO nudges (id, fromUserId, toUserId, templateId, createdAt) VALUES (?, ?, ?, ?, ?)`,
+      [genId("nudge"), DEMO_USERS.FRIEND_BOB, mainUserId, "keep_going", daysAgo(1)]
+    );
+    await execute(
+      `INSERT OR REPLACE INTO nudges (id, fromUserId, toUserId, templateId, createdAt) VALUES (?, ?, ?, ?, ?)`,
+      [genId("nudge"), DEMO_USERS.FRIEND_ALICE, mainUserId, "you_got_this", daysAgo(2)]
+    );
+
+    // 10. Notifications (using new emoji set, for main user)
+    await execute(
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, data, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         genId("notif"),
         mainUserId,
         "REACTION_RECEIVED",
         "New reaction",
         "Alice reacted 👏 to your post",
+        JSON.stringify({ postId: posts[0].id }),
         0,
         daysAgo(1),
       ]
     );
     await execute(
-      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, data, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         genId("notif"),
         mainUserId,
         "REACTION_RECEIVED",
         "New reaction",
         "Bob reacted ❤️ to your post",
+        JSON.stringify({ postId: posts[0].id }),
         0,
         daysAgo(1),
       ]
@@ -445,13 +474,39 @@ export async function seedDemoData(
         daysAgo(1),
       ]
     );
+    await execute(
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, data, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        genId("notif"),
+        mainUserId,
+        "NUDGE_RECEIVED",
+        "You got a nudge!",
+        "Bob sent you encouragement: Keep going!",
+        JSON.stringify({ fromUserId: DEMO_USERS.FRIEND_BOB }),
+        0,
+        daysAgo(1),
+      ]
+    );
+    await execute(
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, data, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        genId("notif"),
+        mainUserId,
+        "NUDGE_RECEIVED",
+        "You got a nudge!",
+        "Alice sent you encouragement: You got this!",
+        JSON.stringify({ fromUserId: DEMO_USERS.FRIEND_ALICE }),
+        0,
+        daysAgo(2),
+      ]
+    );
 
     logger.info("Demo data seeded successfully", { mainUserId, isCurrentUser });
     return {
       success: true,
       message: isCurrentUser
-        ? `Demo data created for your account: 2 goals, 4 habits, 40+ check-ins, 2 posts, friend data`
-        : "Demo data created: 4 users, 3 goals, 6 habits, 40+ check-ins, 4 posts, 4 reactions",
+        ? `Demo data created for your account: 2 goals, 4 habits, 40+ check-ins, 2 posts, 2 friends, 2 nudges, 2 comments`
+        : "Demo data created: 4 users, 3 goals, 6 habits, 40+ check-ins, 4 posts, 4 reactions, 2 nudges, 2 comments",
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

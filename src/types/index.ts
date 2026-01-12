@@ -51,7 +51,9 @@ export type User = {
   displayName: string;
   photoUrl?: string;
   bio?: string;
+  defaultPrivacy: Privacy;
   createdAt: string;
+  updatedAt?: string;
 };
 
 export type Circle = {
@@ -206,6 +208,8 @@ export type HabitCheckIn = {
 export type Post = {
   id: string;
   authorUserId: string;
+  authorName?: string;
+  authorAvatarUrl?: string;
   circleId?: string;
   pillar: Pillar;
   privacy: Privacy;
@@ -263,7 +267,7 @@ export type ReactionEmoji = "👍" | "❤️" | "👏" | "🔥" | "📈";
 export type Comment = {
   id: string;
   postId: string;
-  userId: string;
+  userId: string; // Author of the comment
   bodyText: string; // Max 50 chars
   isArchived: boolean;
   createdAt: string;
@@ -272,6 +276,7 @@ export type Comment = {
   // Joined fields
   authorName?: string;
   authorPhotoUrl?: string;
+  authorAvatarUrl?: string;
 };
 
 export type CreateCommentRequest = {

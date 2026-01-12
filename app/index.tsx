@@ -235,9 +235,24 @@ export default function Index() {
         <View
           style={[
             styles.nav,
-            { gap: theme.space.componentGap * 2, paddingBottom: theme.space.screenPadding },
+            { gap: theme.space.componentGap, paddingBottom: theme.space.screenPadding },
           ]}
         >
+          <Pressable
+            style={[
+              styles.navButton,
+              {
+                flex: 1,
+                backgroundColor: theme.button.secondary.background,
+                padding: theme.button.secondary.paddingVertical * 1.5,
+                borderRadius: theme.button.secondary.borderRadius,
+              },
+            ]}
+            onPress={() => router.push("/profile")}
+          >
+            <Text style={[styles.navButtonText, { color: theme.text.primary }]}>My Profile</Text>
+          </Pressable>
+
           <Pressable
             style={[
               styles.navButton,

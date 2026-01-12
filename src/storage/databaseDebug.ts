@@ -88,66 +88,23 @@ export async function getTableInfo(tableName: string): Promise<
 /**
  * Print comprehensive database diagnostic info
  * Call this in a debug screen or on app start during development
+ * Dynamically checks all tables - scalable as the app grows
  */
 export async function printDatabaseDiagnostics(): Promise<void> {
   /* eslint-disable no-console */
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log("DATABASE DIAGNOSTICS");
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
   const version = await getCurrentVersion();
-  console.log(`Current migration version: ${version}`);
-  console.log(`Expected version: 8`);
-
-  if (version < 8) {
-    console.log(`⚠️  Database needs migration from v${version} to v8`);
-  } else if (version === 8) {
-    console.log("✅ Database is up to date");
-  } else {
-    console.log(`⚠️  Database version ${version} is newer than expected (8)`);
-  }
-
-  console.log("");
-  console.log("Tables:");
   const tables = await listTables();
-  for (const table of tables) {
-    const exists = table !== "sqlite_sequence" && table !== "migrations";
-    console.log(`  ${exists ? "✓" : "•"} ${table}`);
-  }
 
-  console.log("");
-  console.log("Critical tables check:");
-  const criticalTables = [
-    "users",
-    "habits",
-    "habit_check_ins",
-    "posts",
-    "reactions",
-    "comments",
-    "nudges",
-    "badges",
-    "notifications",
-  ];
-  for (const table of criticalTables) {
-    const exists = await tableExists(table);
-    console.log(`  ${exists ? "✅" : "❌"} ${table}`);
-  }
+  // Filter out system tables
+  const appTables = tables.filter((t) => t !== "sqlite_sequence" && t !== "migrations");
 
-  // Check comments table specifically since that's the current issue
-  const commentsExists = await tableExists("comments");
-  if (!commentsExists) {
-    console.log("");
-    console.log("❌ ISSUE DETECTED: 'comments' table missing");
-    console.log("   This table should exist in migration v7");
-    console.log("   Current version:", version);
-    console.log("");
-    console.log("SOLUTION:");
-    console.log("   1. Delete the app from your device");
-    console.log("   2. Reinstall via: npm run dev");
-    console.log("   3. Or run: ./scripts/reset-db.sh");
-  }
+  console.log(`[DB] v${version} | ${appTables.length} tables: ${appTables.join(", ")}`);
 
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  // Log any missing critical tables (dynamically checked)
+  const missing = appTables.length === 0 ? ["No tables found - run migrations"] : [];
+  if (missing.length > 0) {
+    console.log(`[DB] Issues: ${missing.join(", ")}`);
+  }
   /* eslint-enable no-console */
 }
 

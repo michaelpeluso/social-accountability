@@ -9,6 +9,7 @@ import { Platform } from "react-native";
 import { logger } from "../lib/logger";
 import { api } from "./api";
 import type { User, SignInWithAppleRequest } from "../types/user";
+import { saveUser } from "../storage/user";
 
 const TOKEN_KEY = "auth_token";
 const USER_KEY = "auth_user";
@@ -107,9 +108,10 @@ export const auth = {
             : undefined,
         };
       } else {
+        // Use stable dev user ID for consistent local development
         request = {
-          appleToken: `mock-apple-token-${Date.now()}`,
-          appleUserId: `mock-apple-user-${Date.now()}`,
+          appleToken: "mock-apple-token-dev",
+          appleUserId: "dev-user-12345",
           email: "dev@example.com",
           fullName: "Dev User",
         };
@@ -124,9 +126,13 @@ export const auth = {
 
       const { user, token, expiresAt } = response.data;
 
+      // Save to SecureStore for session management
       await secureSet(TOKEN_KEY, token);
       await secureSet(USER_KEY, JSON.stringify(user));
       await secureSet(TOKEN_EXPIRY_KEY, expiresAt.toString());
+
+      // Save to SQLite for local queries (device-first architecture)
+      await saveUser(user);
 
       logger.info("Auth: signIn successful", { userId: user.id });
 

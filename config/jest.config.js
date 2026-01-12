@@ -11,6 +11,13 @@ module.exports = {
     '!**/node_modules/**',
   ],
   coverageReporters: ['text', 'lcov', 'json-summary'],
+  transform: {
+    '^.+\\.(ts|tsx)$': 'ts-jest',
+    '^.+\\.(js|jsx)$': 'babel-jest',
+  },
+  transformIgnorePatterns: [
+    'node_modules/(?!(expo-sqlite|expo|@expo|react-native|@react-native|@react-navigation)/)',
+  ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
