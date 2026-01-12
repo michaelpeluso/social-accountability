@@ -8,14 +8,14 @@
 
 import { useState } from "react";
 import { View, Text, StyleSheet, Pressable, Image, TextInput } from "react-native";
-import type { FeedPost, ReactionEmoji, Comment } from "../../types";
-import { ALLOWED_REACTIONS } from "../../types";
-import { toggleReaction } from "../../storage/reactions";
-import { createComment, getPostComments } from "../../storage/comments";
-import { formatRelativeTime } from "../../logic/dates";
-import { useTheme } from "../../theme";
-import { spacing, borderRadius } from "../../theme/spacing";
-import { typography } from "../../theme/typography";
+import type { FeedPost, ReactionEmoji, Comment } from "../../../types";
+import { ALLOWED_REACTIONS } from "../../../types";
+import { toggleReaction } from "../../../storage/reactions";
+import { createComment, getPostComments } from "../../../storage/comments";
+import { formatRelativeTime } from "../../../logic/dates";
+import { useTheme } from "../../../theme";
+import { spacing, borderRadius } from "../../../theme/spacing";
+import { typography } from "../../../theme/typography";
 
 type PostCardProps = {
   post: FeedPost;

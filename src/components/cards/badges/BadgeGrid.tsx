@@ -4,9 +4,9 @@
  */
 
 import { View, Text, StyleSheet, Pressable } from "react-native";
-import type { BadgeWithInfo } from "../../storage/badges";
-import { spacing, borderRadius } from "../../theme/spacing";
-import { typography } from "../../theme/typography";
+import type { BadgeWithInfo } from "../../../storage/badges";
+import { spacing, borderRadius } from "../../../theme/spacing";
+import { typography } from "../../../theme/typography";
 
 type BadgeGridProps = {
   badges: BadgeWithInfo[];

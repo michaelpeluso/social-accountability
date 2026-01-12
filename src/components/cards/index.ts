@@ -1,7 +1,22 @@
 /**
  * Card Components Index
- * List items and content cards
+ * Organized by feature domain for scalability
  */
 
-export * from "./PostCard";
-export * from "./BadgeGrid";
+// Dashboard cards
+export * from "./dashboard";
+
+// Habit cards
+export * from "./habits";
+
+// Goal cards
+export * from "./goals";
+
+// Social/feed cards
+export * from "./social";
+
+// Friend cards
+export * from "./friends";
+
+// Badge cards
+export * from "./badges";
