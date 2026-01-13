@@ -425,6 +425,17 @@ const PRESET_IDENTITIES = [
   bestTimeHour?: number (0-23)      // ML-detected optimal time
   bestTimeConfidence?: number (0-1) // Confidence score for bestTimeHour
 
+  // M5: Progressive overload (1% rule)
+  progressiveOverload?: {
+      enabled: boolean,
+      incrementRate: number (0-1),  // 1% per completion
+      allowDecimals: boolean,  // Round to nearest 0.1
+      originalTarget: number,  // Started at 30 min
+      currentTarget?: number,  // After 10 completions: 30 * 1.01^10 ≈ 33.5
+      maxTarget?: number,  // Stop at 60 min
+      lastIncrementedAt: timestamp
+    },
+
   privacy: Privacy
   archivedAt?: timestamp
   createdAt: timestamp
@@ -451,6 +462,7 @@ const PRESET_IDENTITIES = [
 - miniVersion: Implements James Clear's "2-minute rule" for habit formation
 - environmentalCue: Environmental design from Atomic Habits
 - bestTimeHour/Confidence: ML-detected from check-in patterns (M4)
+- progressiveOverload: Automatic target increment (1% rule), only for metric-based habits (count, duration, distance, weight)
 
 ---
 
