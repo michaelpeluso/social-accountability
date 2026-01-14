@@ -15,8 +15,12 @@ import { router } from "expo-router";
 import { auth, isAppleAuthAvailable } from "../../src/services/auth";
 import { api } from "../../src/services/api";
 import { logger } from "../../src/lib/logger";
+import { useTheme } from "../../src/theme";
+import { spacing, borderRadius } from "../../src/theme/spacing";
+import { typography } from "../../src/theme/typography";
 
 export default function SignIn() {
+  const { theme } = useTheme();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [appleAuthAvailable, setAppleAuthAvailable] = useState(false);
@@ -85,15 +89,17 @@ export default function SignIn() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background.primary }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Social Accountability</Text>
-        <Text style={styles.subtitle}>Track habits with friends</Text>
+        <Text style={[styles.title, { color: theme.text.primary }]}>Social Accountability</Text>
+        <Text style={[styles.subtitle, { color: theme.text.tertiary }]}>
+          Track habits with friends
+        </Text>
       </View>
 
       <View style={styles.buttonContainer}>
         {loading ? (
-          <ActivityIndicator size="large" color="#000" />
+          <ActivityIndicator size="large" color={theme.semantic.primary} />
         ) : appleAuthAvailable && Platform.OS !== "web" ? (
           <AppleAuthentication.AppleAuthenticationButton
             buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
@@ -103,19 +109,26 @@ export default function SignIn() {
             onPress={handleSignIn}
           />
         ) : (
-          <Pressable style={styles.mockButton} onPress={handleSignIn}>
-            <Text style={styles.mockButtonText}>Sign In (Dev Mode)</Text>
+          <Pressable
+            style={[styles.mockButton, { backgroundColor: theme.text.primary }]}
+            onPress={handleSignIn}
+          >
+            <Text style={[styles.mockButtonText, { color: theme.background.primary }]}>
+              Sign In (Dev Mode)
+            </Text>
           </Pressable>
         )}
 
-        {error && <Text style={styles.error}>{error}</Text>}
+        {error && <Text style={[styles.error, { color: theme.semantic.danger }]}>{error}</Text>}
 
         <Pressable style={styles.forgotButton} onPress={() => setShowRecoveryModal(true)}>
-          <Text style={styles.forgotText}>Trouble signing in?</Text>
+          <Text style={[styles.forgotText, { color: theme.semantic.primary }]}>
+            Trouble signing in?
+          </Text>
         </Pressable>
       </View>
 
-      <Text style={styles.footer}>
+      <Text style={[styles.footer, { color: theme.text.tertiary }]}>
         By signing in, you agree to our Terms of Service and Privacy Policy
       </Text>
 
@@ -125,25 +138,38 @@ export default function SignIn() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowRecoveryModal(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Account Recovery</Text>
+        <View style={[styles.modalContainer, { backgroundColor: theme.background.secondary }]}>
+          <View
+            style={[
+              styles.modalHeader,
+              { backgroundColor: theme.background.primary, borderBottomColor: theme.border.light },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: theme.text.primary }]}>Account Recovery</Text>
             <Pressable onPress={() => setShowRecoveryModal(false)}>
-              <Text style={styles.modalClose}>Cancel</Text>
+              <Text style={[styles.modalClose, { color: theme.semantic.primary }]}>Cancel</Text>
             </Pressable>
           </View>
 
           <View style={styles.modalContent}>
-            <Text style={styles.recoveryDescription}>
+            <Text style={[styles.recoveryDescription, { color: theme.text.tertiary }]}>
               Enter the email address associated with your Apple ID. We will send you a recovery
               link that expires in 1 hour.
             </Text>
 
             <TextInput
-              style={styles.recoveryInput}
+              style={[
+                styles.recoveryInput,
+                {
+                  backgroundColor: theme.input.background,
+                  borderColor: theme.input.border,
+                  color: theme.text.primary,
+                },
+              ]}
               value={recoveryEmail}
               onChangeText={setRecoveryEmail}
               placeholder="Email address"
+              placeholderTextColor={theme.text.tertiary}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -153,15 +179,18 @@ export default function SignIn() {
             <Pressable
               style={[
                 styles.recoveryButton,
+                { backgroundColor: theme.button.primary.background },
                 (!recoveryEmail.trim() || recoverySending) && styles.recoveryButtonDisabled,
               ]}
               onPress={handleRecovery}
               disabled={!recoveryEmail.trim() || recoverySending}
             >
               {recoverySending ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={theme.button.primary.text} />
               ) : (
-                <Text style={styles.recoveryButtonText}>Send Recovery Email</Text>
+                <Text style={[styles.recoveryButtonText, { color: theme.button.primary.text }]}>
+                  Send Recovery Email
+                </Text>
               )}
             </Pressable>
           </View>
@@ -176,21 +205,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 40,
-    backgroundColor: "#fff",
+    padding: spacing.xl,
   },
   header: {
     alignItems: "center",
     marginTop: 80,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 8,
+    fontSize: typography.fontSize.xxxl,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
-    color: "#666",
+    fontSize: typography.fontSize.base,
   },
   buttonContainer: {
     width: "100%",
@@ -203,86 +230,72 @@ const styles = StyleSheet.create({
   mockButton: {
     width: 280,
     height: 50,
-    backgroundColor: "#000",
-    borderRadius: 8,
+    borderRadius: borderRadius.md,
     justifyContent: "center",
     alignItems: "center",
   },
   mockButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
   },
   error: {
-    color: "red",
-    marginTop: 16,
+    marginTop: spacing.md,
     textAlign: "center",
   },
   footer: {
-    fontSize: 12,
-    color: "#999",
+    fontSize: typography.fontSize.xs,
     textAlign: "center",
-    marginBottom: 40,
+    marginBottom: spacing.xl,
   },
   forgotButton: {
-    marginTop: 20,
-    padding: 8,
+    marginTop: spacing.lg,
+    padding: spacing.sm,
   },
   forgotText: {
-    color: "#007AFF",
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
   },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
-    backgroundColor: "#fff",
+    padding: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#ddd",
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
   },
   modalClose: {
-    color: "#007AFF",
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
   },
   modalContent: {
-    padding: 20,
+    padding: spacing.lg,
   },
   recoveryDescription: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 20,
+    fontSize: typography.fontSize.sm,
+    marginBottom: spacing.lg,
     lineHeight: 20,
   },
   recoveryInput: {
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 14,
-    fontSize: 16,
-    marginBottom: 16,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    fontSize: typography.fontSize.base,
+    marginBottom: spacing.md,
   },
   recoveryButton: {
-    backgroundColor: "#000",
-    padding: 16,
-    borderRadius: 8,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
     alignItems: "center",
   },
   recoveryButtonDisabled: {
     opacity: 0.5,
   },
   recoveryButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

@@ -86,9 +86,9 @@ describe("Pillar Score Calculation", () => {
       // Reference: Monday Jan 15. This week: Sun Jan 14 - Sat Jan 20
       // Last week: Sun Jan 7 - Sat Jan 13
       const checkIns = [
-        { habitId: "habit-1", occurredAt: "2024-01-15T08:00:00.000Z" }, // This week
-        { habitId: "habit-1", occurredAt: "2024-01-14T08:00:00.000Z" }, // This week (Sunday)
-        { habitId: "habit-1", occurredAt: "2024-01-15T18:00:00.000Z" }, // This week (another)
+        { habitId: "habit-1", occurredAt: "2024-01-15T08:00:00.000Z" }, // This week (Monday)
+        { habitId: "habit-1", occurredAt: "2024-01-16T08:00:00.000Z" }, // This week (Tuesday)
+        { habitId: "habit-1", occurredAt: "2024-01-17T08:00:00.000Z" }, // This week (Wednesday)
         // Only 1 last week
         { habitId: "habit-1", occurredAt: "2024-01-10T08:00:00.000Z" }, // Last week (Wednesday)
       ];

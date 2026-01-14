@@ -36,11 +36,15 @@ import {
   getStatusMessage,
   calculateRecoveryStatus,
 } from "../../src/logic";
+import { useTheme } from "../../src/theme";
+import { spacing, borderRadius } from "../../src/theme/spacing";
+import { typography } from "../../src/theme/typography";
 
 // Privacy options for editing
 const PRIVACY_OPTIONS: Privacy[] = ["SELF", "FRIENDS", "PUBLIC"];
 
 export default function HabitDetailScreen() {
+  const { theme } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [habit, setHabit] = useState<Habit | null>(null);
   const [checkIns, setCheckIns] = useState<HabitCheckIn[]>([]);
@@ -283,22 +287,24 @@ export default function HabitDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.loadingText}>Loading...</Text>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
+        <Text style={[styles.loadingText, { color: theme.text.secondary }]}>Loading...</Text>
       </SafeAreaView>
     );
   }
 
   if (!habit) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
+        <View style={[styles.header, { borderBottomColor: theme.border.light }]}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backButtonText}>Back</Text>
+            <Text style={[styles.backButtonText, { color: theme.button.primary.background }]}>
+              Back
+            </Text>
           </Pressable>
         </View>
         <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Habit not found</Text>
+          <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>Habit not found</Text>
         </View>
       </SafeAreaView>
     );
@@ -309,18 +315,22 @@ export default function HabitDetailScreen() {
   const targetMet = todayCount >= habit.schedule.targetCount;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: theme.border.light }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>Back</Text>
+          <Text style={[styles.backButtonText, { color: theme.button.primary.background }]}>
+            Back
+          </Text>
         </Pressable>
         <View style={styles.headerActions}>
           <Pressable onPress={openEditModal} style={styles.editButton}>
-            <Text style={styles.editButtonText}>Edit</Text>
+            <Text style={[styles.editButtonText, { color: theme.button.primary.background }]}>
+              Edit
+            </Text>
           </Pressable>
           <Pressable onPress={handleArchive} style={styles.archiveButton}>
-            <Text style={styles.archiveButtonText}>Archive</Text>
+            <Text style={[styles.archiveButtonText, { color: theme.text.error }]}>Archive</Text>
           </Pressable>
         </View>
       </View>
@@ -597,45 +607,45 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#e5e5e5",
   },
   backButton: {
-    padding: 8,
+    padding: spacing.sm,
   },
   backButtonText: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
     color: "#007AFF",
   },
   headerActions: {
     flexDirection: "row",
-    gap: 16,
+    gap: spacing.md,
   },
   editButton: {
-    padding: 8,
+    padding: spacing.sm,
   },
   editButtonText: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
     color: "#007AFF",
   },
   archiveButton: {
-    padding: 8,
+    padding: spacing.sm,
   },
   archiveButtonText: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
     color: "#FF6B6B",
   },
   emptyState: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 40,
+    padding: spacing.xxl - 8,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: typography.fontSize.lg,
     color: "#666",
   },
   content: {
@@ -643,9 +653,9 @@ const styles = StyleSheet.create({
   },
   habitCard: {
     backgroundColor: "#fff",
-    margin: 16,
-    padding: 20,
-    borderRadius: 16,
+    margin: spacing.md,
+    padding: spacing.lg - 4,
+    borderRadius: borderRadius.xl,
     borderLeftWidth: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -658,37 +668,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   pillarEmoji: {
-    fontSize: 32,
-    marginRight: 12,
+    fontSize: typography.fontSize.xxxl,
+    marginRight: spacing.sm,
   },
   habitTitleContainer: {
     flex: 1,
   },
   habitTitle: {
     fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 4,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.xs,
   },
   pillarLabel: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
     color: "#666",
   },
   scheduleInfo: {
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
     borderTopWidth: 1,
     borderTopColor: "#f0f0f0",
   },
   scheduleText: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
     color: "#666",
   },
   // Status banner styles
   statusBanner: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 12,
-    borderRadius: 12,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    padding: spacing.sm,
+    borderRadius: borderRadius.lg,
     alignItems: "center",
   },
   statusRecovering: {
@@ -707,17 +717,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   statusBannerText: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
     color: "#333",
   },
   streakCard: {
     flexDirection: "row",
     backgroundColor: "#fff",
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 20,
-    borderRadius: 16,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    padding: spacing.lg - 4,
+    borderRadius: borderRadius.xl,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -734,23 +744,23 @@ const styles = StyleSheet.create({
   },
   streakNumber: {
     fontSize: 36,
-    fontWeight: "bold",
+    fontWeight: typography.fontWeight.bold,
     color: "#FF6B6B",
   },
   recoveryNumber: {
     color: "#4CAF50",
   },
   streakLabel: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
     color: "#666",
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
   todayCard: {
     backgroundColor: "#fff",
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 20,
-    borderRadius: 16,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    padding: spacing.lg - 4,
+    borderRadius: borderRadius.xl,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -758,9 +768,9 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 16,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.md,
   },
   todayProgress: {
     alignItems: "center",
@@ -769,53 +779,53 @@ const styles = StyleSheet.create({
   progressCircle: {
     width: 80,
     height: 80,
-    borderRadius: 40,
+    borderRadius: borderRadius.full,
     backgroundColor: "#f0f0f0",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   progressCount: {
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: typography.fontSize.xxl,
+    fontWeight: typography.fontWeight.bold,
     color: "#333",
   },
   progressComplete: {
     color: "#4CAF50",
   },
   progressLabel: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
     color: "#666",
   },
   checkInButton: {
     backgroundColor: "#000",
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: spacing.sm,
   },
   checkInButtonComplete: {
     backgroundColor: "#4CAF50",
   },
   checkInButtonText: {
     color: "#fff",
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
   },
   addNoteButton: {
     alignItems: "center",
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
   },
   addNoteButtonText: {
     color: "#007AFF",
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
   },
   historySection: {
     backgroundColor: "#fff",
-    marginHorizontal: 16,
-    marginBottom: 32,
-    padding: 20,
-    borderRadius: 16,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.xl,
+    padding: spacing.lg - 4,
+    borderRadius: borderRadius.xl,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -825,14 +835,14 @@ const styles = StyleSheet.create({
   noCheckIns: {
     textAlign: "center",
     color: "#999",
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
     paddingVertical: 20,
   },
   checkInRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    paddingVertical: 12,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: "#f5f5f5",
   },
@@ -840,19 +850,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   checkInTime: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
     color: "#333",
   },
   checkInNote: {
     fontSize: 13,
     color: "#666",
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
   checkInSource: {
     backgroundColor: "#f0f0f0",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
   },
   checkInSourceText: {
     fontSize: 11,
@@ -867,70 +877,70 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: "#e5e5e5",
   },
   modalCancel: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
     color: "#666",
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
   },
   modalSave: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
     color: "#007AFF",
-    fontWeight: "600",
+    fontWeight: typography.fontWeight.semibold,
   },
   disabled: {
     opacity: 0.5,
   },
   modalContent: {
     flex: 1,
-    padding: 20,
+    padding: spacing.lg - 4,
   },
   label: {
     fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 10,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.xmd,
     color: "#333",
   },
   noteInput: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
     borderWidth: 1,
     borderColor: "#e5e5e5",
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
     minHeight: 120,
   },
   charCount: {
     textAlign: "right",
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     color: "#999",
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   // Edit Modal Styles
   textInput: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
     borderWidth: 1,
     borderColor: "#e5e5e5",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.lg - 4,
     backgroundColor: "#fff",
   },
   frequencyOptions: {
     flexDirection: "row",
-    gap: 12,
-    marginBottom: 20,
+    gap: spacing.sm,
+    marginBottom: spacing.lg - 4,
   },
   frequencyOption: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: spacing.smd,
+    borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: "#e5e5e5",
     alignItems: "center",
@@ -941,22 +951,22 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0F7FF",
   },
   frequencyOptionText: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
     color: "#666",
   },
   frequencyOptionTextSelected: {
     color: "#007AFF",
-    fontWeight: "600",
+    fontWeight: typography.fontWeight.semibold,
   },
   privacyOptions: {
     flexDirection: "row",
-    gap: 12,
-    marginBottom: 8,
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
   privacyOption: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: "#e5e5e5",
     alignItems: "center",
@@ -967,16 +977,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0F7FF",
   },
   privacyOptionText: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
     color: "#666",
   },
   privacyOptionTextSelected: {
     color: "#007AFF",
-    fontWeight: "600",
+    fontWeight: typography.fontWeight.semibold,
   },
   privacyDescription: {
     fontSize: 13,
     color: "#999",
-    marginBottom: 20,
+    marginBottom: spacing.lg - 4,
   },
 });

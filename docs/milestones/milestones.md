@@ -98,6 +98,7 @@
 - Training module: workout logging with exercise library, PR tracking, body weight trends, progression charts
 - Nutrition module: meal logging (breakfast/lunch/dinner), weekly completion view, streak tracking
 - Podcast module: episode logging, listening stats, show history
+- Progressive habits (1% rule): auto-incrementing targets for metric-based habits (duration, count, distance, weight)
 - Module streak system (hardcoded requirements: books 1/week, workouts 3/week, meals 7/week, podcasts 1/week)
 - History views per module with charts/visualizations (device-side analytics)
 - Account linking OAuth infrastructure (Goodreads, Strava, Spotify - tokens only, NO auto-sync yet)

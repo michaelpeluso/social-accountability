@@ -8,7 +8,7 @@ import type { SQLiteBindValue, SQLiteRunResult } from "expo-sqlite";
 import { logger } from "../lib/logger";
 
 const DB_NAME = "social_accountability.db";
-const CURRENT_VERSION = 6;
+const CURRENT_VERSION = 9;
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -94,6 +94,15 @@ async function applyMigration(database: SQLite.SQLiteDatabase, version: number):
         break;
       case 6:
         await migrationV6(database);
+        break;
+      case 7:
+        await migrationV7(database);
+        break;
+      case 8:
+        await migrationV8(database);
+        break;
+      case 9:
+        await migrationV9(database);
         break;
       default:
         throw new Error(`Unknown migration version: ${version}`);
@@ -512,6 +521,194 @@ async function migrationV6(database: SQLite.SQLiteDatabase): Promise<void> {
     
     CREATE INDEX IF NOT EXISTS idx_identities_userId ON identities(userId);
   `);
+}
+
+/**
+ * Migration V7: Social tables for M3 (posts, reactions, nudges, badges, notifications)
+ */
+async function migrationV7(database: SQLite.SQLiteDatabase): Promise<void> {
+  await database.execAsync(`
+    -- Posts table
+    CREATE TABLE IF NOT EXISTS posts (
+      id TEXT PRIMARY KEY,
+      authorUserId TEXT NOT NULL,
+      circleId TEXT,
+      pillar TEXT NOT NULL,
+      privacy TEXT NOT NULL DEFAULT 'FRIENDS',
+      bodyText TEXT,
+      mediaUrl TEXT,
+      linkedCheckInId TEXT,
+      linkedHabitId TEXT,
+      editedAt TEXT,
+      createdAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (linkedCheckInId) REFERENCES habit_check_ins(id),
+      FOREIGN KEY (linkedHabitId) REFERENCES habits(id)
+    );
+
+    -- Reactions table
+    CREATE TABLE IF NOT EXISTS reactions (
+      id TEXT PRIMARY KEY,
+      postId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      emoji TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (postId) REFERENCES posts(id) ON DELETE CASCADE,
+      UNIQUE(postId, userId)
+    );
+
+    -- Comments table (50 char max)
+    CREATE TABLE IF NOT EXISTS comments (
+      id TEXT PRIMARY KEY,
+      postId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      bodyText TEXT NOT NULL,
+      isArchived INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (postId) REFERENCES posts(id) ON DELETE CASCADE
+    );
+
+    -- Nudges table
+    CREATE TABLE IF NOT EXISTS nudges (
+      id TEXT PRIMARY KEY,
+      fromUserId TEXT NOT NULL,
+      toUserId TEXT NOT NULL,
+      templateId TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      syncedAt TEXT
+    );
+
+    -- Badges table
+    CREATE TABLE IF NOT EXISTS badges (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      badgeType TEXT NOT NULL,
+      earnedAt TEXT NOT NULL,
+      sharedAt TEXT,
+      syncedAt TEXT,
+      UNIQUE(userId, badgeType)
+    );
+
+    -- Notifications table
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      data TEXT,
+      read INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL
+    );
+
+    -- Habit participants (for habit joining feature)
+    CREATE TABLE IF NOT EXISTS habit_participants (
+      id TEXT PRIMARY KEY,
+      habitId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'MEMBER',
+      joinedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (habitId) REFERENCES habits(id),
+      UNIQUE(habitId, userId)
+    );
+
+    -- Rate limit tracking
+    CREATE TABLE IF NOT EXISTS rate_limits (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      actionType TEXT NOT NULL,
+      targetId TEXT,
+      date TEXT NOT NULL,
+      count INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(userId, actionType, targetId, date)
+    );
+
+    -- Indexes for social queries
+    CREATE INDEX IF NOT EXISTS idx_posts_authorUserId ON posts(authorUserId);
+    CREATE INDEX IF NOT EXISTS idx_posts_createdAt ON posts(createdAt);
+    CREATE INDEX IF NOT EXISTS idx_posts_privacy ON posts(privacy);
+    CREATE INDEX IF NOT EXISTS idx_reactions_postId ON reactions(postId);
+    CREATE INDEX IF NOT EXISTS idx_reactions_userId ON reactions(userId);
+    CREATE INDEX IF NOT EXISTS idx_nudges_fromUserId ON nudges(fromUserId);
+    CREATE INDEX IF NOT EXISTS idx_nudges_toUserId ON nudges(toUserId);
+    CREATE INDEX IF NOT EXISTS idx_nudges_createdAt ON nudges(createdAt);
+    CREATE INDEX IF NOT EXISTS idx_badges_userId ON badges(userId);
+    CREATE INDEX IF NOT EXISTS idx_notifications_userId ON notifications(userId);
+    CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
+    CREATE INDEX IF NOT EXISTS idx_habit_participants_habitId ON habit_participants(habitId);
+    CREATE INDEX IF NOT EXISTS idx_habit_participants_userId ON habit_participants(userId);
+    CREATE INDEX IF NOT EXISTS idx_rate_limits_userId_date ON rate_limits(userId, date);
+  `);
+}
+
+/**
+ * Migration V8: Add advanced post fields for M3 (media type, post tags, linked objects, context)
+ */
+async function migrationV8(database: SQLite.SQLiteDatabase): Promise<void> {
+  const postsInfo = await database.getAllAsync<{ name: string }>("PRAGMA table_info(posts)");
+  const postsColumns = postsInfo.map((col) => col.name);
+
+  // Add advanced post fields if they don't exist
+  if (!postsColumns.includes("mediaType")) {
+    await database.execAsync(`ALTER TABLE posts ADD COLUMN mediaType TEXT;`);
+  }
+  if (!postsColumns.includes("postTypeTags")) {
+    await database.execAsync(`ALTER TABLE posts ADD COLUMN postTypeTags TEXT;`); // JSON array
+  }
+  if (!postsColumns.includes("customTags")) {
+    await database.execAsync(`ALTER TABLE posts ADD COLUMN customTags TEXT;`); // JSON array
+  }
+  if (!postsColumns.includes("linkedObjectId")) {
+    await database.execAsync(`ALTER TABLE posts ADD COLUMN linkedObjectId TEXT;`);
+  }
+  if (!postsColumns.includes("linkedObjectType")) {
+    await database.execAsync(`ALTER TABLE posts ADD COLUMN linkedObjectType TEXT;`);
+  }
+  if (!postsColumns.includes("contextTimeOfDay")) {
+    await database.execAsync(`ALTER TABLE posts ADD COLUMN contextTimeOfDay TEXT;`);
+  }
+  if (!postsColumns.includes("contextLocation")) {
+    await database.execAsync(`ALTER TABLE posts ADD COLUMN contextLocation TEXT;`);
+  }
+
+  logger.info("Migration V8 applied: Advanced post fields added");
+}
+
+/**
+ * Migration V9: Fix missing columns from v7 (posts.updatedAt) and ensure comments table exists
+ */
+async function migrationV9(database: SQLite.SQLiteDatabase): Promise<void> {
+  // Check if posts table has updatedAt column
+  const postsInfo = await database.getAllAsync<{ name: string }>("PRAGMA table_info(posts)");
+  const postsColumns = postsInfo.map((col) => col.name);
+
+  if (!postsColumns.includes("updatedAt")) {
+    await database.execAsync(`ALTER TABLE posts ADD COLUMN updatedAt TEXT;`);
+    // Set updatedAt = createdAt for existing posts
+    await database.execAsync(`UPDATE posts SET updatedAt = createdAt WHERE updatedAt IS NULL;`);
+    logger.info("Added updatedAt column to posts table");
+  }
+
+  // Ensure comments table exists (may have been skipped in v7 if posts already existed)
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS comments (
+      id TEXT PRIMARY KEY,
+      postId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      bodyText TEXT NOT NULL,
+      isArchived INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (postId) REFERENCES posts(id) ON DELETE CASCADE
+    );
+  `);
+
+  logger.info("Migration V9 applied: Fixed posts.updatedAt and ensured comments table exists");
 }
 
 /**

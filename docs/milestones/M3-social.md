@@ -39,6 +39,12 @@ M3 adds social layer on top of tracking. Users post stories, react with emojis, 
   - Photo/video (optional, max 10MB)
   - Pillar tag (required, dropdown: MIND/BODY/HEART/SOUL)
   - Privacy (required, defaults to user default: SELF/FRIENDS/PUBLIC)
+  - "Advanced" toggle reveals optional fields:
+    - Pillar tag override (optional, chips: mind · body · heart · soul)
+    - Media type selector (photo, short video <60s, chart snapshot)
+    - Post type tags (optional, chips: #win, #struggle, #question, #reflection, or custom with #)
+    - Linked object picker (optional, search: habit · goal · milestone · module)
+    - Location category (home/work/gym/outdoors - if location permission granted)
 - [ ] Preview before posting
 - [ ] Save creates post locally, syncs in background
 - [ ] Post appears in own feed immediately
@@ -178,7 +184,7 @@ Response: { data: Post[], nextCursor?: string }
 **Acceptance Criteria:**
 
 - [ ] "React" button on each post
-- [ ] Emoji picker shows allowed reactions: 👏 🔥 💪 ❤️ ✨
+- [ ] Emoji picker shows allowed reactions: � ❤️ 👏 🔥 📈
 - [ ] Tapping emoji adds reaction (or removes if already reacted)
 - [ ] Post shows reaction summary: "👏 3 🔥 5"
 - [ ] Tapping summary shows who reacted
@@ -187,11 +193,11 @@ Response: { data: Post[], nextCursor?: string }
 
 **Allowed Emojis (Fixed Set):**
 
-- 👏 Clap (general support)
-- 🔥 Fire (impressive, on fire)
-- 💪 Strong (motivational, keep going)
+- 👍 Like (general support)
 - ❤️ Heart (love, care)
-- ✨ Sparkles (amazing, inspiring)
+- 👏 Clap (celebrating achievement)
+- 🔥 Fire (impressive, on fire)
+- 📈 Growth (progress, improvement)
 
 **Why limited:** Prevents negative reactions (no 👎, no 😢)
 
@@ -239,7 +245,7 @@ Response: { data: { message: "Reaction removed" } }
 - [ ] Nudge template picker (predefined messages):
   - "Keep it up! 💪"
   - "Proud of your streak! 🔥"
-  - "You've got this! ✨"
+  - "You've got this! 🔥"
   - "Don't break the chain! ⛓️"
   - "Let's do this together! 🙌"
 - [ ] Tapping template sends nudge
@@ -263,7 +269,7 @@ Rate Limits: 3/day per pair, 10/day per user
 
 - `keep-it-up` - "Keep it up! 💪"
 - `proud-streak` - "Proud of your streak! 🔥"
-- `you-got-this` - "You've got this! ✨"
+- `you-got-this` - "You've got this! 🔥"
 - `dont-break-chain` - "Don't break the chain! ⛓️"
 - `lets-do-together` - "Let's do this together! 🙌"
 

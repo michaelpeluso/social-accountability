@@ -4,15 +4,24 @@ import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { auth } from "../src/services/auth";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
+import { ThemeProvider, useTheme } from "../src/theme";
+import { printDatabaseDiagnostics } from "../src/storage/databaseDebug";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const segments = useSegments();
   const navigationState = useRootNavigationState();
+  const { theme } = useTheme();
 
   useEffect(() => {
     checkAuth();
+    // Run database diagnostics in development
+    if (__DEV__) {
+      printDatabaseDiagnostics().catch((error) =>
+        console.error("Database diagnostics failed:", error)
+      );
+    }
   }, []);
 
   async function checkAuth() {
@@ -40,8 +49,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#000" />
+      <View style={[styles.loading, { backgroundColor: theme.background.primary }]}>
+        <ActivityIndicator size="large" color={theme.semantic.primary} />
       </View>
     );
   }
@@ -53,9 +62,11 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
-        <AuthGate>
-          <Slot />
-        </AuthGate>
+        <ThemeProvider>
+          <AuthGate>
+            <Slot />
+          </AuthGate>
+        </ThemeProvider>
       </SafeAreaProvider>
     </ErrorBoundary>
   );
@@ -66,6 +77,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
   },
 });

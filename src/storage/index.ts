@@ -9,3 +9,15 @@ export * from "./goals";
 export * from "./habits";
 export * from "./checkIns";
 export * from "./dbDebug";
+
+// M3 Social modules
+export * from "./posts";
+export * from "./reactions";
+export * from "./comments";
+export * from "./nudges";
+export * from "./badges";
+export * from "./notifications";
+export * from "./rateLimits";
+
+// Dev utilities
+export { seedDemoData, clearDemoData, hasDemoData, DEMO_USERS } from "./seedData";

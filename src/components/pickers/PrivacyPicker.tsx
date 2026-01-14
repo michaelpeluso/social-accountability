@@ -5,6 +5,8 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import type { Privacy } from "../../types";
 import { PRIVACY_INFO } from "../../types/goals";
+import { spacing, borderRadius } from "../../theme/spacing";
+import { typography } from "../../theme/typography";
 
 interface PrivacyPickerProps {
   options: Privacy[];
@@ -38,11 +40,11 @@ export function PrivacyPicker({ options, selected, onSelect }: PrivacyPickerProp
 
 const styles = StyleSheet.create({
   privacyPicker: {
-    gap: 10,
+    gap: spacing.xmd,
   },
   privacyOption: {
-    padding: 14,
-    borderRadius: 10,
+    padding: spacing.smd,
+    borderRadius: borderRadius.xmd,
     borderWidth: 2,
     borderColor: "#e5e5e5",
     backgroundColor: "#fafafa",
@@ -52,16 +54,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#f5f5f5",
   },
   privacyOptionLabel: {
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
     color: "#666",
-    marginBottom: 2,
+    marginBottom: spacing.xxs,
   },
   privacyOptionLabelSelected: {
     color: "#000",
   },
   privacyOptionDesc: {
-    fontSize: 13,
+    fontSize: typography.fontSize.sm,
     color: "#999",
   },
 });

@@ -6,6 +6,8 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import type { Pillar } from "../../types";
 import { PILLAR_INFO, ALL_PILLARS } from "../../types/goals";
+import { spacing, borderRadius } from "../../theme/spacing";
+import { typography } from "../../theme/typography";
 
 interface PillarPickerProps {
   selected: Pillar;
@@ -65,41 +67,41 @@ const styles = StyleSheet.create({
   pillarPicker: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: spacing.xmd,
   },
   pillarOption: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingHorizontal: spacing.smd,
+    paddingVertical: spacing.xmd,
+    borderRadius: borderRadius.xmd,
     borderWidth: 2,
     borderColor: "#e5e5e5",
     backgroundColor: "#fafafa",
   },
   pillarOptionEmoji: {
-    fontSize: 18,
-    marginRight: 6,
+    fontSize: typography.fontSize.lg,
+    marginRight: spacing.xs + 2,
   },
   pillarOptionText: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
     color: "#666",
   },
   lockedPillarBadge: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingHorizontal: spacing.smd,
+    paddingVertical: spacing.xmd + 2,
+    borderRadius: borderRadius.xmd,
     borderWidth: 2,
     borderColor: "#e5e5e5",
     backgroundColor: "#f9f9f9",
   },
   lockedPillarText: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
     color: "#666",
-    marginLeft: 8,
+    marginLeft: spacing.sm,
   },
 });

@@ -709,33 +709,90 @@ Instagram Usage - Today
 
 ---
 
-### 8.6 Custom Friend Lists
+### 8.6 Circle Groups (Private Groups with Feed + Chat)
 
-**Story:** As a user, I want to create custom groups of friends to share different content with different circles.
+**Story:** As a user, I want to create Circle groups with their own private feed and group chat, distinct from my general friends list.
+
+**What are Circles?**
+
+Circles are private groups (like Slack workspaces or Discord servers) where users can:
+
+- Create multiple Circles for different contexts ("Gym Buddies", "Family", "Work Friends")
+- Invite members (who must be friends) to join
+- Post to a Circle-specific feed (visible only to Circle members)
+- Chat with Circle members in a persistent group DM
+- Receive notifications for Circle activity
+
+**Key distinction:** Circles are NOT the same as friends. Users can have multiple Circles, and each Circle has its own private feed and chat.
 
 **Acceptance Criteria:**
 
-- [ ] Create/edit/delete friend lists: "Gym Buddies", "Family", "Work Friends"
-- [ ] Add friends to multiple lists
-- [ ] When posting: Select lists to share with (instead of FRIENDS/PUBLIC)
-- [ ] Default list: "Close Friends" (M4 existing feature)
-- [ ] Story privacy: "Visible to: Family, Gym Buddies"
+- [ ] Create/edit/delete Circles: name, description, privacy (invite-only / public)
+- [ ] Assign roles: `OWNER` (creator, full admin), `MEMBER` (regular participant)
+- [ ] Invite friends to Circles; members can see member list
+- [ ] Circle Feed: posts scoped to `circleId` visible only to Circle members
+- [ ] Circle Chat: persistent group DM with messages (`CircleMessage`) supporting text, media, pagination
+- [ ] Notifications: `CIRCLE_POST`, `CIRCLE_MESSAGE`, `CIRCLE_INVITE`, `CIRCLE_MEMBER_JOINED`
+- [ ] Moderation: owners can remove posts/messages, remove members, archive Circle
+- [ ] User can leave Circle (owners can transfer ownership or archive)
 
-**Why:** Users have different circles with different sharing comfort levels. Work friends see professional growth, gym buddies see fitness journey, family sees personal struggles. Avoids oversharing or under-sharing.
+**Why:** Users have different circles with different sharing comfort levels. Work friends see professional growth, gym buddies see fitness journey, family sees personal struggles. Circles provide dedicated spaces for each group with their own conversations and feeds, avoiding oversharing or under-sharing.
 
 **Technical Requirements:**
 
-- New table: `friend_lists` (userId, name)
-- Junction table: `friend_list_members` (listId, friendId)
-- Post privacy: JSON array of list IDs
-- Query expansion: Resolve list IDs to friend IDs server-side
+**Data Model:**
+
+- `circles` table: `id`, `ownerUserId`, `name`, `description`, `privacy` (INVITE_ONLY/PUBLIC), `createdAt`, `archivedAt`
+- `circle_members` table: `circleId`, `userId`, `role` (OWNER/MEMBER), `joinedAt`
+- `circle_messages` table: `id`, `circleId`, `fromUserId`, `body`, `mediaUrl`, `createdAt`, `deletedAt`
+- `circle_invites` table: `id`, `circleId`, `fromUserId`, `toUserId`, `status` (PENDING/ACCEPTED/DECLINED), `createdAt`
+- `posts` table: existing `circleId` field now enforced; posts with `circleId` only visible to Circle members
+
+**API Endpoints:**
+
+- `POST /circles` - Create Circle
+- `GET /circles/:id` - Get Circle details + members
+- `POST /circles/:id/invite` - Invite friend to Circle
+- `POST /circles/:id/leave` - Leave Circle
+- `DELETE /circles/:id/members/:userId` - Remove member (owner only)
+- `GET /circles/:id/feed` - Get Circle-scoped posts (paginated)
+- `GET /circles/:id/messages` - Get Circle chat messages (paginated)
+- `POST /circles/:id/messages` - Send message to Circle chat
+- `DELETE /circles/:id/messages/:msgId` - Delete message (owner or author)
+
+**Privacy Enforcement:**
+
+- Server MUST validate Circle membership before returning feed or messages
+- Non-members see 403 Forbidden
+- Circle coordinates or location info must respect user privacy settings
+- Audit log: track post/message deletions, member removals
+
+**UI Components:**
+
+- Circle creation flow (name, description, privacy)
+- Circle member management screen (invite, remove, transfer ownership)
+- Circle Feed screen (posts scoped to Circle)
+- Circle Chat screen (group DM with real-time updates)
+- Circle list view (user's Circles)
+
+**Future Enhancements (M9+):**
+
+- Read receipts and typing indicators in Circle chat
+- Threaded replies in Circle chat
+- Message reactions and pinned messages
+- Circle events and shared goals
+- Polls and scheduling tools
+- Cross-Circle mentions
+- Circle discovery (public Circles)
 
 **Privacy Notes:**
 
-- List names never visible to list members (user's private organization)
-- Friends don't know which lists they're in
+- Circle members can see each other and the member list
+- Circle names and descriptions visible to members only (unless public)
+- Friends can see which Circles you're in together (shared Circles)
+- Non-members cannot see Circle content
 
-**Cost:** $0
+**Cost:** $0 (server storage and bandwidth for messages; monitor usage)
 
 ---
 

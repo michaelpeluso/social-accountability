@@ -12,8 +12,10 @@ import { getGoalById, archiveGoal } from "../../src/storage/goals";
 import { getHabitsByGoal } from "../../src/storage/habits";
 import { PILLAR_INFO, PRIVACY_INFO } from "../../src/types/goals";
 import type { Goal, Habit } from "../../src/types";
+import { useTheme, spacing, borderRadius, typography } from "../../src/theme";
 
 export default function GoalDetailScreen() {
+  const { theme } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [goal, setGoal] = useState<Goal | null>(null);
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -77,22 +79,27 @@ export default function GoalDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.loadingText}>Loading...</Text>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background.secondary }]}>
+        <Text style={[styles.loadingText, { color: theme.text.tertiary }]}>Loading...</Text>
       </SafeAreaView>
     );
   }
 
   if (!goal) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background.secondary }]}>
+        <View
+          style={[
+            styles.header,
+            { backgroundColor: theme.background.primary, borderBottomColor: theme.border.light },
+          ]}
+        >
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backButtonText}>Back</Text>
+            <Text style={[styles.backButtonText, { color: theme.semantic.primary }]}>Back</Text>
           </Pressable>
         </View>
         <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Goal not found</Text>
+          <Text style={[styles.emptyTitle, { color: theme.text.tertiary }]}>Goal not found</Text>
         </View>
       </SafeAreaView>
     );
@@ -102,73 +109,108 @@ export default function GoalDetailScreen() {
   const privacyInfo = PRIVACY_INFO[goal.privacy];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background.secondary }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: theme.background.primary, borderBottomColor: theme.border.light },
+        ]}
+      >
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>Back</Text>
+          <Text style={[styles.backButtonText, { color: theme.semantic.primary }]}>Back</Text>
         </Pressable>
         <Pressable onPress={handleArchive} style={styles.archiveButton}>
-          <Text style={styles.archiveButtonText}>Archive</Text>
+          <Text style={[styles.archiveButtonText, { color: theme.semantic.danger }]}>Archive</Text>
         </Pressable>
       </View>
 
       <ScrollView
         style={styles.content}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.text.secondary}
+          />
+        }
       >
         {/* Goal Info Card */}
-        <View style={[styles.goalCard, { borderLeftColor: pillarInfo.color }]}>
+        <View
+          style={[
+            styles.goalCard,
+            { backgroundColor: theme.card.background, borderLeftColor: pillarInfo.color },
+          ]}
+        >
           <View style={styles.goalHeader}>
             <Text style={styles.pillarEmoji}>{pillarInfo.emoji}</Text>
             <View style={styles.goalTitleContainer}>
-              <Text style={styles.goalTitle}>{goal.title}</Text>
-              <Text style={styles.pillarLabel}>{pillarInfo.label}</Text>
+              <Text style={[styles.goalTitle, { color: theme.text.primary }]}>{goal.title}</Text>
+              <Text style={[styles.pillarLabel, { color: theme.text.tertiary }]}>
+                {pillarInfo.label}
+              </Text>
             </View>
           </View>
 
-          <View style={styles.metaRow}>
-            <View style={styles.privacyBadge}>
-              <Text style={styles.privacyText}>{privacyInfo.label}</Text>
+          <View style={[styles.metaRow, { borderTopColor: theme.border.light }]}>
+            <View style={[styles.privacyBadge, { backgroundColor: theme.background.secondary }]}>
+              <Text style={[styles.privacyText, { color: theme.text.tertiary }]}>
+                {privacyInfo.label}
+              </Text>
             </View>
-            <Text style={styles.createdDate}>
+            <Text style={[styles.createdDate, { color: theme.text.tertiary }]}>
               Created {new Date(goal.createdAt).toLocaleDateString()}
             </Text>
           </View>
         </View>
 
         {/* Linked Habits Section */}
-        <View style={styles.habitsSection}>
+        <View style={[styles.habitsSection, { backgroundColor: theme.card.background }]}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Linked Habits</Text>
-            <Pressable onPress={handleAddHabit} style={styles.addHabitButton}>
-              <Text style={styles.addHabitButtonText}>+ Add Habit</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>Linked Habits</Text>
+            <Pressable
+              onPress={handleAddHabit}
+              style={[styles.addHabitButton, { backgroundColor: theme.button.primary.background }]}
+            >
+              <Text style={[styles.addHabitButtonText, { color: theme.button.primary.text }]}>
+                + Add Habit
+              </Text>
             </Pressable>
           </View>
 
           {habits.length === 0 ? (
             <View style={styles.noHabits}>
-              <Text style={styles.noHabitsText}>No habits linked to this goal yet.</Text>
+              <Text style={[styles.noHabitsText, { color: theme.text.tertiary }]}>
+                No habits linked to this goal yet.
+              </Text>
               <Pressable onPress={handleAddHabit} style={styles.linkHabitButton}>
-                <Text style={styles.linkHabitButtonText}>Create a habit</Text>
+                <Text style={[styles.linkHabitButtonText, { color: theme.semantic.primary }]}>
+                  Create a habit
+                </Text>
               </Pressable>
             </View>
           ) : (
             habits.map((habit) => (
               <Pressable
                 key={habit.id}
-                style={styles.habitCard}
+                style={[styles.habitCard, { borderBottomColor: theme.border.light }]}
                 onPress={() => router.push(`/habits/${habit.id}`)}
               >
                 <View style={styles.habitInfo}>
-                  <Text style={styles.habitTitle}>{habit.title}</Text>
-                  <Text style={styles.habitSchedule}>
+                  <Text style={[styles.habitTitle, { color: theme.text.primary }]}>
+                    {habit.title}
+                  </Text>
+                  <Text style={[styles.habitSchedule, { color: theme.text.tertiary }]}>
                     {habit.schedule.targetCount}x {habit.schedule.frequency}
                   </Text>
                 </View>
                 {habit.currentStreak > 0 && (
-                  <View style={styles.streakBadge}>
-                    <Text style={styles.streakText}>{habit.currentStreak} day streak</Text>
+                  <View
+                    style={[styles.streakBadge, { backgroundColor: theme.semantic.danger + "20" }]}
+                  >
+                    <Text style={[styles.streakText, { color: theme.semantic.danger }]}>
+                      {habit.currentStreak} day streak
+                    </Text>
                   </View>
                 )}
               </Pressable>
@@ -177,13 +219,15 @@ export default function GoalDetailScreen() {
         </View>
 
         {/* Progress Summary (placeholder for M2-2.7) */}
-        <View style={styles.progressSection}>
-          <Text style={styles.sectionTitle}>Progress</Text>
-          <View style={styles.progressCard}>
-            <Text style={styles.progressText}>
+        <View style={[styles.progressSection, { backgroundColor: theme.card.background }]}>
+          <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>Progress</Text>
+          <View style={[styles.progressCard, { backgroundColor: theme.background.secondary }]}>
+            <Text style={[styles.progressText, { color: theme.text.primary }]}>
               {habits.length} habit{habits.length !== 1 ? "s" : ""} linked
             </Text>
-            <Text style={styles.progressSubtext}>Track your progress towards this goal</Text>
+            <Text style={[styles.progressSubtext, { color: theme.text.tertiary }]}>
+              Track your progress towards this goal
+            </Text>
           </View>
         </View>
       </ScrollView>
@@ -194,56 +238,48 @@ export default function GoalDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
   },
   loadingText: {
     textAlign: "center",
     marginTop: 100,
-    fontSize: 16,
-    color: "#666",
+    fontSize: typography.fontSize.base,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "#fff",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e5e5",
   },
   backButton: {
-    padding: 8,
+    padding: spacing.xs,
   },
   backButtonText: {
-    fontSize: 16,
-    color: "#007AFF",
+    fontSize: typography.fontSize.base,
   },
   archiveButton: {
-    padding: 8,
+    padding: spacing.xs,
   },
   archiveButtonText: {
-    fontSize: 16,
-    color: "#FF6B6B",
+    fontSize: typography.fontSize.base,
   },
   emptyState: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 40,
+    padding: spacing.xxl,
   },
   emptyTitle: {
-    fontSize: 18,
-    color: "#666",
+    fontSize: typography.fontSize.lg,
   },
   content: {
     flex: 1,
   },
   goalCard: {
-    backgroundColor: "#fff",
-    margin: 16,
-    padding: 20,
-    borderRadius: 16,
+    margin: spacing.md,
+    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
     borderLeftWidth: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -254,52 +290,46 @@ const styles = StyleSheet.create({
   goalHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   pillarEmoji: {
     fontSize: 32,
-    marginRight: 12,
+    marginRight: spacing.sm,
   },
   goalTitleContainer: {
     flex: 1,
   },
   goalTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 4,
+    fontSize: typography.heading.h2.fontSize,
+    fontWeight: typography.heading.h2.fontWeight,
+    marginBottom: spacing.xxs,
   },
   pillarLabel: {
-    fontSize: 14,
-    color: "#666",
+    fontSize: typography.fontSize.sm,
   },
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingTop: 16,
+    paddingTop: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
   },
   privacyBadge: {
-    backgroundColor: "#f0f0f0",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs,
+    borderRadius: borderRadius.sm,
   },
   privacyText: {
-    fontSize: 12,
-    color: "#666",
+    fontSize: typography.fontSize.xs,
   },
   createdDate: {
-    fontSize: 12,
-    color: "#999",
+    fontSize: typography.fontSize.xs,
   },
   habitsSection: {
-    backgroundColor: "#fff",
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 20,
-    borderRadius: 16,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -310,77 +340,68 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
   },
   addHabitButton: {
-    backgroundColor: "#000",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: borderRadius.sm,
   },
   addHabitButtonText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "500",
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
   },
   noHabits: {
     alignItems: "center",
-    paddingVertical: 20,
+    paddingVertical: spacing.lg,
   },
   noHabitsText: {
-    color: "#999",
-    fontSize: 14,
-    marginBottom: 12,
+    fontSize: typography.fontSize.sm,
+    marginBottom: spacing.sm,
   },
   linkHabitButton: {
-    paddingVertical: 8,
+    paddingVertical: spacing.xs,
   },
   linkHabitButtonText: {
-    color: "#007AFF",
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
   },
   habitCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 14,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: "#f5f5f5",
   },
   habitInfo: {
     flex: 1,
   },
   habitTitle: {
-    fontSize: 16,
-    fontWeight: "500",
-    marginBottom: 4,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing.xxs,
   },
   habitSchedule: {
-    fontSize: 13,
-    color: "#666",
+    fontSize: typography.fontSize.xs,
   },
   streakBadge: {
-    backgroundColor: "#FF6B6B20",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs,
+    borderRadius: borderRadius.full,
   },
   streakText: {
-    fontSize: 12,
-    color: "#FF6B6B",
-    fontWeight: "600",
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
   },
   progressSection: {
-    backgroundColor: "#fff",
-    marginHorizontal: 16,
-    marginBottom: 32,
-    padding: 20,
-    borderRadius: 16,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.xxl,
+    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -388,18 +409,16 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   progressCard: {
-    marginTop: 12,
-    padding: 16,
-    backgroundColor: "#f8f8f8",
-    borderRadius: 12,
+    marginTop: spacing.sm,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
   },
   progressText: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 4,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.xxs,
   },
   progressSubtext: {
-    fontSize: 14,
-    color: "#666",
+    fontSize: typography.fontSize.sm,
   },
 });

@@ -118,12 +118,17 @@ const mockApi = {
   ): Promise<ApiResponse<SignInResponse>> => {
     logger.info("Mock API: signInWithApple", { appleUserId: request.appleUserId });
 
+    // Use stable ID for dev user
+    const isDevUser = request.appleUserId === "dev-user-12345";
+    const userId = isDevUser ? "dev-user-001" : `user-${request.appleUserId.slice(0, 8)}`;
+
     const mockUser: User = {
-      id: `user-${request.appleUserId.slice(0, 8)}`,
+      id: userId,
       appleId: request.appleUserId,
       displayName: request.fullName || "New User",
       email: request.email,
-      defaultPrivacy: "SELF",
+      bio: isDevUser ? "Building good habits, one day at a time." : undefined,
+      defaultPrivacy: "FRIENDS",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -177,13 +182,61 @@ const mockApi = {
   },
 
   getFriends: async (): Promise<ApiResponse<User[]>> => {
-    return { data: [] };
+    // Return mock friends (Alice and Bob)
+    return {
+      data: [
+        {
+          id: "demo_alice",
+          displayName: "Alice",
+          bio: "Marathon runner",
+          defaultPrivacy: "FRIENDS",
+          createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          id: "demo_bob",
+          displayName: "Bob",
+          bio: "Mindfulness enthusiast",
+          defaultPrivacy: "FRIENDS",
+          createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+    };
   },
 
   getFriendRequests: async (): Promise<
     ApiResponse<{ sent: FriendRequest[]; received: FriendRequest[] }>
   > => {
-    return { data: { sent: [], received: [] } };
+    return {
+      data: {
+        sent: [],
+        received: [
+          {
+            id: "req_1",
+            fromUserId: "demo_carol",
+            toUserId: "mock-user-123",
+            status: "PENDING",
+            createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+            sender: {
+              id: "demo_carol",
+              displayName: "Carol",
+              bio: "New to habits",
+              defaultPrivacy: "FRIENDS",
+              createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+            recipient: {
+              id: "mock-user-123",
+              displayName: "Test User",
+              defaultPrivacy: "SELF",
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          },
+        ],
+      },
+    };
   },
 
   sendFriendRequest: async (
@@ -225,9 +278,41 @@ const mockApi = {
     return { data: [] };
   },
 
-  searchUsers: async (_query: string): Promise<ApiResponse<User[]>> => {
-    // Mock empty results for now - real search happens on backend
-    return { data: [] };
+  searchUsers: async (searchQuery: string): Promise<ApiResponse<User[]>> => {
+    // Return demo users that match the search query
+    const allUsers = [
+      {
+        id: "demo_alice",
+        displayName: "Alice",
+        bio: "Marathon runner",
+        defaultPrivacy: "FRIENDS" as Privacy,
+        createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: "demo_bob",
+        displayName: "Bob",
+        bio: "Mindfulness enthusiast",
+        defaultPrivacy: "FRIENDS" as Privacy,
+        createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: "demo_carol",
+        displayName: "Carol",
+        bio: "New to habits",
+        defaultPrivacy: "FRIENDS" as Privacy,
+        createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+
+    const query = searchQuery.toLowerCase();
+    const filtered = allUsers.filter(
+      (u) => u.displayName.toLowerCase().includes(query) || u.bio?.toLowerCase().includes(query)
+    );
+
+    return { data: filtered };
   },
 
   // Goal mock endpoints

@@ -1,6 +1,6 @@
-# Milestone 5: BUILD/BREAK Habits & Stacking
+# Milestone 5: BUILD/BREAK Habits, Stacking & Progressive Overload
 
-**Goal:** Add BUILD/BREAK habit types, intensity tracking, habit stacking detection, and HealthKit steps proof-of-concept.
+**Goal:** Add BUILD/BREAK habit types, intensity tracking, habit stacking detection, progressive habits (1% rule), and HealthKit steps proof-of-concept.
 **Timeline:** 3-4 weeks
 **Cost Target:** $0 (device-side + HealthKit)
 **Dependencies:** M4 complete (identities & analytics working)
@@ -9,7 +9,7 @@
 
 ## Overview
 
-M5 extends habit tracking with BUILD (positive) vs BREAK (negative) habit types, intensity ratings for tracking habit quality, automated habit stacking detection using Atomic Habits principles, and HealthKit steps integration as first automation proof-of-concept.
+M5 extends habit tracking with BUILD (positive) vs BREAK (negative) habit types, intensity ratings for tracking habit quality, automated habit stacking detection using Atomic Habits principles, progressive overload (1% rule) for metric-based habits, and HealthKit steps integration as first automation proof-of-concept.
 
 ---
 
@@ -623,7 +623,319 @@ enum ChallengeType {
 
 ---
 
-### 5.8 Goal Enhancements: Weighted Habit Contributions
+### 5.6 Progressive Habits (1% Rule)
+
+**Story:** As a user, I want my habit targets to automatically increase over time so I can gradually build more capability (progressive overload).
+
+**Acceptance Criteria:**
+
+- [ ] Habit creation includes "Progressive Overload" toggle
+- [ ] Toggle only appears for metric-based habits (count, duration, distance, weight)
+- [ ] Progressive settings:
+  - Increment rate: 1%, 2%, 5%, or 10% (default 1%)
+  - Allow decimal targets: yes (round to nearest 0.1) | no (round to whole number)
+  - Optional max cap: stop incrementing at this value
+  - Increments automatically after every completed check-in
+- [ ] Dashboard shows:
+  - Current target vs original target
+  - Progress toward next increment
+  - Visual indicator (📈 icon)
+- [ ] Habit detail includes progression graph over time
+- [ ] Celebration notification when target increases: "New challenge: 31 minutes! 💪"
+
+**Example Progressive Habits:**
+
+```typescript
+// Duration-based: Exercise
+{
+  habit: "Morning run",
+  progressiveOverload: {
+    enabled: true,
+    incrementRate: 0.01,  // 1% per completion
+    allowDecimals: true,  // Round to nearest 0.1
+    originalTarget: 30,  // Started at 30 min
+    currentTarget: 33.5,  // After 10 completions: 30 * 1.01^10 ≈ 33.5
+    maxTarget: 60,  // Stop at 60 min
+    lastIncrementedAt: "2026-01-05"
+  },
+  schedule: { frequency: "daily", targetDuration: 33.5 }
+}
+
+// Count-based: Pushups
+{
+  habit: "Daily pushups",
+  progressiveOverload: {
+    enabled: true,
+    incrementRate: 0.02,  // 2% per completion
+    allowDecimals: false,  // Whole numbers only
+    originalTarget: 10,
+    currentTarget: 15,  // After ~20 completions: 10 * 1.02^20 ≈ 15
+    maxTarget: null,  // No cap
+  },
+  schedule: { frequency: "daily", targetCount: 15 }
+}
+
+// Distance-based: Running
+{
+  habit: "Weekly long run",
+  progressiveOverload: {
+    enabled: true,
+    incrementRate: 0.05,  // 5% per completion (aggressive)
+    allowDecimals: true,  // Round to nearest 0.1 mile
+    originalTarget: 5.0,  // Started at 5 miles
+    currentTarget: 7.4,  // After 8 completions: 5 * 1.05^8 ≈ 7.4
+    maxTarget: 13.1,  // Half-marathon distance
+  }
+}
+
+// Weight-based: Strength training
+{
+  habit: "Bench press",
+  progressiveOverload: {
+    enabled: true,
+    incrementRate: 0.025,  // 2.5% per completion
+    allowDecimals: false,  // Whole pounds only (easier for gym plates)
+    originalTarget: 135,  // lbs
+    currentTarget: 150,  // After ~5 completions: 135 * 1.025^5 ≈ 153
+    maxTarget: 225,
+  }
+}
+```
+
+**Dashboard Display:**
+
+```
+┌─────────────────────────────────────────┐
+│  🏃 Morning run (progressive) 📈        │
+├─────────────────────────────────────────┤
+│  Current target: 33.5 min               │
+│  Original: 30 min (+11%)                │
+│                                         │
+│  Next: 33.8 min (after next check-in)   │
+│                                         │
+│  Progress over time:                    │
+│  30.0──31.2──32.4──33.5──→              │
+│  W1   W4   W7   W10                     │
+│                                         │
+│  [View Details]                         │
+└─────────────────────────────────────────┘
+```
+
+**Progression Graph:**
+
+```
+Target Over Time (Last 12 Completions)
+
+35 min  ─────────────────────────● Goal
+
+33 min  ──────────────────────●
+
+30 min  ──────────────────●
+
+27 min  ●
+        │  │  │  │  │  │  │  │  │  │  │
+        #1 #2 #4 #5 #7 #8 #10 #11 #12
+```
+
+**Future Projection (Dashboard Forecast):**
+
+The dashboard will include a small forecast graph that projects the habit's future targets based on the user's chosen `incrementRate` and `incrementFrequency`. The projection uses the current target as a starting point and applies the multiplier (1 + incrementRate) for each increment period over a user-configurable horizon (e.g., 4, 12, 52 periods). The projection is presented as a dashed line extending beyond the historical target series.
+
+Example projection display on the dashboard:
+
+```
+Target: 30.0 → 33.5 (current)
+
+Projection (next 12 weeks):
+33.5 ───┐──────────┐──────────┐─── dashed →
+35.2 ───┘          \          \
+37.1 ──────────────\          \
+40.3 ──────────────────────────●
+
+Legend: solid = historical targets, dashed = projected targets
+```
+
+Calculation snippet (device-side):
+
+```typescript
+function projectTargets(
+  currentTarget: number,
+  rate: number,
+  periods: number,
+  allowDecimals: boolean
+) {
+  const out: number[] = [];
+  let t = currentTarget;
+  for (let i = 1; i <= periods; i++) {
+    t = t * (1 + rate);
+    if (allowDecimals) {
+      t = Math.round(t * 10) / 10; // Round to nearest 0.1
+    } else {
+      t = Math.round(t); // Round to nearest whole number
+    }
+    out.push(t);
+  }
+  return out; // array of projected targets per period
+}
+```
+
+Notes:
+
+- Projection respects `maxTarget` and stops the dashed line at the cap.
+- The dashboard projection will show an optional confidence overlay based on recent completion consistency (deferred to M7 for ML-driven confidence). In M5 the confidence indicator is a simple completion-rate threshold (e.g., show as high/medium/low).
+
+**Increment Logic:**
+
+```typescript
+// Called automatically after each successful check-in
+function incrementHabitTarget(habit: Habit): number {
+  const { progressiveOverload } = habit;
+
+  if (!progressiveOverload?.enabled) {
+    return habit.currentTarget;
+  }
+
+  // Calculate new target
+  const multiplier = 1 + progressiveOverload.incrementRate;
+  let newTarget = progressiveOverload.currentTarget * multiplier;
+
+  // Apply rounding
+  if (progressiveOverload.allowDecimals) {
+    newTarget = Math.round(newTarget * 10) / 10; // Round to nearest 0.1
+  } else {
+    newTarget = Math.round(newTarget); // Round to nearest whole number
+  }
+
+  // Apply max cap
+  if (progressiveOverload.maxTarget && newTarget > progressiveOverload.maxTarget) {
+    newTarget = progressiveOverload.maxTarget;
+    // Stop incrementing, achieved max
+    progressiveOverload.enabled = false;
+    showNotification(`🎉 Maximum target reached: ${newTarget} ${habit.unit}!`);
+  } else {
+    // Show celebration for normal increment
+    showNotification(`New challenge: ${newTarget} ${habit.unit}! 💪`);
+  }
+
+  // Update habit
+  progressiveOverload.currentTarget = newTarget;
+  progressiveOverload.lastIncrementedAt = new Date().toISOString();
+
+  return newTarget;
+}
+
+// Triggered after check-in creation
+function onHabitCheckIn(habitId: string) {
+  const habit = getHabit(habitId);
+  if (habit.progressiveOverload?.enabled) {
+    const newTarget = incrementHabitTarget(habit);
+    updateHabit(habit);
+  }
+}
+```
+
+**Why:**
+
+- Progressive overload is the foundation of fitness and skill development
+- Auto-incrementing prevents plateau and maintains challenge
+- 1% rule makes growth feel achievable (not overwhelming)
+- Training module users expect this feature (standard in workout apps)
+
+**Design Rationale:**
+
+- **Metric-based only:** Boolean check-in habits ("Meditate daily") can't meaningfully increment
+- **Opt-in per habit:** Not all habits benefit from progression (e.g., "Read before bed" vs "Run 5K")
+- **Auto-increment on completion:** Simplest possible UX - just complete the habit, target increases automatically
+- **Adjustable rate:** Small increments (1%) for sustainability, larger (5-10%) for aggressive training
+- **Decimal choice matters:** "Run 30.3 minutes" is fine for some users, but "15.7 pushups" feels awkward; let users choose per habit
+- **Max cap prevents absurdity:** Without cap, "10 pushups" becomes "1000 pushups" after 200 completions
+- **Show progression graph:** Users need to see their growth trajectory to stay motivated
+
+**Training Module Integration:**
+
+Progressive habits are especially powerful in the Training module (M5 Growth Hub):
+
+```typescript
+// Training module workout habits auto-enable progressive overload
+{
+  habit: "Squat",
+  module: "TRAINING",
+  progressiveOverload: {
+    enabled: true,  // Default ON for training
+    incrementRate: 0.025,  // 2.5% per workout
+    allowDecimals: false,  // Whole pounds for plates
+    originalTarget: 135,
+    currentTarget: 150,
+  }
+}
+```
+
+**Social Sharing:**
+
+Progressive habits create natural social moments:
+
+- "Sarah just increased her running target to 35 minutes! 🎉" (auto-post on milestone, opt-in)
+- Habit detail shows progression graph (with privacy controls)
+- Badge: "1% Better" (awarded after 10 increments on any progressive habit)
+
+**Privacy Notes:**
+
+- Progression is SELF-only by default
+- User can share progression milestones (opt-in)
+- Graph visibility inherits habit privacy setting
+
+**Limitations & Future Enhancements (M7+):**
+
+**Not included in M5:**
+
+- ❌ ML-detected optimal increment rate (e.g., analyzing completion consistency to suggest faster/slower progression)
+- ❌ Automatic deload weeks (reduce 10% every 4th week for recovery)
+- ❌ Adaptive increments based on intensity ratings (if user rates workouts 2/5 consistently, slow progression)
+- ❌ Comparison with similar users' progression rates
+- ❌ Auto-suggest progressive overload for appropriate habits
+
+**Example limitation:**
+
+```typescript
+// M5: User manually enables progressive overload
+{
+  habit: "Morning run",
+  progressiveOverload: { enabled: true, ... }
+}
+
+// M7: ML suggests it after detecting consistent completion
+{
+  suggestion: {
+    type: "ENABLE_PROGRESSIVE",
+    habit: "Morning run",
+    reason: "You've completed this habit 90% of days for 60 days. Ready to challenge yourself with 1% weekly increases?",
+    confidence: 0.87
+  }
+}
+```
+
+**Cost:** $0
+
+**Technical Requirements:**
+
+- Habit.progressiveOverload column (JSON object)
+- Device-side increment calculation (no server calls)
+- Weekly cron job to check and increment eligible habits
+- Notification on increment
+- Progression graph component (reusable across habit types)
+
+**Testing Checklist:**
+
+- [ ] Progressive toggle only shown for metric-based habits
+- [ ] Increment calculation accurate across all rounding rules
+- [ ] Max cap prevents over-incrementing
+- [ ] Graph displays progression over time
+- [ ] Celebration notification appears on increment
+- [ ] Training module habits default to progressive
+
+---
+
+### 5.7 Goal Enhancements: Weighted Habit Contributions
 
 **Story:** As a user, I want my linked habits to contribute different weights to my goal progress.
 
@@ -674,7 +986,7 @@ enum ChallengeType {
 
 ---
 
-### 5.9 Goal Enhancements: Habit-Derived Data Source
+### 5.8 Goal Enhancements: Habit-Derived Data Source
 
 **Story:** As a user, I want my goal progress to be automatically calculated from my habit check-ins.
 
@@ -729,6 +1041,288 @@ enum ChallengeType {
 
 ---
 
+### 5.9 Habit Signals (Ribbons + Warnings)
+
+Story:
+As a user, I want clear visual signals on my habits so I can instantly see what’s going well (ribbons) and what needs attention (warnings) without reading metrics.
+
+Overview:
+Habit Signals are lightweight visual markers attached to habit icons. These attributes should linked to the habit, so it shows in the habit menu but also will be listed in its own ribbon/warning sections on the dashboard.
+
+- Ribbons = positive achievements
+- Warnings = negative or risk states
+- A habit can show only ONE signal at a time (either a ribbon OR a warning)
+- Signals are relative, not absolute
+
+Visual System:
+
+Ribbons (Positive):
+[icon]
+horizontal colored ribbon across icon
+short label (1 word)
+muted positive color
+
+Warnings (Negative):
+[icon]
+small triangle or flag in bottom-right
+short label (1 word)
+yellow = early risk, red = confirmed issue
+
+Acceptance Criteria:
+
+- Habit shows either a ribbon OR a warning, never both
+- Signals are computed weekly (default), optionally monthly
+- Signals are relative across the user’s habits
+- No numbers or percentages shown
+- Tap signal opens habit insight detail
+- Signals auto-update and auto-clear
+- Signals respect habit privacy settings
+
+Ribbon Set (Positive):
+
+- Consistent
+- Longest
+- Completed
+- Recovered
+- High-Effort
+
+Warning Set (Negative):
+
+- Avoided
+- Lapsed
+- Missed
+- Reset
+- Low-Effort
+
+Ribbon ↔ Warning Mapping:
+Consistent ↔ Avoided
+Longest ↔ Lapsed
+Completed ↔ Missed
+Recovered ↔ Reset
+High-Effort ↔ Low-Effort
+
+Signal Selection Logic (Device-Side):
+
+function assignHabitSignals(habits, window) {
+const stats = computeHabitStats(habits, window);
+
+const positives = {
+consistent: maxBy(stats, 'completionRate'),
+longest: maxBy(stats, 'currentStreak'),
+completed: maxBy(stats, 'completionCount'),
+recovered: maxBy(stats, 'recoveryCount'),
+highEffort: maxBy(stats, 'avgIntensity'),
+};
+
+const negatives = {
+avoided: minBy(stats, 'completionRate'),
+lapsed: minBy(stats, 'daysSinceLapse'),
+missed: maxBy(stats, 'missCount'),
+reset: maxBy(stats, 'resetCount'),
+lowEffort: minBy(stats, 'avgIntensity'),
+};
+
+return resolveConflicts(positives, negatives);
+}
+
+Rules:
+
+- Minimum data threshold required
+- If difference is insignificant, no signal shown
+- BREAK habits prefer recovery framing
+- Warnings override ribbons when both apply
+
+Dashboard Example:
+Gym → Consistent
+Reading → Longest
+No Social Media → Avoided
+Meditation → Lapsed
+
+Interaction:
+
+- Tap ribbon: “This was your most consistent habit this week”
+- Tap warning: “This habit was most missed this week”
+- No forced actions or shame language
+
+Privacy:
+
+- Signals inherit habit visibility
+- No metrics exposed via signals
+- Warnings never auto-posted socially
+
+Why:
+Separating ribbons (wins) from warnings (attention signals) keeps achievements meaningful, reduces shame, and makes the dashboard instantly readable.
+
+Cost: $0
+
+---
+
+### 5.10 Habit Spectrum (Coupled Analytics Bar)
+
+Story:
+As a user, I want to see a simple visual spectrum on each habit page so I can understand where this habit falls between positive and negative extremes at a glance.
+
+Overview:
+The Habit Spectrum is a horizontal gradient bar shown on each habit detail page.
+It visualizes a habit’s position between two coupled attributes (positive ↔ negative). When clicked, take user to the scoreboard page that shows all habits and their spectrums.
+
+The spectrum is descriptive, not judgmental.
+
+Visual Format:
+consistent ─────●───── avoided
+
+- Left label = positive attribute
+- Right label = negative attribute
+- Dot position = relative placement within window
+- No numbers shown
+
+Acceptance Criteria:
+
+- Each habit page displays 1–3 spectrum bars
+- Each spectrum uses paired opposites
+- Dot position updates automatically per time window
+- Labels are static and consistent across habits
+- Bars are read-only (no interaction required)
+
+Coupled Attribute Pairs:
+
+- Consistent ↔ Avoided
+- Longest ↔ Lapsed
+- Completed ↔ Missed
+- Recovered ↔ Reset
+- High-Effort ↔ Low-Effort
+
+Bar Behavior:
+
+- Dot is centered when habit is neutral
+- Dot shifts left as positive signal strengthens
+- Dot shifts right as negative signal strengthens
+- Bars animate smoothly on update
+
+Selection Logic:
+
+- Pairs shown depend on habit type (BUILD vs BREAK)
+- Maximum of 3 bars per habit page
+- Bars chosen based on strongest signals for that habit
+
+Computation Logic:
+
+function computeHabitSpectrum(habit, window) {
+return {
+consistency: normalize(habit.completionRate),
+streak: normalize(habit.currentStreak),
+completion: normalize(habit.completionCount),
+recovery: normalize(habit.recoveryScore),
+effort: normalize(habit.avgIntensity),
+};
+}
+
+Normalization Rules:
+
+- Values scaled to -1.0 → +1.0
+- 0 = neutral baseline
+- Negative values lean toward right-side label
+- Positive values lean toward left-side label
+
+Example Habit Page:
+Habit: Morning Workout
+
+Consistency:
+consistent ─────●───── avoided
+
+Effort:
+high-effort ───●────── low-effort
+
+Streak:
+longest ───────●─── lapsed
+
+Interaction:
+
+- Tap bar opens explanation tooltip
+- Tooltip explains what moves the dot
+- No raw metrics shown
+
+Privacy:
+
+- Spectrum bars visible only to habit owner
+- Shared views show ribbons/warnings only
+- No spectrum values exposed socially
+
+Why:
+The spectrum bar conveys nuance better than binary states, helping users understand trends without numbers or shame.
+
+Cost: $0
+
+---
+
+### 5.11 Spectrum Highlights (Top Signals)
+
+Story:
+As a user, I want the most important positive and negative habits for a selected spectrum to be highlighted at the top of the scoreboard so I can instantly see my best and worst habits before scanning the full list.
+
+Overview:
+Spectrum Highlights are two pinned habit cards shown at the top of a Habit Spectrum Scoreboard.
+
+- One represents the positive extreme (ribbon habit)
+- One represents the negative extreme (warning habit)
+
+These are the same habits that receive ribbons or warnings elsewhere in the app.
+
+Placement:
+
+- Always pinned at the top of the Spectrum Scoreboard
+- Displayed before the full sorted list
+- Visually separated from the rest of the list
+
+Visual Layout:
+
+BEST
+[icon] Morning Workout
+━━ CONSISTENT ━━
+
+NEEDS ATTENTION
+[icon] No Late Scrolling
+⚠️ AVOIDED
+
+All Habits (Sorted)
+[icon] Reading consistent ───●──── avoided
+[icon] Journaling consistent ─────●── avoided
+[icon] Meditation consistent ───────● avoided
+
+Acceptance Criteria:
+
+- Exactly two highlight slots shown when data exists
+- Positive slot shows habit with ribbon
+- Negative slot shows habit with warning
+- If only one extreme exists, show only one slot
+- If no clear extremes, hide highlight section entirely
+- Highlights update with time window changes
+
+Logic:
+
+- Highlight habits are selected using the same logic as ribbons/warnings
+- No additional calculations required
+- Highlights are read-only and informational
+
+Interaction:
+
+- Tap highlighted habit → opens habit detail page
+- Tap ribbon or warning → opens spectrum explanation
+- No actions (no dismiss, no hide)
+
+Privacy:
+
+- Highlights inherit habit visibility
+- Never shown in shared or social views
+- No metrics or ranks exposed
+
+Why:
+Pinning the strongest positive and negative signals at the top reduces cognitive load, guides attention, and makes the scoreboard instantly useful without forcing users to interpret the full list.
+
+Cost: $0
+
+---
+
 ## Validation Checklist
 
 - [ ] BUILD/BREAK habits created with different icons
@@ -736,6 +1330,7 @@ enum ChallengeType {
 - [ ] Habit stacking detected and displayed
 - [ ] HealthKit permission requested and steps tracked
 - [ ] Challenges created, joined, leaderboard updates
+- [ ] Habit Signals
 
 ---
 

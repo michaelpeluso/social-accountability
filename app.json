@@ -20,7 +20,12 @@
       }
     },
     "owner": "pelsos-org",
-    "plugins": ["expo-router", "expo-secure-store", "expo-sqlite"],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-sqlite",
+      "@react-native-community/datetimepicker"
+    ],
     "metro": {
       "config": "./config/metro.config.js"
     }

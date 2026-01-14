@@ -90,7 +90,7 @@ Goals CAN complete, Habits NEVER complete (recurring forever).
 
 - **Posts**: Permanent, 500 char text, supports comments
 - **Stories**: 24h TTL, 280 char caption, reactions only
-- **Reactions**: 5 emoji only (👏 🔥 💪 ❤️ ✨) - positive reinforcement
+- **Reactions**: 5 emoji only (👍 ❤️ 👏 🔥 📈) - positive reinforcement
 - **Nudges**: Templated encouragement (3/day per friend)
 - **Badges**: Auto-awarded achievements
 

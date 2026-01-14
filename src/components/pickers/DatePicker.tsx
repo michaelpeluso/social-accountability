@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Platform, Modal, Pressable } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { openPicker, closePicker } from "./pickerManager";
+import { colors, spacing, borderRadius, borderWidth, typography } from "../../theme";
 
 interface DatePickerProps {
   label: string;
@@ -163,39 +164,39 @@ export function DatePicker({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   label: {
-    fontSize: 12,
-    color: "#666",
-    marginBottom: 4,
-    fontWeight: "500",
+    fontSize: typography.fontSize.xs,
+    color: colors.darkGray,
+    marginBottom: spacing.xs,
+    fontWeight: typography.fontWeight.medium,
   },
   dateInput: {
-    borderWidth: 2,
-    borderColor: "#e5e5e5",
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    backgroundColor: "#fff",
+    borderWidth: borderWidth.thick,
+    borderColor: colors.borderMedium,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.lg - spacing.sm, // 12px
+    paddingHorizontal: spacing.lg - spacing.sm,
+    backgroundColor: colors.white,
     minHeight: 44,
     justifyContent: "center",
   },
   dateInputError: {
-    borderColor: "#ff3b30",
+    borderColor: colors.danger,
   },
   dateInputText: {
-    fontSize: 16,
-    color: "#000",
-    fontWeight: "400",
+    fontSize: typography.fontSize.base,
+    color: colors.black,
+    fontWeight: typography.fontWeight.normal,
   },
   placeholderText: {
-    color: "#999",
+    color: colors.mediumGray,
   },
   errorText: {
-    color: "#ff3b30",
-    fontSize: 12,
-    marginTop: 4,
+    color: colors.danger,
+    fontSize: typography.fontSize.xs,
+    marginTop: spacing.xs,
   },
   modalOverlay: {
     flex: 1,
@@ -204,8 +205,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   pickerModal: {
-    backgroundColor: "#ffffff",
-    borderRadius: 14,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xlg,
     width: "90%",
     maxWidth: 360,
     overflow: "hidden",
@@ -214,28 +215,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.lg - spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#c6c6c8",
-    backgroundColor: "#f9f9f9",
+    borderBottomColor: colors.gray[300],
+    backgroundColor: colors.gray[50],
   },
   headerButton: {
     minWidth: 60,
   },
   modalTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#000",
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.black,
   },
   cancelText: {
-    fontSize: 17,
-    color: "#007AFF",
+    fontSize: typography.fontSize.md,
+    color: colors.primary,
   },
   doneText: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#007AFF",
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.primary,
     textAlign: "right",
   },
 });
