@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, RefreshControl, Alert } from "react-native";
+import { View, StyleSheet, ScrollView, RefreshControl, Alert, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { auth } from "../../src/services/auth";
@@ -16,7 +16,7 @@ import { getHabits } from "../../src/storage/habits";
 import { getUserCheckIns } from "../../src/storage/checkIns";
 import { ALL_PILLARS } from "../../src/types/goals";
 import { useTheme } from "../../src/theme";
-import { spacing, borderRadius } from "../../src/theme/spacing";
+import { spacing } from "../../src/theme/spacing";
 import { typography } from "../../src/theme/typography";
 import type { Habit, HabitCheckIn } from "../../src/types";
 import {
@@ -42,6 +42,7 @@ import {
 } from "../../src/components/cards";
 import { ActivityChart, CompletionTrendChart, DayOfWeekChart } from "../../src/components/charts";
 import { PillarDetailModal } from "../../src/components/modals";
+import { ScreenHeader, EmptyState, SectionTitle } from "../../src/components/layout";
 
 export default function DashboardScreen() {
   const { theme } = useTheme();
@@ -219,6 +220,7 @@ export default function DashboardScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
+        <ScreenHeader title="Dashboard" backLabel="Back" />
         <Text style={[styles.loadingText, { color: theme.text.secondary }]}>
           Loading dashboard...
         </Text>
@@ -228,15 +230,7 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
-      <View style={[styles.header, { borderBottomColor: theme.border.light }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={[styles.backButtonText, { color: theme.button.primary.background }]}>
-            Back
-          </Text>
-        </Pressable>
-        <Text style={[styles.title, { color: theme.text.primary }]}>Dashboard</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <ScreenHeader title="Dashboard" backLabel="Back" />
 
       <ScrollView
         style={styles.content}
@@ -252,7 +246,7 @@ export default function DashboardScreen() {
         <OverallScoreCard score={pillarData.overall} activeHabits={habitSummary.activeHabits} />
 
         {/* Pillar Scores Grid */}
-        <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>Life Pillars</Text>
+        <SectionTitle>Life Pillars</SectionTitle>
         <View style={styles.pillarGrid}>
           {ALL_PILLARS.map((pillar) => {
             const score = pillarData.pillars.find((p) => p.pillar === pillar);
@@ -264,7 +258,7 @@ export default function DashboardScreen() {
         </View>
 
         {/* Weekly Summary */}
-        <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>This Week</Text>
+        <SectionTitle>This Week</SectionTitle>
         <SummaryCard
           checkInsThisWeek={habitSummary.checkInsThisWeek}
           completionRate={habitSummary.completionRate}
@@ -277,9 +271,7 @@ export default function DashboardScreen() {
         {/* Needs Attention */}
         {needsAttention.length > 0 && (
           <>
-            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
-              Needs Attention
-            </Text>
+            <SectionTitle>Needs Attention</SectionTitle>
             <NeedsAttentionCard habits={needsAttention} />
           </>
         )}
@@ -287,7 +279,7 @@ export default function DashboardScreen() {
         {/* Top Streaks */}
         {habitSummary.topStreaks.length > 0 && (
           <>
-            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>Top Streaks</Text>
+            <SectionTitle>Top Streaks</SectionTitle>
             <TopStreaksCard streaks={habitSummary.topStreaks} />
           </>
         )}
@@ -295,9 +287,7 @@ export default function DashboardScreen() {
         {/* Recovery Streaks */}
         {recoveryHabits.length > 0 && (
           <>
-            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
-              Getting Back on Track
-            </Text>
+            <SectionTitle>Getting Back on Track</SectionTitle>
             <RecoveryCard habits={recoveryHabits} />
           </>
         )}
@@ -305,7 +295,7 @@ export default function DashboardScreen() {
         {/* Most Missed */}
         {habitSummary.mostMissed.length > 0 && (
           <>
-            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>Needs Work</Text>
+            <SectionTitle>Needs Work</SectionTitle>
             <MissedCard items={habitSummary.mostMissed} />
           </>
         )}
@@ -313,9 +303,7 @@ export default function DashboardScreen() {
         {/* Peak Activity Times */}
         {peakHours.length > 0 && (
           <>
-            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
-              Best Check-in Times
-            </Text>
+            <SectionTitle>Best Check-in Times</SectionTitle>
             <PeakHoursCard hours={peakHours} />
           </>
         )}
@@ -323,9 +311,7 @@ export default function DashboardScreen() {
         {/* Completion Rate Trend */}
         {completionTrend.length > 0 && (
           <>
-            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
-              Weekly Completion Trend
-            </Text>
+            <SectionTitle>Weekly Completion Trend</SectionTitle>
             <CompletionTrendChart data={completionTrend} />
           </>
         )}
@@ -333,29 +319,20 @@ export default function DashboardScreen() {
         {/* Day of Week Breakdown */}
         {dayOfWeekData.some((d) => d.count > 0) && (
           <>
-            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
-              Activity by Day
-            </Text>
+            <SectionTitle>Activity by Day</SectionTitle>
             <DayOfWeekChart data={dayOfWeekData} />
           </>
         )}
 
         {/* Empty State */}
         {habits.length === 0 && (
-          <View style={[styles.emptyState, { backgroundColor: theme.card.background }]}>
-            <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>No habits yet</Text>
-            <Text style={[styles.emptySubtext, { color: theme.text.secondary }]}>
-              Create your first habit to start tracking
-            </Text>
-            <Pressable
-              style={[styles.createButton, { backgroundColor: theme.button.primary.background }]}
-              onPress={() => router.push("/habits")}
-            >
-              <Text style={[styles.createButtonText, { color: theme.button.primary.text }]}>
-                Create Habit
-              </Text>
-            </Pressable>
-          </View>
+          <EmptyState
+            emoji="📊"
+            title="No habits yet"
+            subtitle="Create your first habit to start tracking"
+            ctaLabel="Create Habit"
+            onCtaPress={() => router.push("/habits")}
+          />
         )}
 
         <View style={styles.bottomSpacer} />
@@ -382,65 +359,15 @@ const styles = StyleSheet.create({
     marginTop: 100,
     fontSize: typography.fontSize.base,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  backButtonText: {
-    fontSize: typography.fontSize.base,
-  },
-  title: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  placeholder: {
-    width: 50,
-  },
   content: {
     flex: 1,
     padding: spacing.md,
-  },
-  sectionTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    marginBottom: spacing.sm,
   },
   pillarGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
     marginBottom: spacing.lg,
-  },
-  emptyState: {
-    alignItems: "center",
-    paddingVertical: 48,
-    borderRadius: borderRadius.lg,
-  },
-  emptyTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    marginBottom: spacing.sm,
-  },
-  emptySubtext: {
-    fontSize: typography.fontSize.sm,
-    marginBottom: spacing.lg,
-    textAlign: "center",
-  },
-  createButton: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-  },
-  createButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
   },
   bottomSpacer: {
     height: 40,

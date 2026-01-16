@@ -1,21 +1,29 @@
 /**
  * Habits Screen - Display and manage user habits
  * M2-2.2: Create Habit feature
+ * Refactored to use reusable components for maintainability
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, Pressable, FlatList, RefreshControl, Alert } from "react-native";
+import { FlatList, RefreshControl, Alert, StyleSheet, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { auth } from "../../src/services/auth";
 import { createHabit, getHabits } from "../../src/storage/habits";
 import { getGoals } from "../../src/storage/goals";
-import { PILLAR_INFO, ALL_PILLARS } from "../../src/types/goals";
+import { ALL_PILLARS } from "../../src/types/goals";
 import type { Habit, Goal, Pillar } from "../../src/types";
 import { useTheme } from "../../src/theme";
-import { spacing, borderRadius } from "../../src/theme/spacing";
+import { spacing } from "../../src/theme/spacing";
 import { typography } from "../../src/theme/typography";
-import { CreateHabitModal, type CreateHabitData } from "../../src/components";
+import {
+  ScreenHeader,
+  EmptyState,
+  PillarSection,
+  HabitCard,
+  CreateHabitModal,
+  type CreateHabitData,
+} from "../../src/components";
 
 export default function HabitsScreen() {
   const { theme } = useTheme();
@@ -103,12 +111,6 @@ export default function HabitsScreen() {
     {} as Record<Pillar, Habit[]>
   );
 
-  const getGoalTitle = (goalId?: string) => {
-    if (!goalId) return null;
-    const goal = goals.find((g) => g.id === goalId);
-    return goal?.title;
-  };
-
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background.secondary }]}>
@@ -119,42 +121,23 @@ export default function HabitsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background.secondary }]}>
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          { backgroundColor: theme.background.primary, borderBottomColor: theme.border.light },
-        ]}
-      >
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={[styles.backButtonText, { color: theme.semantic.primary }]}>Back</Text>
-        </Pressable>
-        <Text style={[styles.headerTitle, { color: theme.text.primary }]}>Habits</Text>
-        <Pressable
-          onPress={() => setShowCreateModal(true)}
-          style={[styles.addButton, { backgroundColor: theme.button.primary.background }]}
-        >
-          <Text style={[styles.addButtonText, { color: theme.button.primary.text }]}>+ New</Text>
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="Habits"
+        rightButton={{
+          label: "+ New",
+          onPress: () => setShowCreateModal(true),
+          variant: "primary",
+        }}
+      />
 
-      {/* Habits List */}
       {habits.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyEmoji}>🔄</Text>
-          <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>No habits yet</Text>
-          <Text style={[styles.emptySubtitle, { color: theme.text.secondary }]}>
-            Create recurring habits to build consistency
-          </Text>
-          <Pressable
-            style={[styles.createFirstButton, { backgroundColor: theme.button.primary.background }]}
-            onPress={() => setShowCreateModal(true)}
-          >
-            <Text style={[styles.createFirstButtonText, { color: theme.button.primary.text }]}>
-              Create Habit
-            </Text>
-          </Pressable>
-        </View>
+        <EmptyState
+          emoji="🔄"
+          title="No habits yet"
+          subtitle="Create recurring habits to build consistency"
+          ctaLabel="Create Habit"
+          onCtaPress={() => setShowCreateModal(true)}
+        />
       ) : (
         <FlatList
           data={ALL_PILLARS.filter((p) => habitsByPillar[p]?.length > 0)}
@@ -168,67 +151,20 @@ export default function HabitsScreen() {
           }
           contentContainerStyle={styles.listContent}
           renderItem={({ item: pillar }) => (
-            <View style={styles.pillarSection}>
-              <View
-                style={[styles.pillarHeader, { backgroundColor: PILLAR_INFO[pillar].color + "20" }]}
-              >
-                <Text style={styles.pillarEmoji}>{PILLAR_INFO[pillar].emoji}</Text>
-                <Text style={[styles.pillarTitle, { color: PILLAR_INFO[pillar].color }]}>
-                  {PILLAR_INFO[pillar].label}
-                </Text>
-                <Text style={[styles.habitCount, { color: theme.text.tertiary }]}>
-                  {habitsByPillar[pillar]?.length || 0}
-                </Text>
-              </View>
+            <PillarSection pillar={pillar} count={habitsByPillar[pillar]?.length || 0}>
               {habitsByPillar[pillar]?.map((habit) => (
-                <Pressable
+                <HabitCard
                   key={habit.id}
-                  style={[styles.habitCard, { backgroundColor: theme.card.background }]}
+                  habit={habit}
+                  linkedGoal={goals.find((g) => g.id === habit.goalId)}
                   onPress={() => router.push(`/habits/${habit.id}`)}
-                >
-                  <View style={styles.habitHeader}>
-                    <Text style={[styles.habitTitle, { color: theme.text.primary }]}>
-                      {habit.title}
-                    </Text>
-                    {habit.currentStreak > 0 && (
-                      <View
-                        style={[
-                          styles.streakBadge,
-                          { backgroundColor: theme.semantic.danger + "20" },
-                        ]}
-                      >
-                        <Text style={[styles.streakText, { color: theme.semantic.danger }]}>
-                          {habit.currentStreak} day streak
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.habitMeta}>
-                    <Text
-                      style={[
-                        styles.scheduleBadge,
-                        {
-                          color: theme.text.secondary,
-                          backgroundColor: theme.background.secondary,
-                        },
-                      ]}
-                    >
-                      {habit.schedule.targetCount}x {habit.schedule.frequency}
-                    </Text>
-                    {getGoalTitle(habit.goalId) && (
-                      <Text style={[styles.goalLink, { color: theme.semantic.primary }]}>
-                        {getGoalTitle(habit.goalId)}
-                      </Text>
-                    )}
-                  </View>
-                </Pressable>
+                />
               ))}
-            </View>
+            </PillarSection>
           )}
         />
       )}
 
-      {/* Create Habit Modal */}
       <CreateHabitModal
         visible={showCreateModal}
         onClose={() => setShowCreateModal(false)}
@@ -249,130 +185,7 @@ const styles = StyleSheet.create({
     marginTop: 100,
     fontSize: typography.fontSize.base,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xmd,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  backButtonText: {
-    fontSize: typography.fontSize.base,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  addButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-  },
-  addButtonText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: spacing.xxl,
-  },
-  emptyEmoji: {
-    fontSize: typography.fontSize.hero,
-    marginBottom: spacing.md,
-  },
-  emptyTitle: {
-    fontSize: typography.fontSize.xxl,
-    fontWeight: typography.fontWeight.bold,
-    marginBottom: spacing.sm,
-  },
-  emptySubtitle: {
-    fontSize: typography.fontSize.base,
-    textAlign: "center",
-    marginBottom: spacing.lg,
-  },
-  createFirstButton: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.smd,
-    borderRadius: borderRadius.lg,
-  },
-  createFirstButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-  },
   listContent: {
     padding: spacing.md,
-  },
-  pillarSection: {
-    marginBottom: spacing.lg,
-  },
-  pillarHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.xmd,
-    paddingVertical: spacing.xmd,
-    borderRadius: borderRadius.xmd,
-    marginBottom: spacing.sm,
-  },
-  pillarEmoji: {
-    fontSize: typography.fontSize.xl,
-    marginRight: spacing.sm,
-  },
-  pillarTitle: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    flex: 1,
-  },
-  habitCount: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-  },
-  habitCard: {
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing.sm,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: borderRadius.sm,
-    elevation: 2,
-  },
-  habitHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: spacing.sm,
-  },
-  habitTitle: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
-    flex: 1,
-  },
-  streakBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.lg,
-  },
-  streakText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  habitMeta: {
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
-  scheduleBadge: {
-    fontSize: typography.fontSize.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-  },
-  goalLink: {
-    fontSize: typography.fontSize.xs,
   },
 });

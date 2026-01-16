@@ -13,11 +13,12 @@ import {
   TextInput,
   Alert,
   Image,
-  SafeAreaView,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { spacing, borderRadius } from "../../src/theme/spacing";
 import { typography } from "../../src/theme/typography";
+import { Avatar, PillarBadge, ReactionBar, CommentItem, CommentInput } from "../../src/components";
 import { getPostById, updatePost, deletePost } from "../../src/storage/posts";
 import { getPostComments, createComment } from "../../src/storage/comments";
 import { toggleReaction, getPostReactions } from "../../src/storage/reactions";
@@ -36,7 +37,6 @@ export default function PostDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState("");
-  const [commentText, setCommentText] = useState("");
   const [userReaction, setUserReaction] = useState<ReactionEmoji | null>(null);
 
   const isOwnPost = post?.authorUserId === CURRENT_USER_ID;
@@ -122,18 +122,17 @@ export default function PostDetailScreen() {
     }
   };
 
-  const handleAddComment = async () => {
-    if (!post || !commentText.trim()) return;
+  const handleCommentSubmit = async (text: string) => {
+    if (!post) return;
     const result = await createComment(CURRENT_USER_ID, {
       postId: post.id,
-      bodyText: commentText.trim(),
+      bodyText: text,
     });
     if ("error" in result) {
       Alert.alert("Error", result.error);
       return;
     }
     setComments((prev) => [...prev, result]);
-    setCommentText("");
   };
 
   // Calculate reaction counts
@@ -201,23 +200,13 @@ export default function PostDetailScreen() {
               style={styles.authorSection}
               onPress={() => post && router.push(`/profile/${post.authorUserId}`)}
             >
-              <View style={styles.avatar}>
-                {post.authorAvatarUrl ? (
-                  <Image source={{ uri: post.authorAvatarUrl }} style={styles.avatarImage} />
-                ) : (
-                  <Text style={styles.avatarText}>
-                    {post.authorName?.charAt(0)?.toUpperCase() ?? "?"}
-                  </Text>
-                )}
-              </View>
+              <Avatar imageUrl={post.authorAvatarUrl} name={post.authorName} size="md" />
               <View style={styles.authorInfo}>
                 <Text style={styles.authorName}>{post.authorName ?? "Unknown"}</Text>
                 <Text style={styles.timestamp}>{formatRelativeTime(post.createdAt)}</Text>
               </View>
             </Pressable>
-            <View style={styles.pillarBadge}>
-              <Text style={styles.pillarText}>{post.pillar}</Text>
-            </View>
+            <PillarBadge pillar={post.pillar} size="sm" />
           </View>
 
           {/* Media */}
@@ -253,30 +242,12 @@ export default function PostDetailScreen() {
         {/* Reactions */}
         <View style={styles.reactionsSection}>
           <Text style={styles.sectionTitle}>Reactions</Text>
-          <View style={styles.reactionOptions}>
-            {ALLOWED_REACTIONS.map((emoji) => (
-              <Pressable
-                key={emoji}
-                style={[
-                  styles.reactionOption,
-                  userReaction === emoji && styles.reactionOptionActive,
-                ]}
-                onPress={() => handleReaction(emoji)}
-              >
-                <Text style={styles.reactionEmoji}>{emoji}</Text>
-                {reactionCounts[emoji] > 0 && (
-                  <Text
-                    style={[
-                      styles.reactionCount,
-                      userReaction === emoji && styles.reactionCountActive,
-                    ]}
-                  >
-                    {reactionCounts[emoji]}
-                  </Text>
-                )}
-              </Pressable>
-            ))}
-          </View>
+          <ReactionBar
+            reactions={ALLOWED_REACTIONS.map((emoji) => ({ emoji, count: reactionCounts[emoji] }))}
+            userReaction={userReaction}
+            onReaction={handleReaction}
+            showAllReactions
+          />
         </View>
 
         {/* Comments */}
@@ -284,49 +255,25 @@ export default function PostDetailScreen() {
           <Text style={styles.sectionTitle}>Comments ({comments.length})</Text>
 
           {comments.map((comment) => (
-            <View key={comment.id} style={styles.commentItem}>
-              <Pressable
-                style={styles.commentHeader}
-                onPress={() => router.push(`/profile/${comment.userId}`)}
-              >
-                <View style={styles.commentAvatar}>
-                  {comment.authorAvatarUrl ? (
-                    <Image
-                      source={{ uri: comment.authorAvatarUrl }}
-                      style={styles.commentAvatarImage}
-                    />
-                  ) : (
-                    <Text style={styles.commentAvatarText}>
-                      {comment.authorName?.charAt(0)?.toUpperCase() ?? "?"}
-                    </Text>
-                  )}
-                </View>
-                <View style={styles.commentContent}>
-                  <Text style={styles.commentAuthor}>{comment.authorName ?? "User"}</Text>
-                  <Text style={styles.commentBody}>{comment.bodyText}</Text>
-                  <Text style={styles.commentTime}>{formatRelativeTime(comment.createdAt)}</Text>
-                </View>
-              </Pressable>
-            </View>
+            <CommentItem
+              key={comment.id}
+              userId={comment.userId}
+              userName={comment.authorName ?? "User"}
+              userAvatarUrl={comment.authorAvatarUrl}
+              text={comment.bodyText}
+              timestamp={formatRelativeTime(comment.createdAt)}
+              isOwnComment={comment.userId === CURRENT_USER_ID}
+              onPressAuthor={() => router.push(`/profile/${comment.userId}`)}
+            />
           ))}
 
           {/* Add comment */}
           <View style={styles.addComment}>
-            <TextInput
-              style={styles.commentInput}
-              value={commentText}
-              onChangeText={(text) => setCommentText(text.slice(0, 50))}
-              maxLength={50}
+            <CommentInput
               placeholder="Add a comment (50 char max)..."
-              placeholderTextColor="#999"
+              maxLength={50}
+              onSubmit={handleCommentSubmit}
             />
-            <Pressable
-              style={[styles.commentSend, !commentText.trim() && styles.commentSendDisabled]}
-              onPress={handleAddComment}
-              disabled={!commentText.trim()}
-            >
-              <Text style={styles.commentSendText}>Send</Text>
-            </Pressable>
           </View>
         </View>
       </ScrollView>

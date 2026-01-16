@@ -4,19 +4,12 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Image,
-  Alert,
-  SafeAreaView,
-} from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { spacing, borderRadius } from "../../src/theme/spacing";
 import { typography } from "../../src/theme/typography";
+import { Avatar } from "../../src/components";
 import { getUserBadges } from "../../src/storage/badges";
 import { sendNudge } from "../../src/storage/nudges";
 import type { Badge, NudgeTemplateId } from "../../src/types";
@@ -131,13 +124,7 @@ export default function FriendProfileScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Profile Header */}
         <View style={styles.header}>
-          <View style={styles.avatar}>
-            {friend.photoUrl ? (
-              <Image source={{ uri: friend.photoUrl }} style={styles.avatarImage} />
-            ) : (
-              <Text style={styles.avatarText}>{friend.displayName.charAt(0).toUpperCase()}</Text>
-            )}
-          </View>
+          <Avatar imageUrl={friend.photoUrl} name={friend.displayName} size="xl" />
           <Text style={styles.displayName}>{friend.displayName}</Text>
           {friend.bio && <Text style={styles.bio}>{friend.bio}</Text>}
         </View>
@@ -205,25 +192,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     marginBottom: spacing.md,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#007AFF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: spacing.sm,
-  },
-  avatarImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-  },
-  avatarText: {
-    fontSize: 32,
-    fontWeight: typography.fontWeight.bold,
-    color: "#fff",
   },
   displayName: {
     fontSize: typography.fontSize.xl,

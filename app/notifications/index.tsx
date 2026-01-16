@@ -4,15 +4,8 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  SafeAreaView,
-} from "react-native";
+import { View, Text, StyleSheet, FlatList, Pressable, RefreshControl } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, router } from "expo-router";
 import { spacing, borderRadius } from "../../src/theme/spacing";
 import { typography } from "../../src/theme/typography";

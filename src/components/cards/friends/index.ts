@@ -3,3 +3,4 @@
  */
 
 export * from "./FriendItem";
+export * from "./FriendRequestCard";

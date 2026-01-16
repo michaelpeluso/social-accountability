@@ -18,9 +18,10 @@ const PRIVACY_LABELS: Record<Privacy, string> = {
 interface GoalCardProps {
   goal: Goal;
   onPress?: () => void;
+  onLongPress?: () => void;
 }
 
-export function GoalCard({ goal, onPress }: GoalCardProps) {
+export function GoalCard({ goal, onPress, onLongPress }: GoalCardProps) {
   const { theme } = useTheme();
 
   return (
@@ -32,6 +33,7 @@ export function GoalCard({ goal, onPress }: GoalCardProps) {
         },
       ]}
       onPress={onPress}
+      onLongPress={onLongPress}
     >
       <Text style={[styles.title, { color: theme.text.primary }]} numberOfLines={2}>
         {goal.title}

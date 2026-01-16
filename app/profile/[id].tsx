@@ -11,7 +11,6 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Image,
   RefreshControl,
   ActivityIndicator,
   Alert,
@@ -28,6 +27,7 @@ import type { User, Badge, FeedPost } from "../../src/types";
 import { formatRelativeTime } from "../../src/logic/dates";
 import { useTheme } from "../../src/theme";
 import { PostCard, BadgeCard } from "../../src/components/cards";
+import { Avatar } from "../../src/components";
 
 export default function UserProfileScreen() {
   const { theme } = useTheme();
@@ -166,15 +166,7 @@ export default function UserProfileScreen() {
       >
         {/* Profile Header */}
         <View style={[styles.profileHeader, { backgroundColor: theme.card.background }]}>
-          <View style={[styles.avatar, { backgroundColor: theme.semantic.primary }]}>
-            {user.photoUrl ? (
-              <Image source={{ uri: user.photoUrl }} style={styles.avatarImage} />
-            ) : (
-              <Text style={[styles.avatarText, { color: theme.button.primary.text }]}>
-                {user.displayName.charAt(0).toUpperCase()}
-              </Text>
-            )}
-          </View>
+          <Avatar imageUrl={user.photoUrl} name={user.displayName} size="xl" />
           <Text style={[styles.displayName, { color: theme.text.primary }]}>
             {user.displayName}
           </Text>
