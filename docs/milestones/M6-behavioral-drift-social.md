@@ -714,6 +714,101 @@ User {
 
 ---
 
+### 6.7 Circles (Group Feeds & Chat)
+
+**Story:** As a user, I want private Circle groups so I can share posts and chat with a focused group of friends.
+
+**Acceptance Criteria:**
+
+- [ ] Create Circle: user can create a Circle with `name`, `privacy` (PUBLIC | INVITE_ONLY | PRIVATE) and invite members.
+- [ ] Membership & Roles: All members have equal permissions by default — posting, reading, moderating (remove messages/posts), and managing membership. The creating user is recorded as `ownerUserId` for metadata (creation/archival/transfer) but that label does not grant unilateral powers.
+- [ ] Circle Feed: posts scoped to a `circleId` are visible only to Circle members (respecting privacy setting).
+- [ ] Circle Chat: persistent group chat per Circle (`CircleMessage`) with pagination, media support, and basic moderation.
+- [ ] Notifications: users receive opt-in notifications for `CIRCLE_POST`, `CIRCLE_MESSAGE`, `CIRCLE_INVITE`.
+- [ ] Moderation: Any member can flag or remove problematic posts/messages; removals are recorded in an audit log and can surface a lightweight consensus or appeal flow if needed.
+
+**Why:** Circles let users create smaller, intentional communities (gym buddies, family, work friends) so they can share more private progress and coordinate accountability without oversharing to their whole friends list.
+
+**Technical Requirements / Data Model:**
+
+- Add server models (and mirror in local DB):
+  - `circles` (id, ownerUserId, name, description?, privacy, createdAt, archivedAt?) // `ownerUserId` recorded for metadata; no unilateral powers required
+  - `circle_members` (circleId, userId, role?: OWNER|MEMBER|MODERATOR, joinedAt) // role is optional; default MEMBER; privileges are equal by default
+  - `circle_messages` (id, circleId, fromUserId, body, mediaUrl?, createdAt, deletedAt?)
+  - `circle_invites` (id, circleId, fromUserId, toUserId, status: PENDING|ACCEPTED|DECLINED, createdAt)
+
+- Extend `posts` to optionally include `circleId` (nullable) and enforce visibility checks server-side.
+- Store feed and chat locally (SQLite) and sync aggregates and content via existing sync queue to Postgres.
+
+**Member-driven moderation:** prefer member-reporting + lightweight moderation flows over unilateral owner control. Owners exist for technical actions (archive, transfer ownership) but default UX should feel like a normal group chat.
+
+**API Contracts (examples):**
+
+```
+POST /circles
+Body: { name, description?, privacy }
+Response: { data: Circle }
+
+GET /circles/:id
+Response: { data: Circle, members: CircleMember[] }
+
+POST /circles/:id/invite
+Body: { toUserId }
+Response: { data: CircleInvite }
+
+POST /circles/:id/join
+Body: { inviteId? }
+Response: { success: true }
+
+POST /circles/:id/leave
+Body: { }
+Response: { success: true }
+
+GET /circles/:id/feed?limit=20
+Response: { data: Post[] }
+
+GET /circles/:id/messages?limit=50&cursor=...
+Response: { data: CircleMessage[], nextCursor }
+
+POST /circles/:id/messages
+Body: { body, mediaUrl? }
+Response: { data: CircleMessage }
+
+DELETE /circles/:id/members/:userId
+Response: { success: true } // Allowed by any member (must be a current member); server enforces membership check and logs removals
+
+POST /circles/:id/report
+Body: { messageId?: string, reason: string }
+Response: { success: true }
+```
+
+**Security & Privacy:**
+
+- Server MUST validate circle membership for all circle-scoped endpoints; non-members receive 403.
+- Do not expose location coordinates or sensitive metadata in circle-scoped data.
+- Provide UI for members to manage moderation and export minimal audit logs for accountability; owner metadata is visible but does not grant special day-to-day powers.
+
+**Migration / Implementation Hints:**
+
+- Add DB migrations for `circles`, `circle_members`, `circle_messages`, `circle_invites`.
+- Add authorization checks in API layer and sync handlers.
+- Reuse existing Post model where possible; add `circleId` index and visibility enforcement.
+- Client: Circle creation flow, member management, Circle Feed screen, Circle Chat screen (re-use chat/message components if available).
+
+**Acceptance Test Ideas:**
+
+- Create a Circle, invite another test user, accept invite, verify invited user sees feed and can post.
+- Verify non-member cannot access feed or messages (403) and local DB does not store circle content without membership.
+- Verify a member can remove members and delete messages; audit entries exist for removals.
+
+**Future Enhancements (M8+):**
+
+- Read receipts and typing indicators in Circle Chat.
+- Threaded replies, reactions, pinned messages, and cross-circle mentions.
+- Circle events (calendar), polls, shared goals and integrations.
+
+---
+
 ## Validation Checklist
 
 - [ ] Behavioral patterns detected weekly

@@ -36,14 +36,12 @@ M3 adds social layer on top of tracking. Users post stories, react with emojis, 
 - [ ] "New Post" button on home screen
 - [ ] Post form:
   - Body text (optional, 500 chars max)
-  - Photo/video (optional, max 10MB)
-  - Pillar tag (required, dropdown: MIND/BODY/HEART/SOUL)
-  - Privacy (required, defaults to user default: SELF/FRIENDS/PUBLIC)
-  - "Advanced" toggle reveals optional fields:
-    - Pillar tag override (optional, chips: mind · body · heart · soul)
-    - Media type selector (photo, short video <60s, chart snapshot)
-    - Post type tags (optional, chips: #win, #struggle, #question, #reflection, or custom with #)
-    - Linked object picker (optional, search: habit · goal · milestone · module)
+  - Photo/video/Chart-snapshot selector (optional, max 10MB)
+  - Privacy (required, defaults to user default: CLOSE_FRIENDS/FRIENDS/PUBLIC)
+  - visible "Advanced" section with optional fields:
+    - Pillar tag (optional, chips: mind · body · heart · soul) (clicking again removes)
+    - Post type tags (optional, chips: #win, #struggle, #question, #reflection, or custom with #) (all in the same section)
+    - Linked object picker (optional, search: habit · goal · milestone · growth hub module)
     - Location category (home/work/gym/outdoors - if location permission granted)
 - [ ] Preview before posting
 - [ ] Save creates post locally, syncs in background
@@ -56,31 +54,20 @@ M3 adds social layer on top of tracking. Users post stories, react with emojis, 
 - Text only: "Completed my morning meditation 🧘"
 - Text + photo: workout selfie + "5K done!"
 - Text + video: short yoga flow clip
-- Linked to check-in (optional): "Just logged workout #42 💪"
-
-**API Contract:**
-
-```
-POST /posts
-Body: {
-  pillar: Pillar,
-  privacy: Privacy,
-  bodyText?: string,
-  mediaUrl?: string
-}
-Response: { data: Post }
-```
+- Text + chart snapshot: "Getting bigger! 💪" (implemented later)
 
 **Technical Requirements:**
 
 - Media upload: Cloudinary API (client-side upload for speed)
-- Video: max 60 seconds, auto-compress to 10MB
+- Video: max 10 seconds, auto-compress to 10MB
 - SQLite insert first (instant UX)
 - Sync queue: POST /posts with retry
 - createdAt: device timestamp
 
 **Privacy Notes:**
 
+- **NO** SELF post option: posts meant for social sharing
+- CLOSE_FRIENDS posts: visible to close friends only (M4 feature)
 - FRIENDS posts: visible to all accepted friends
 - PUBLIC posts: no location, no identifiable info in photo EXIF
 - Strip EXIF data from photos before upload
@@ -88,7 +75,6 @@ Response: { data: Post }
 **Security Notes:**
 
 - Rate limit: 20 posts per user per day
-- Content moderation: TODO (M5, for now rely on user reports)
 - Validate media type (image/video only, no executables)
 
 **Cost:** Cloudinary free tier (25GB storage)
@@ -128,15 +114,15 @@ function getFeed(scope: "mine" | "friends" | "discover"): Post[] {
   let posts = queryPosts(); // from SQLite or API
 
   if (scope === "mine") {
-    return posts.filter((p) => p.authorUserId === currentUserId);
+    return posts.filter((p) => p.userId === currentUserId);
   }
 
   if (scope === "friends") {
     return posts.filter(
       (p) =>
         p.privacy === "PUBLIC" ||
-        (p.privacy === "FRIENDS" && isFriend(p.authorUserId)) ||
-        p.authorUserId === currentUserId
+        (p.privacy === "FRIENDS" && isFriend(p.userId)) ||
+        p.userId === currentUserId
     );
   }
 
@@ -422,7 +408,7 @@ function checkBadges(user: User, habits: Habit[], checkIns: HabitCheckIn[]) {
 
 ```
 PATCH /posts/:id
-Body: { bodyText?: string, privacy?: Privacy }
+Body: { text?: string, privacy?: Privacy }
 Response: { data: Post }
 
 DELETE /posts/:id

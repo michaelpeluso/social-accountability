@@ -13,10 +13,8 @@ import { logger } from "../lib/logger";
 export async function getCurrentVersion(): Promise<number> {
   try {
     const db = await getDatabase();
-    const result = await db.getFirstAsync<{ version: number }>(
-      "SELECT MAX(version) as version FROM migrations"
-    );
-    return result?.version || 0;
+    const result = await db.getFirstAsync<{ user_version: number }>("PRAGMA user_version");
+    return result?.user_version || 0;
   } catch (error) {
     logger.error("Failed to get current version", { error });
     return -1;

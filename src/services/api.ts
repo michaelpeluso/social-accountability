@@ -62,7 +62,7 @@ export interface CreateCheckInRequest {
   habitId: string;
   occurredAt?: string;
   source?: CheckInSource;
-  evidenceRef?: string;
+  evidenceUrl?: string;
   note?: string;
 }
 
@@ -330,6 +330,7 @@ const mockApi = {
         title: updates.title || "Updated Goal",
         pillar: updates.pillar || "BODY",
         privacy: updates.privacy || "SELF",
+        metricType: "COUNT",
         isArchived: updates.isArchived || false,
         isIndefinite: false,
         dataSource: "MANUAL",

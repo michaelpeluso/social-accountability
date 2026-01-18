@@ -30,19 +30,19 @@ An iOS app that minimizes user friction by automatically tracking behavior throu
 
 **Database**
 
-- **Local:** SQLite (source of truth)
-- **Cloud:** Postgres (sync replica)
-- Pattern: Device-first, offline-first
+- **Local:** SQLite
+- **Cloud:** ???
+- Pattern: Device/offline-first, upload changes in background
 
 **Storage**
 
 - expo-secure-store (tokens)
-- Cloudinary (media, 25GB free)
+- ???
 
 **Development**
 
 - Primary: Windows + iPhone (Expo Go)
-- Validation: Mac (monthly for HealthKit)
+- Validation: Mac (monthly)
 
 ---
 
@@ -200,8 +200,10 @@ All writes enqueued for background sync. Exponential backoff on failure. Last-mo
 - **This file**: Project overview
 - **WORKFLOW.md**: Dev workflow & commands
 - **data-model.md**: Complete database schema
+- **database-normalization-summary.md**: Field naming standards & migration history
 - **api-contracts.md**: REST API endpoints
-- **M0-M5 milestones/**: Feature specifications
+- **architecture.md**: System design & patterns
+- **M0-M8 milestones/**: Feature specifications
 - **.github/copilot-instructions.md**: AI agent guide
 
 ---

@@ -41,6 +41,7 @@ src/components/
 ├── forms/              # Form elements
 │   ├── CustomTagInput.tsx
 │   ├── FormField.tsx
+│   ├── MediaPicker.tsx
 │   ├── ObjectPicker.tsx
 │   ├── PhotoPicker.tsx
 │   ├── PillarChips.tsx
@@ -104,6 +105,7 @@ import { ScreenHeader, EmptyState, SectionTitle, Avatar, PillarBadge } from "@/c
 import {
   FormField,
   PhotoPicker,
+  MediaPicker,
   PrivacySelector,
   PillarChips,
   PostTypeTagSelector,
@@ -121,8 +123,17 @@ import {
   error={nameError}
 />
 
-// Photo picker
+// Photo picker (for profile photos - circular)
 <PhotoPicker value={photoUri} onChange={setPhotoUri} />
+
+// Media picker (for posts - photo/video with preview)
+<MediaPicker
+  value={mediaAsset}
+  onChange={setMediaAsset}
+  allowVideo={true}
+  allowCamera={true}
+  placeholder="Add photo or video"
+/>
 
 // Privacy selector
 <PrivacySelector value={privacy} onChange={setPrivacy} label="Who can see this?" />

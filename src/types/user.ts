@@ -1,6 +1,6 @@
 // User-related types for M1
 
-export type Privacy = "SELF" | "FRIENDS" | "PUBLIC";
+export type Privacy = "SELF" | "FRIENDS" | "CLOSE_FRIENDS" | "PUBLIC"; // CLOSE_FRIENDS added for M4
 
 export type FriendshipStatus = "PENDING" | "ACCEPTED" | "BLOCKED";
 

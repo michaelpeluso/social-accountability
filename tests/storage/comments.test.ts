@@ -48,14 +48,14 @@ describe("Comments Storage", () => {
 
       const result = await createComment("user_1", {
         postId: "post_1",
-        bodyText: "Great post!",
+        text: "Great post!",
       });
 
       expect("error" in result).toBe(false);
       if (!("error" in result)) {
         expect(result.postId).toBe("post_1");
         expect(result.userId).toBe("user_1");
-        expect(result.bodyText).toBe("Great post!");
+        expect(result.text).toBe("Great post!");
         expect(result.isArchived).toBe(false);
       }
     });
@@ -63,7 +63,7 @@ describe("Comments Storage", () => {
     it("rejects empty comments", async () => {
       const result = await createComment("user_1", {
         postId: "post_1",
-        bodyText: "",
+        text: "",
       });
 
       expect("error" in result).toBe(true);
@@ -75,7 +75,7 @@ describe("Comments Storage", () => {
     it("rejects comments over 50 characters", async () => {
       const result = await createComment("user_1", {
         postId: "post_1",
-        bodyText: "This is a very long comment that exceeds the fifty character limit",
+        text: "This is a very long comment that exceeds the fifty character limit",
       });
 
       expect("error" in result).toBe(true);
@@ -89,7 +89,7 @@ describe("Comments Storage", () => {
 
       const result = await createComment("user_1", {
         postId: "nonexistent",
-        bodyText: "Hello",
+        text: "Hello",
       });
 
       expect("error" in result).toBe(true);
@@ -103,7 +103,7 @@ describe("Comments Storage", () => {
 
       const result = await createComment("user_1", {
         postId: "post_1",
-        bodyText: "Hello",
+        text: "Hello",
       });
 
       expect("error" in result).toBe(true);
@@ -116,16 +116,16 @@ describe("Comments Storage", () => {
   describe("getPostComments", () => {
     it("returns comments for a post", async () => {
       const mockComments = [
-        { id: "c1", postId: "post_1", userId: "user_1", bodyText: "Hello", authorName: "Alice" },
-        { id: "c2", postId: "post_1", userId: "user_2", bodyText: "World", authorName: "Bob" },
+        { id: "c1", postId: "post_1", userId: "user_1", text: "Hello", userName: "Alice" },
+        { id: "c2", postId: "post_1", userId: "user_2", text: "World", userName: "Bob" },
       ];
       (query as jest.Mock).mockResolvedValue(mockComments);
 
       const result = await getPostComments("post_1");
 
       expect(result).toHaveLength(2);
-      expect(result[0].bodyText).toBe("Hello");
-      expect(result[1].bodyText).toBe("World");
+      expect(result[0].text).toBe("Hello");
+      expect(result[1].text).toBe("World");
     });
   });
 
@@ -135,7 +135,7 @@ describe("Comments Storage", () => {
         id: "c1",
         postId: "post_1",
         userId: "user_1",
-        bodyText: "Original",
+        text: "Original",
         isArchived: false,
         createdAt: "2024-01-01T00:00:00Z",
         updatedAt: "2024-01-01T00:00:00Z",
@@ -146,7 +146,7 @@ describe("Comments Storage", () => {
 
       expect("error" in result).toBe(false);
       if (!("error" in result)) {
-        expect(result.bodyText).toBe("Updated");
+        expect(result.text).toBe("Updated");
       }
     });
 
@@ -154,7 +154,7 @@ describe("Comments Storage", () => {
       (queryFirst as jest.Mock).mockResolvedValue({
         id: "c1",
         userId: "other_user",
-        bodyText: "Not yours",
+        text: "Not yours",
       });
 
       const result = await updateComment("user_1", "c1", "Hijack");

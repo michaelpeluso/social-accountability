@@ -53,6 +53,7 @@ export async function createGoal(userId: string, data: CreateGoalData): Promise<
     identityId: data.identityId,
     // Values
     isIndefinite: data.isIndefinite,
+    metricType: "COUNT", // Default metric type
     startValue: data.startValue,
     targetValue: data.targetValue,
     currentValue: data.startValue, // Initialize to start value
@@ -71,11 +72,11 @@ export async function createGoal(userId: string, data: CreateGoalData): Promise<
   await execute(
     `INSERT INTO goals (
       id, userId, title, pillar, privacy, description, identityId,
-      isIndefinite, startValue, targetValue, currentValue,
+      isIndefinite, metricType, startValue, targetValue, currentValue,
       startDate, deadline,
       dataSource, linkedHabitIds,
       isArchived, createdAt, updatedAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       goal.id,
       goal.userId,
@@ -85,6 +86,7 @@ export async function createGoal(userId: string, data: CreateGoalData): Promise<
       goal.description || null,
       goal.identityId || null,
       goal.isIndefinite ? 1 : 0,
+      goal.metricType,
       goal.startValue ?? null,
       goal.targetValue ?? null,
       goal.currentValue ?? null,
@@ -166,7 +168,7 @@ export async function updateGoal(
     deadline?: string;
     dataSource?: GoalDataSource;
     linkedHabitIds?: string[];
-    vacationMode?: boolean;
+    isVacationMode?: boolean;
     vacationEndsAt?: string;
     isArchived?: boolean;
   }
@@ -227,9 +229,9 @@ export async function updateGoal(
     setClauses.push("linkedHabitIds = ?");
     params.push(updates.linkedHabitIds ? JSON.stringify(updates.linkedHabitIds) : null);
   }
-  if (updates.vacationMode !== undefined) {
-    setClauses.push("vacationMode = ?");
-    params.push(updates.vacationMode ? 1 : 0);
+  if (updates.isVacationMode !== undefined) {
+    setClauses.push("isVacationMode = ?");
+    params.push(updates.isVacationMode ? 1 : 0);
   }
   if (updates.vacationEndsAt !== undefined) {
     setClauses.push("vacationEndsAt = ?");
@@ -307,6 +309,8 @@ interface GoalRow {
   identityId: string | null;
   // Values
   isIndefinite: number;
+  metricType: string;
+  metricUnit: string | null;
   startValue: number | null;
   targetValue: number | null;
   currentValue: number | null;
@@ -317,7 +321,7 @@ interface GoalRow {
   dataSource: string;
   linkedHabitIds: string | null; // JSON array
   // Vacation mode
-  vacationMode: number;
+  isVacationMode: number;
   vacationEndsAt: string | null;
   // System fields
   isArchived: number;
@@ -338,6 +342,8 @@ function rowToGoal(row: GoalRow): Goal {
     identityId: row.identityId ?? undefined,
     // Values
     isIndefinite: row.isIndefinite === 1,
+    metricType: (row.metricType || "COUNT") as Goal["metricType"],
+    metricUnit: row.metricUnit ?? undefined,
     startValue: row.startValue ?? undefined,
     targetValue: row.targetValue ?? undefined,
     currentValue: row.currentValue ?? undefined,
@@ -348,7 +354,7 @@ function rowToGoal(row: GoalRow): Goal {
     dataSource: (row.dataSource || "MANUAL") as GoalDataSource,
     linkedHabitIds: row.linkedHabitIds ? JSON.parse(row.linkedHabitIds) : undefined,
     // Vacation mode
-    vacationMode: row.vacationMode === 1,
+    isVacationMode: row.isVacationMode === 1,
     vacationEndsAt: row.vacationEndsAt ?? undefined,
     // System fields
     isArchived: row.isArchived === 1,

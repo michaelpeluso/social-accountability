@@ -13,8 +13,10 @@ export interface CreateCheckInInput {
   occurredAt?: string; // Defaults to now
   source?: CheckInSource; // Defaults to MANUAL
   value?: number; // For count/duration habits (e.g., 25 mins, 8 reps)
-  evidenceRef?: string;
+  evidenceUrl?: string;
   note?: string;
+  intensity?: number;
+  outcome?: string;
 }
 
 // Check-in row from SQLite
@@ -25,8 +27,10 @@ interface CheckInRow {
   occurredAt: string;
   source: CheckInSource;
   value: number | null;
-  evidenceRef: string | null;
+  evidenceUrl: string | null;
   note: string | null;
+  intensity: number | null;
+  outcome: string | null;
   createdAt: string;
   syncedAt: string | null;
 }
@@ -39,8 +43,10 @@ function rowToCheckIn(row: CheckInRow): HabitCheckIn {
     occurredAt: row.occurredAt,
     source: row.source,
     value: row.value ?? undefined,
-    evidenceRef: row.evidenceRef ?? undefined,
+    evidenceUrl: row.evidenceUrl ?? undefined,
     note: row.note ?? undefined,
+    intensity: row.intensity ?? undefined,
+    outcome: row.outcome as HabitCheckIn["outcome"],
     createdAt: row.createdAt,
     syncedAt: row.syncedAt ?? undefined,
   };
@@ -77,8 +83,8 @@ export async function createCheckIn(
   // Insert check-in
   await db.runAsync(
     `INSERT INTO habit_check_ins (
-      id, habitId, userId, occurredAt, source, value, evidenceRef, note, createdAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      id, habitId, userId, occurredAt, source, value, evidenceUrl, note, intensity, outcome, createdAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       habitId,
@@ -86,8 +92,10 @@ export async function createCheckIn(
       occurredAt,
       input.source ?? "MANUAL",
       input.value ?? null,
-      input.evidenceRef ?? null,
+      input.evidenceUrl ?? null,
       input.note ?? null,
+      input.intensity ?? null,
+      input.outcome ?? null,
       now,
     ]
   );
@@ -102,8 +110,10 @@ export async function createCheckIn(
     occurredAt,
     source: input.source ?? "MANUAL",
     value: input.value,
-    evidenceRef: input.evidenceRef,
+    evidenceUrl: input.evidenceUrl,
     note: input.note,
+    intensity: input.intensity,
+    outcome: input.outcome as HabitCheckIn["outcome"],
     createdAt: now,
   };
 

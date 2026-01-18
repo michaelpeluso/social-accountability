@@ -9,4 +9,5 @@ export { PostTypeTagSelector } from "./PostTypeTagSelector";
 export { CustomTagInput } from "./CustomTagInput";
 export { ObjectPicker } from "./ObjectPicker";
 export { PhotoPicker } from "./PhotoPicker";
+export { MediaPicker } from "./MediaPicker";
 export { FormField } from "./FormField";

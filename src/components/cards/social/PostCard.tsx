@@ -55,7 +55,7 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
     setIsSubmittingComment(true);
     const result = await createComment(currentUserId, {
       postId: post.id,
-      bodyText: commentText.trim(),
+      text: commentText.trim(),
     });
     setIsSubmittingComment(false);
 
@@ -70,7 +70,11 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
   };
 
   const handleReaction = async (emoji: ReactionEmoji) => {
-    const result = await toggleReaction(currentUserId, { postId: post.id, emoji });
+    const result = await toggleReaction(currentUserId, {
+      targetId: post.id,
+      targetType: "POST",
+      emoji,
+    });
 
     if ("error" in result) {
       console.error("Failed to toggle reaction:", result.error);
@@ -150,11 +154,11 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
           }}
         >
           <View style={[styles.avatar, { backgroundColor: pillarColor || theme.semantic.primary }]}>
-            {post.authorAvatarUrl ? (
-              <Image source={{ uri: post.authorAvatarUrl }} style={styles.avatarImage} />
+            {post.userPhotoUrl ? (
+              <Image source={{ uri: post.userPhotoUrl }} style={styles.avatarImage} />
             ) : (
               <Text style={[styles.avatarText, { color: theme.button.primary.text }]}>
-                {post.authorName?.charAt(0) ?? "?"}
+                {post.userName?.charAt(0) ?? "?"}
               </Text>
             )}
           </View>
@@ -167,7 +171,7 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
           }}
         >
           <Text style={[styles.authorName, { color: theme.text.primary }]}>
-            {post.authorName ?? "Unknown"}
+            {post.userName ?? "Unknown"}
           </Text>
           <Text style={[styles.timestamp, { color: theme.text.tertiary }]}>
             {formatRelativeTime(post.createdAt)}
@@ -222,20 +226,18 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
       )}
 
       {/* Location Context (only location, not time - time is shown in header) */}
-      {post.contextLocation && (
+      {post.contextLocationId && (
         <View style={styles.contextChips}>
           <View style={[styles.contextChip, { backgroundColor: `${theme.semantic.secondary}15` }]}>
             <Text style={[styles.contextChipText, { color: theme.semantic.secondary }]}>
-              📍 {post.contextLocation}
+              📍 {post.contextLocationId}
             </Text>
           </View>
         </View>
       )}
 
       {/* Post Body */}
-      {post.bodyText && (
-        <Text style={[styles.bodyText, { color: theme.text.primary }]}>{post.bodyText}</Text>
-      )}
+      {post.text && <Text style={[styles.text, { color: theme.text.primary }]}>{post.text}</Text>}
 
       {/* Media */}
       {post.mediaUrl && (
@@ -305,10 +307,10 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
                   style={[styles.commentItem, { borderBottomColor: theme.border.light }]}
                 >
                   <Text style={[styles.commentAuthor, { color: theme.text.primary }]}>
-                    {comment.authorName ?? "User"}
+                    {comment.userName ?? "User"}
                   </Text>
                   <Text style={[styles.commentBody, { color: theme.text.secondary }]}>
-                    {comment.bodyText}
+                    {comment.text}
                   </Text>
                   <Text style={[styles.commentTime, { color: theme.text.tertiary }]}>
                     {formatRelativeTime(comment.createdAt)}
@@ -467,7 +469,7 @@ const styles = StyleSheet.create({
   contextChipText: {
     fontSize: 12,
   },
-  bodyText: {
+  text: {
     fontSize: 15,
     lineHeight: 22,
     marginBottom: spacing.md,

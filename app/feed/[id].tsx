@@ -39,7 +39,7 @@ export default function PostDetailScreen() {
   const [editText, setEditText] = useState("");
   const [userReaction, setUserReaction] = useState<ReactionEmoji | null>(null);
 
-  const isOwnPost = post?.authorUserId === CURRENT_USER_ID;
+  const isOwnPost = post?.userId === CURRENT_USER_ID;
 
   // Check if post is within 24h edit window
   const canEdit =
@@ -52,7 +52,7 @@ export default function PostDetailScreen() {
     const postData = await getPostById(id);
     if (postData) {
       setPost(postData);
-      setEditText(postData.bodyText || "");
+      setEditText(postData.text || "");
     }
     const commentsData = await getPostComments(id);
     setComments(commentsData);
@@ -71,7 +71,7 @@ export default function PostDetailScreen() {
   const handleEdit = async () => {
     if (!post) return;
     const result = await updatePost(post.id, CURRENT_USER_ID, {
-      bodyText: editText.trim(),
+      text: editText.trim(),
     });
     if ("error" in result) {
       Alert.alert("Error", result.error);
@@ -102,7 +102,11 @@ export default function PostDetailScreen() {
 
   const handleReaction = async (emoji: ReactionEmoji) => {
     if (!post) return;
-    const result = await toggleReaction(CURRENT_USER_ID, { postId: post.id, emoji });
+    const result = await toggleReaction(CURRENT_USER_ID, {
+      targetId: post.id,
+      targetType: "POST",
+      emoji,
+    });
     if ("error" in result) return;
 
     if (result.action === "added") {
@@ -126,7 +130,7 @@ export default function PostDetailScreen() {
     if (!post) return;
     const result = await createComment(CURRENT_USER_ID, {
       postId: post.id,
-      bodyText: text,
+      text: text,
     });
     if ("error" in result) {
       Alert.alert("Error", result.error);
@@ -198,11 +202,11 @@ export default function PostDetailScreen() {
           <View style={styles.postHeader}>
             <Pressable
               style={styles.authorSection}
-              onPress={() => post && router.push(`/profile/${post.authorUserId}`)}
+              onPress={() => post && router.push(`/profile/${post.userId}`)}
             >
-              <Avatar imageUrl={post.authorAvatarUrl} name={post.authorName} size="md" />
+              <Avatar imageUrl={post.userPhotoUrl} name={post.userName} size="md" />
               <View style={styles.authorInfo}>
-                <Text style={styles.authorName}>{post.authorName ?? "Unknown"}</Text>
+                <Text style={styles.authorName}>{post.userName ?? "Unknown"}</Text>
                 <Text style={styles.timestamp}>{formatRelativeTime(post.createdAt)}</Text>
               </View>
             </Pressable>
@@ -233,7 +237,7 @@ export default function PostDetailScreen() {
             </View>
           ) : (
             <>
-              <Text style={styles.bodyText}>{post.bodyText}</Text>
+              <Text style={styles.text}>{post.text}</Text>
               {post.editedAt && <Text style={styles.editedText}>Edited</Text>}
             </>
           )}
@@ -258,9 +262,9 @@ export default function PostDetailScreen() {
             <CommentItem
               key={comment.id}
               userId={comment.userId}
-              userName={comment.authorName ?? "User"}
-              userAvatarUrl={comment.authorAvatarUrl}
-              text={comment.bodyText}
+              userName={comment.userName ?? "User"}
+              userAvatarUrl={comment.userPhotoUrl}
+              text={comment.text}
               timestamp={formatRelativeTime(comment.createdAt)}
               isOwnComment={comment.userId === CURRENT_USER_ID}
               onPressAuthor={() => router.push(`/profile/${comment.userId}`)}
@@ -377,7 +381,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     marginBottom: spacing.sm,
   },
-  bodyText: {
+  text: {
     fontSize: typography.fontSize.md,
     color: "#333",
     lineHeight: 22,

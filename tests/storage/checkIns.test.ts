@@ -72,13 +72,13 @@ describe("checkIns storage", () => {
       const checkIn = await createCheckIn(testHabitId, testUserId, {
         occurredAt: "2024-01-15T10:00:00.000Z",
         source: "INTEGRATION",
-        evidenceRef: "photo_123",
+        evidenceUrl: "photo_123",
         note: "Completed morning run!",
       });
 
       expect(checkIn.occurredAt).toBe("2024-01-15T10:00:00.000Z");
       expect(checkIn.source).toBe("INTEGRATION");
-      expect(checkIn.evidenceRef).toBe("photo_123");
+      expect(checkIn.evidenceUrl).toBe("photo_123");
       expect(checkIn.note).toBe("Completed morning run!");
     });
 

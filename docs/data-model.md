@@ -34,6 +34,28 @@ dependencies: architecture.md
 
 ---
 
+## Database Normalization (Current Implementation)
+
+**Naming Conventions**
+
+| Pattern          | Rule                    | Examples                                                              |
+| ---------------- | ----------------------- | --------------------------------------------------------------------- |
+| Boolean fields   | `is` prefix             | `isPreset`, `isArchived`, `isRead`, `isCloseFriend`, `isVacationMode` |
+| Timestamps       | `At` suffix             | `createdAt`, `updatedAt`, `syncedAt`, `deletedAt`, `earnedAt`         |
+| User references  | `userId` + denormalized | `userId`, `userName`, `userPhotoUrl`                                  |
+| Foreign keys     | Simple `{table}Id`      | `habitId`, `goalId`, `postId`, `checkInId`                            |
+| Text content     | Semantic naming         | `text` (short), `description` (long), `note` (annotations)            |
+| Reaction targets | Polymorphic pattern     | `targetId`, `targetType` (for posts/stories)                          |
+
+**Schema Status:**
+
+- Single consolidated schema supporting M0-M8+ milestones
+- No incremental migrations - fresh start with SCHEMA_VERSION=1
+- All tables include `syncedAt` for offline-first sync tracking
+- Soft deletes use `deletedAt` or `archivedAt` + `isArchived` boolean
+
+---
+
 ## Enums
 
 ```typescript
@@ -66,16 +88,8 @@ enum HabitType {
 }
 
 // M4
-enum CheckInOutcome {
-  COMPLETED = "COMPLETED", // BUILD habits: completed the habit
-  RESISTED = "RESISTED", // BREAK habits: resisted temptation
-  LAPSED = "LAPSED", // BREAK habits: gave in to temptation
-}
-
-// M4
 enum StackRelationship {
-  BEFORE = "BEFORE", // Do this habit BEFORE the linked habit
-  AFTER = "AFTER", // Do this habit AFTER the linked habit
+  AFTER = "AFTER", // linkedHabitId happens AFTER habitId (habitId triggers linkedHabitId)
 }
 
 // M6
@@ -121,8 +135,10 @@ enum ReactionEmoji {
   name: string; // "Athlete", "Student", "Parent"
   pillar: Pillar; // Each identity maps to ONE pillar
   icon: string; // Emoji or preset icon
-  preset: boolean; // From predefined list vs custom (M4)
+  isPreset: boolean; // From predefined list vs custom (M4)
   createdAt: timestamp;
+  updatedAt: timestamp;
+  syncedAt?: timestamp;
 }
 ```
 
@@ -180,40 +196,18 @@ const PRESET_IDENTITIES = [
 ```typescript
 {
   id: string (uuid)
+  appleId?: string                  // Apple Sign-In identifier
   displayName: string
   email?: string                    // Optional from Apple Sign-In
   photoUrl?: string
   bio?: string (280 char max)
   defaultPrivacy: Privacy           // M1 - defaults to SELF
-  pillarWeights?: {                 // M4 - optional scoring preferences
-    MIND: number (0-1),
-    BODY: number (0-1),
-    HEART: number (0-1),
-    SOUL: number (0-1)
-  }
-
-  // M6: Auto-Post Controls - granular privacy for every auto-generated post type
-  autoPostSettings?: {
-    weeklyPatterns: { enabled: boolean, privacy: Privacy },      // Weekly drift summaries
-    milestones: { enabled: boolean, privacy: Privacy },          // Goal completions
-    streaks: { enabled: boolean, privacy: Privacy },             // Streak achievements
-    badges: { enabled: boolean, privacy: Privacy },              // Badge unlocks
-    challenges: { enabled: boolean, privacy: Privacy },          // Challenge completions
-    recovery: { enabled: boolean, privacy: Privacy },            // Recovery milestones
-    newHabits: { enabled: boolean, privacy: Privacy }            // New habits started
-  }
-
-  // M6: Behavioral Drift Settings
-  driftSettings?: {
-    shareWeeklyPatterns: boolean,        // Auto-post weekly summaries (opt-in)
-    allowFriendSupport: boolean,         // Friends can offer help
-    patternVisibility: Privacy,          // Who can see drift patterns
-    showDetailedMetrics: boolean,        // Show performance numbers (with warning)
-    autoShareRecovery: boolean           // Celebrate comebacks publicly
-  }
-
+  isVacationMode: boolean           // M2 - pause habit tracking
+  vacationEndsAt?: timestamp        // M2 - when vacation mode ends
   createdAt: timestamp
   updatedAt: timestamp
+  deletedAt?: timestamp             // Soft delete
+  syncedAt?: timestamp              // Last cloud sync
 }
 ```
 
@@ -235,8 +229,10 @@ const PRESET_IDENTITIES = [
   friendId: string                  // User who accepted
   status: 'PENDING' | 'ACCEPTED'
   isCloseFriend: boolean            // M4 - defaults to false
-  createdAt: timestamp
   acceptedAt?: timestamp            // Null if PENDING
+  createdAt: timestamp
+  updatedAt: timestamp
+  syncedAt?: timestamp
 }
 ```
 
@@ -264,7 +260,9 @@ const PRESET_IDENTITIES = [
   description?: string (500 char max)
   privacy: 'INVITE_ONLY' | 'PUBLIC' // INVITE_ONLY = members only, PUBLIC = discoverable
   createdAt: timestamp
+  updatedAt: timestamp
   archivedAt?: timestamp            // Soft delete
+  syncedAt?: timestamp
 }
 ```
 
@@ -289,10 +287,12 @@ const PRESET_IDENTITIES = [
 
 ```typescript
 {
-  circleId: string;
-  userId: string;
-  role: "OWNER" | "MEMBER"; // OWNER = full admin, MEMBER = regular participant
-  joinedAt: timestamp;
+  id: string (uuid)
+  circleId: string
+  userId: string
+  role: "OWNER" | "MEMBER"  // OWNER = full admin, MEMBER = regular participant
+  joinedAt: timestamp
+  syncedAt?: timestamp
 }
 ```
 
@@ -316,8 +316,8 @@ const PRESET_IDENTITIES = [
 {
   id: string (uuid)
   circleId: string
-  fromUserId: string
-  body: string (2000 char max)      // Message text
+  userId: string                    // Message sender
+  text: string (2000 char max)      // Message text
   mediaUrl?: string                 // Optional image/video
   mediaType?: 'photo' | 'video' | 'audio' // Optional - type of media
   createdAt: timestamp
@@ -352,19 +352,27 @@ const PRESET_IDENTITIES = [
   userId: string
   identityId?: string               // Optional: "Working toward Athlete identity"
   title: string                     // "Run 5K under 30 minutes"
+  description?: string              // Optional detailed description
   pillar: Pillar
-  metric: {
-    type: MetricType,               // COUNT, DURATION, DISTANCE, WEIGHT, CUSTOM
-    target: number,                 // 30 (for 30 minutes)
-    current?: number,               // Auto-calculated from linked habits
-    unit: string                    // 'minutes', 'km', 'workouts', 'lbs'
-  }
-  deadline?: timestamp              // Optional target date
-  completedAt?: timestamp           // When target achieved
   privacy: Privacy
+  isIndefinite: boolean             // No deadline - ongoing goal
+  metricType: MetricType            // COUNT, DURATION, DISTANCE, WEIGHT, CUSTOM
+  metricUnit?: string               // 'minutes', 'km', 'workouts', 'lbs'
+  startValue?: number               // Starting point
+  targetValue?: number              // Goal target
+  currentValue?: number             // Auto-calculated from linked habits
+  startDate?: timestamp             // When goal tracking starts
+  deadline?: timestamp              // Optional target date
+  dataSource: 'MANUAL' | 'INTEGRATION' // How progress is tracked
+  linkedHabitIds?: string[]         // Habits contributing to this goal
+  isVacationMode: boolean           // Goal tracking paused
+  vacationEndsAt?: timestamp        // When vacation mode ends
+  completedAt?: timestamp           // When target achieved
+  isArchived: boolean               // Archived goals
   archivedAt?: timestamp
   createdAt: timestamp
   updatedAt: timestamp
+  syncedAt?: timestamp
 }
 ```
 
@@ -403,43 +411,44 @@ const PRESET_IDENTITIES = [
 {
   id: string (uuid)
   userId: string
-  title: string
-  pillar: Pillar
-  habitType: HabitType              // BUILD or BREAK
   goalId?: string                   // Optional: contributes to goal progress
   identityId?: string               // Optional: supports this identity
-  schedule: {
-    frequency: 'daily' | 'weekly' | 'monthly' | 'custom'
-    targetCount?: number             // e.g., 7 for daily, 3 for 3x/week
-    daysOfWeek?: number[]           // [0-6] for weekly/custom, 0=Sunday
-    timeSlotsOfDay?: {              // M2 - flexible scheduling
-      day: number,                  // 0-6
-      hour: number,                 // 0-23
-      minute: number                // 0-59
-    }[]
-  }
-
-  // M4: Atomic Habits strategies (auto-detected or user-set)
-  miniVersion?: string (100 chars)  // 2-minute rule: "1 push-up", "Read 1 page"
-  environmentalCue?: string (200 chars) // "Shoes by door", "Phone in other room"
-  bestTimeHour?: number (0-23)      // ML-detected optimal time
-  bestTimeConfidence?: number (0-1) // Confidence score for bestTimeHour
-
-  // M5: Progressive overload (1% rule)
-  progressiveOverload?: {
-      enabled: boolean,
-      incrementRate: number (0-1),  // 1% per completion
-      allowDecimals: boolean,  // Round to nearest 0.1
-      originalTarget: number,  // Started at 30 min
-      currentTarget?: number,  // After 10 completions: 30 * 1.01^10 ≈ 33.5
-      maxTarget?: number,  // Stop at 60 min
-      lastIncrementedAt: timestamp
-    },
-
+  parentHabitId?: string            // M5: For habit sub-habits
+  stackAfterHabitId?: string        // M5: Do THIS habit after THAT habit (creates linked list chain)
+  title: string
+  description?: string              // Optional detailed description
+  pillar: Pillar
+  habitType: HabitType              // BUILD or BREAK
+  completionType: 'BINARY' | 'NUMERIC' // M2 - Binary (yes/no) or Numeric (count/duration)
+  targetValue?: number              // For numeric habits - daily target
+  unit?: string                     // For numeric habits - 'minutes', 'reps', etc.
+  icon?: string                     // Optional emoji icon
+  tags?: string                     // JSON array of tags
+  schedule: string                  // JSON object with frequency config
+  timezone?: string                 // User's timezone for scheduling
+  difficulty?: number (1-5)         // M4 - self-assessed difficulty
+  miniVersion?: string (100 chars)  // M4 - 2-minute rule: "1 push-up", "Read 1 page"
+  graceDays: number                 // M2 - allowed misses before streak breaks (default 0)
   privacy: Privacy
+  isArchived: boolean               // Archived habits
   archivedAt?: timestamp
+  currentStreak: number             // Current consecutive completions
+  longestStreak: number             // Best ever streak
+  lastCheckInAt?: timestamp         // Most recent check-in
+  lastMissedAt?: timestamp          // Most recent miss
+  recoveryStreak: number            // M3 - comeback streak after break
+  environmentalCue?: string (200 chars) // M4 - "Shoes by door", "Phone in other room"
+  progressiveOverload?: string      // M5 - JSON config for progressive overload
+  progressiveOverloadStart?: number // M5 - initial numeric target for progressive overload (e.g. starting rep/duration)
+  progressiveOverloadPrevious?: number // M5 - previous target before last auto-increment
+  progressiveOverloadLastAppliedAt?: timestamp // M5 - when last auto-increment was applied
+  isReminderEnabled: boolean        // M5 - Enable reminder notifications
+  reminderTimes?: string            // M5 - JSON array of reminder times
+  reminderText?: string             // M5 - Custom reminder message
+  reflectionPrompt?: string         // M5 - Custom reflection prompt after check-in
   createdAt: timestamp
   updatedAt: timestamp
+  syncedAt?: timestamp
 }
 ```
 
@@ -456,12 +465,21 @@ const PRESET_IDENTITIES = [
 - Habits NEVER complete (recurring actions, not one-time)
 - habitType: BUILD (develop good habits) vs BREAK (overcome bad habits)
 - Tags are simple strings (M2), rich Tag table in M4
-- timeSlotsOfDay allows "4pm Mon, 8am Fri" flexibility
+- **schedule field responsibility**: Determines success/failure criteria for streak calculation
+  - Daily habits: Must have check-in each day (after graceDays tolerance)
+  - Flexible habits: "3x/week" counts check-ins in rolling 7-day window, no specific days required
+  - Custom patterns: "Mon/Wed/Fri", "every 3 days", etc. evaluated per schedule logic
+  - Absence of check-in = didn't do it (schedule determines if that's acceptable)
 - archivedAt soft-deletes (keeps history)
 - goalId links habit progress to goal's metric.current
 - miniVersion: Implements James Clear's "2-minute rule" for habit formation
 - environmentalCue: Environmental design from Atomic Habits
 - bestTimeHour/Confidence: ML-detected from check-in patterns (M4)
+- completionPrior: Bayesian prior probability P(complete|habit) - cached and updated weekly or after 5+ check-ins
+  - Calculation: (completions + α) / (total_opportunities + α + β) where α=1, β=1 (Beta prior)
+  - Updated: On background sync after new check-ins, or weekly for active habits
+  - Use case: Predict likelihood of completion, prioritize nudges, calculate recovery scores
+- priorLastUpdatedAt: Tracks staleness of prior (recalculate if >7 days old)
 - progressiveOverload: Automatic target increment (1% rule), only for metric-based habits (count, duration, distance, weight)
 
 ---
@@ -475,14 +493,15 @@ const PRESET_IDENTITIES = [
   userId: string
   occurredAt: timestamp             // When habit was completed
   source: CheckInSource             // MANUAL or INTEGRATION
-  evidenceRef?: string              // M4 - e.g., 'healthkit:steps:10543'
-  note?: string                     // M4 - optional user note
-
-  // M4: Intensity and outcome tracking
-  intensity?: number (1-5)          // BUILD: how energized, BREAK: temptation strength
-  outcome?: CheckInOutcome          // BREAK habits only: COMPLETED/RESISTED/LAPSED
-
+  success: boolean                  // Did I succeed? (interpretation depends on Habit.habitType)
+  value?: number                    // For numeric habits - actual value
+  evidenceUrl?: string              // M4 - URL to evidence photo/video
+  note?: string (500 char max)      // M4 - optional user note
+  intensity?: number (1-5)          // M4 - BUILD: energy level, BREAK: temptation strength
+  moodBefore?: number (1-5)         // M4 - Mood before check-in
+  moodAfter?: number (1-5)          // M4 - Mood after check-in
   createdAt: timestamp              // When check-in was logged
+  syncedAt?: timestamp
 }
 ```
 
@@ -496,24 +515,35 @@ const PRESET_IDENTITIES = [
 **Notes:**
 
 - occurredAt vs createdAt: allows backdating check-ins
-- evidenceRef stores integration metadata for debugging
+- evidenceUrl stores integration metadata for debugging
 - intensity (M4): For BUILD habits = energy/commitment level, for BREAK habits = temptation strength
-- outcome (M4): Only for BREAK habits to track RESISTED vs LAPSED instances
-- Defaults: intensity=3 if skipped (zero friction), outcome=COMPLETED for BUILD habits
+- **success field interpretation (depends on Habit.habitType)**:
+  - BUILD habits: success=true means "I did the habit" (ran, meditated, worked out)
+  - BREAK habits: success=true means "I resisted" (avoided social media, didn't smoke)
+  - BREAK habits: success=false means "I lapsed" (gave in to temptation)
+  - BUILD habits rarely use success=false (just don't create check-in if didn't do it)
+- No check-in = didn't do it (for BUILD) or no temptation faced (for BREAK)
+- Streak evaluation: Habit's schedule field defines success criteria (daily, 3x/week, etc.)
+  - Daily habits: Missing check-in for a day = potential streak break (after graceDays)
+  - Flexible habits ("3x/week"): Count check-ins in window, no concept of "missed Tuesday"
+- Defaults: success=true if not specified
 
 ---
 
 ### HabitStack (M5)
 
+**Purpose:** ML-detected habit co-occurrence patterns (separate from user-configured stacking)
+
 ```typescript
 {
   id: string(uuid);
-  habitId: string; // The "trigger" habit
-  linkedHabitId: string; // The habit that follows
-  relationship: StackRelationship; // BEFORE or AFTER
-  confidence: number(0 - 1); // ML-detected (30-day window, 30-min co-occurrence)
+  habitId: string; // The "trigger" habit that happens first
+  linkedHabitId: string; // The habit that tends to follow
+  relationship: StackRelationship; // Always AFTER (linkedHabitId follows habitId)
+  confidence: number(0 - 1); // ML confidence (30-day window, 30-min co-occurrence, 70%+ frequency)
   userId: string; // Denormalized for queries
   createdAt: timestamp;
+  updatedAt: timestamp;
 }
 ```
 
@@ -526,10 +556,22 @@ const PRESET_IDENTITIES = [
 
 **Notes:**
 
-- Implements James Clear's "habit stacking" from Atomic Habits
+- **ML-detected only** - not user-configured (user config uses `Habit.stackAfterHabitId`)
 - Detected device-side: when 2 habits occur within 30 min, 70%+ of time over 30 days
 - CASCADE DELETE when either habit is deleted
 - confidence score determines UI priority (higher = show first)
+- Used for suggestions: "You usually stretch after running. Want to link them?"
+- Example: User always does meditation then journal → (meditation, journal, AFTER, 0.85)
+
+**User-Configured Stacking (in Habit table):**
+
+For explicit user chains like "Meditate → Journal → Breakfast":
+
+- Meditate.stackAfterHabitId = null (start of chain)
+- Journal.stackAfterHabitId = meditateId
+- Breakfast.stackAfterHabitId = journalId
+
+This creates a simple linked list: each habit knows its "previous" habit.
 
 ---
 
@@ -584,21 +626,25 @@ const PRESET_IDENTITIES = [
 ```typescript
 {
   id: string (uuid)
-  userId: string
-  authorName: string                // Denormalized for performance
-  authorPhotoUrl?: string           // Denormalized
+  userId: string                    // Post author (join with User table for name/photo)
+  circleId?: string                 // M8 - Optional circle post
   pillar: Pillar
   privacy: Privacy
-  bodyText?: string (500 char max)
+  text?: string (500 char max)      // Post content
   mediaUrl?: string                 // Cloudinary URL
   mediaType?: 'photo' | 'video' | 'chart' // M3 - type of media
-  tags: string[]                    // M2 - ['workout', 'progress']
-  postTypeTags?: string[]           // M3 - ['win', 'struggle', 'question', 'reflection'] or custom
-  linkedCheckInId?: string          // Optional link to HabitCheckIn
-  linkedObjectId?: string           // M3 - Optional link to habit/goal/milestone/module
-  linkedObjectType?: 'habit' | 'goal' | 'milestone' | 'module' // M3 - Type of linked object
-  contextLocation?: string          // M3 - Location category name (e.g., 'gym', 'home', 'work')
+  tags?: string                     // JSON array - all tags unified (e.g. ['workout', 'win', 'my-custom-tag'])
+  checkInId?: string                // M3 - Optional link to HabitCheckIn
+  habitId?: string                  // M3 - Optional link to Habit
+  goalId?: string                   // M3 - Optional link to Goal
+  linkedObjectId?: string           // M3 - Generic linked object
+  linkedObjectType?: string         // M3 - Type of linked object
+  contextTimeOfDay?: string         // M3 - 'morning', 'afternoon', 'evening', 'night'
+  contextLocationIdId?: string        // M3 - Reference to SavedLocation.id (category displayed from location)
+  editedAt?: timestamp              // M3 - Last edit timestamp (24h window)
   createdAt: timestamp
+  updatedAt: timestamp
+  syncedAt?: timestamp
 }
 ```
 
@@ -607,7 +653,7 @@ const PRESET_IDENTITIES = [
 - PRIMARY KEY (id)
 - INDEX (userId, createdAt DESC)
 - INDEX (privacy, createdAt DESC) - for public feed
-- INDEX (linkedCheckInId)
+- INDEX (checkInId)
 
 **Privacy Rules:**
 
@@ -617,7 +663,7 @@ const PRESET_IDENTITIES = [
 
 **Notes:**
 
-- Denormalized author fields to avoid joins (SQLite performance)
+- Use JOIN with User table for author name/photo (consistency over denormalization)
 - Permanent (no TTL) - for thoughtful sharing
 - Supports rich interactions (comments, not just reactions)
 
@@ -628,23 +674,18 @@ const PRESET_IDENTITIES = [
 ```typescript
 {
   id: string (uuid)
-  userId: string
-  authorName: string                // Denormalized
-  authorPhotoUrl?: string           // Denormalized
+  userId: string                    // Story author (join with User table for name/photo)
   pillar: Pillar
   privacy: Privacy
   mediaUrl: string                  // Required - always has photo/video
   mediaType: 'photo' | 'video'      // Required - type of media
-  caption?: string (280 char max)   // Optional short caption
-  tags: string[]                    // M2 - same as Post/Habit
-  linkedCheckInId?: string          // Creates HabitCheckIn atomically
-  badges?: {                        // Auto-calculated on post
-    streak?: number,
-    milestone?: number,             // e.g., 10th check-in
-    achievement?: string            // 'first_week', 'perfect_month'
-  }
+  caption?: string (200 char max)   // Optional short caption
+  tags?: string                     // JSON array - all tags unified
+  checkInId?: string                // Creates HabitCheckIn atomically
+  habitId?: string                  // Optional habit link
   expiresAt: timestamp              // Auto-set to +24h
   createdAt: timestamp
+  syncedAt?: timestamp
 }
 ```
 
@@ -654,7 +695,7 @@ const PRESET_IDENTITIES = [
 - INDEX (userId, expiresAt) - for cleanup
 - INDEX (privacy, createdAt DESC) - for feed
 - INDEX (expiresAt) - for TTL cleanup job
-- INDEX (linkedCheckInId)
+- INDEX (checkInId)
 
 **Privacy Rules:**
 
@@ -666,7 +707,8 @@ const PRESET_IDENTITIES = [
 - Always 24h TTL (deleted after expiresAt)
 - Optimized for quick sharing (camera → post → done)
 - No comments (reactions only)
-- Badges calculated on creation (not stored in HabitCheckIn)
+- Use JOIN with User table for author name/photo
+- Badges generate their own optional auto-posts (like LinkedIn's automatic posts)
 
 **Cleanup:**
 
@@ -683,12 +725,11 @@ DELETE FROM stories WHERE expiresAt < NOW()
   id: string (uuid)
   postId: string
   userId: string
-  authorName: string                // Denormalized
-  authorPhotoUrl?: string           // Denormalized
-  bodyText: string (50 char max)
-  isArchived: boolean,              // M5 post archive
-  createdAt: timestamp,
+  text: string (50 word max)        // Comment content
+  isArchived: boolean               // M5 post archive
+  createdAt: timestamp
   updatedAt: timestamp              // can edit
+  syncedAt?: timestamp
 }
 ```
 
@@ -712,24 +753,27 @@ DELETE FROM stories WHERE expiresAt < NOW()
 ```typescript
 {
   id: string(uuid);
-  targetId: string; // postId or storyId
-  targetType: "POST" | "STORY";
+  postId?: string;                  // Optional - reaction on post
+  storyId?: string;                 // Optional - reaction on story (one must be set)
   userId: string;
   emoji: ReactionEmoji;
   createdAt: timestamp;
+  syncedAt?: timestamp;
 }
 ```
 
 **Indexes:**
 
 - PRIMARY KEY (id)
-- UNIQUE (targetId, targetType, userId) - one reaction per user per item
-- INDEX (targetId, targetType, createdAt) - for reaction counts
+- UNIQUE (postId, userId) WHERE postId IS NOT NULL - one reaction per user per post
+- UNIQUE (storyId, userId) WHERE storyId IS NOT NULL - one reaction per user per story
+- INDEX (postId, createdAt) - for post reaction counts
+- INDEX (storyId, createdAt) - for story reaction counts
 
 **Notes:**
 
-- Works for both Posts and Stories
-- User can change reaction (UPDATE emoji WHERE targetId+targetType+userId)
+- Either postId OR storyId must be set (CHECK constraint)
+- User can change reaction (UPDATE emoji WHERE postId/storyId + userId)
 - Only 5 allowed emojis (prevent abuse)
 
 ---
@@ -743,8 +787,8 @@ DELETE FROM stories WHERE expiresAt < NOW()
   toUserId: string
   habitId?: string                  // Optional: nudge about specific habit
   templateId: string                // Predefined template
-  message: string                   // Generated from template
   createdAt: timestamp
+  syncedAt?: timestamp
 }
 ```
 
@@ -768,30 +812,17 @@ DELETE FROM stories WHERE expiresAt < NOW()
 ### SavedLocation (M5)
 
 ```typescript
-enum LocationCategory {
-  HOME = 'HOME',
-  WORK = 'WORK',
-  SCHOOL = 'SCHOOL',
-  GYM = 'GYM',
-  LIBRARY = 'LIBRARY',
-  CHURCH = 'CHURCH',
-  SOCIAL = 'SOCIAL',
-  ENTERTAINMENT = 'ENTERTAINMENT',
-  CUSTOM = 'CUSTOM'
-}
-
 {
   id: string (uuid)
   userId: string
   name: string                      // User-assigned name: "My Gym", "Office", "Park"
-  category: LocationCategory        // Preset or CUSTOM
+  category: string                  // HOME, WORK, GYM, etc.
   latitude: number                  // Encrypted at rest
   longitude: number                 // Encrypted at rest
-  radius: number                    // Meters (e.g., 100m)
-  icon?: string                     // Optional emoji
-  useInContextChips: boolean        // Show in post context (defaults false)
+  radiusMeters: number              // Radius in meters (e.g., 100m)
   createdAt: timestamp
   updatedAt: timestamp
+  syncedAt?: timestamp
 }
 ```
 
@@ -827,11 +858,14 @@ enum LocationCategory {
 
 ### HabitTrigger (M5)
 
+> **Note:** The config structure for HabitTrigger is not fully planned out yet. This schema is subject to change and should not be implemented until finalized.
+
 ```typescript
 enum TriggerType {
   LOCATION = 'LOCATION',            // Geofence entry/exit
   TIME_OF_DAY = 'TIME_OF_DAY',      // Scheduled time
   APP_OPENED = 'APP_OPENED',        // iOS Screen Time API
+  HEALTH_KIT = 'HEALTH_KIT',        // HealthKit data (M6+)
   HABIT_COMPLETED = 'HABIT_COMPLETED', // After linked habit
   CALENDAR_EVENT = 'CALENDAR_EVENT' // Calendar integration
 }
@@ -839,7 +873,7 @@ enum TriggerType {
 enum TriggerAction {
   PROMPT_CHECKIN = 'PROMPT_CHECKIN',   // Notification: "Log habit?"
   PROMPT_STORY = 'PROMPT_STORY',       // Notification: "Share story?"
-  AUTO_LOG = 'AUTO_LOG'                // Auto-create check-in
+  AUTO_LOG = 'AUTO_LOG',               // Auto-create check-in
 }
 
 {
@@ -960,8 +994,7 @@ enum TriggerAction {
 {
   id: string (uuid)
   userId: string
-  name: string                      // "Marathon Training"
-  slug: string                      // "marathon-training"
+  slug: string                      // "marathon-training" (display as "Marathon Training" via formatting)
   color?: string                    // Hex color for UI
   icon?: string                     // Emoji
   pillar?: Pillar                   // Optional pillar association
@@ -997,45 +1030,27 @@ if (!tagExists(userId, "marathon-training")) {
 
 ---
 
-### BadgeEarned (M3)
+### Badge (M3)
 
 ```typescript
-enum BadgeType {
-  STREAK = 'STREAK',                // Consistency badges
-  MILESTONE = 'MILESTONE',          // Check-in count badges
-  PILLAR = 'PILLAR',                // Pillar-specific badges
-  SOCIAL = 'SOCIAL',                // Social interaction badges
-  CHALLENGE = 'CHALLENGE'           // Challenge winner badges (M4)
-}
-
-enum BadgeTier {
-  BRONZE = 'BRONZE',                // 7 days, 10 check-ins
-  SILVER = 'SILVER',                // 30 days, 50 check-ins
-  GOLD = 'GOLD'                     // 100 days, 100 check-ins
-}
-
 {
   id: string (uuid)
   userId: string
-  badgeId: string                   // 'streak-body-gold'
-  type: BadgeType
-  tier: BadgeTier
+  badgeName: string                 // 'streak-body-gold', 'milestone-50', etc.
   pillar?: Pillar                   // If pillar-specific
   habitId?: string                  // If habit-specific
-  metadata: {
-    streakDays?: number,
-    checkInCount?: number,
-    value: number                   // The qualifying value (7, 30, 100)
-  }
-  sharedAsPostId?: string           // Auto-posted (with opt-out)
+  tier?: number                     // 1=Bronze, 2=Silver, 3=Gold
+  metadata?: string                 // JSON object with badge details
+  sharedAt?: timestamp              // When shared as post (optional)
   earnedAt: timestamp
+  syncedAt?: timestamp
 }
 ```
 
 **Indexes:**
 
 - PRIMARY KEY (id)
-- UNIQUE (userId, badgeId, pillar, habitId) - no duplicates
+- UNIQUE (userId, badgeName, pillar, habitId) - no duplicates
 - INDEX (userId, earnedAt DESC) - badge wall
 - INDEX (type, tier) - leaderboards
 
@@ -1098,12 +1113,13 @@ UserSettings {
 {
   id: string (uuid)
   userId: string
-  bodyText: string (5000 char max)
-  pillars: Pillar[]                 // Can tag multiple pillars
-  mood?: number (1-5)               // Optional mood emoji scale
+  text: string (5000 char max)
+  pillar?: Pillar                   // Can tag single pillar
+  tags?: string                     // JSON array of tags
   privacy: Privacy                  // Defaults to SELF
-  entryDate: timestamp              // Date of entry (can backdate)
   createdAt: timestamp
+  updatedAt: timestamp
+  syncedAt?: timestamp
 }
 ```
 
@@ -1111,7 +1127,7 @@ UserSettings {
 
 - PRIMARY KEY (id)
 - INDEX (userId, entryDate DESC)
-- FULLTEXT INDEX (bodyText) - SQLite FTS for search
+- FULLTEXT INDEX (text) - SQLite FTS for search
 
 ---
 
@@ -1121,10 +1137,11 @@ UserSettings {
 {
   id: string (uuid)
   userId: string
-  value: number (1-5)               // 😞 😐 🙂 😊 😄
-  note?: string (100 char max)
-  timestamp: timestamp
+  mood: number (1-5)                // 😞 😐 🙂 😊 😄
+  emotion?: Emotion                 // Optional micro-emotion within mood level
+  note?: string (250 char max)
   createdAt: timestamp
+  syncedAt?: timestamp
 }
 ```
 
@@ -1137,30 +1154,50 @@ UserSettings {
 ### Challenge (M4)
 
 ```typescript
+// Challenge
 {
   id: string (uuid)
-  creatorId: string
-  name: string
-  habitId: string                   // Habit to compete on
-  type: 'completion' | 'streak' | 'together'
+  creatorUserId?: string            // Optional - null for system-created challenges
+  title: string
+  description?: string
+  pillar?: Pillar                   // Optional pillar focus
+  habitIds?: string                 // JSON array - directly linked habits
+  goalIds?: string                  // JSON array - linked goals (their habits also count)
   startDate: timestamp
   endDate: timestamp
+  privacy: Privacy
+  isArchived: boolean
   createdAt: timestamp
+  updatedAt: timestamp
+  syncedAt?: timestamp
 }
+```
 
-ChallengeParticipant {
+**Notes:**
+
+- habitIds: Habits directly part of challenge
+- goalIds: Goals linked to challenge - their associated habits automatically count toward challenge
+- At least one of habitIds or goalIds should be set
+- Challenge progress calculated from check-ins on all linked habits (direct + via goals)
+
+```typescript
+// ChallengeParticipant
+{
   id: string (uuid)
   challengeId: string
   userId: string
-  checkInsCount: number             // Updated on each check-in
-  currentStreak: number
+  status: string                    // 'ACTIVE', 'COMPLETED', 'DROPPED'
+  score: number                     // Check-ins count or other metric
+  progress: number                  // 0-100% completion toward challenge goal
   joinedAt: timestamp
+  completedAt?: timestamp
+  syncedAt?: timestamp
 }
 ```
 
 **Purpose:** Social challenges with friends
 
-**Leaderboard:** Device-side query (ORDER BY checkInsCount DESC)
+**Leaderboard:** Device-side query (ORDER BY score DESC, progress DESC)
 
 ---
 
@@ -1172,13 +1209,16 @@ ChallengeParticipant {
 {
   id: string (uuid)
   userId: string
-  source: 'healthkit' | 'screentime' | 'location' | 'calendar'
-  enabled: boolean
-  permissions: {                    // Source-specific permissions
-    [key: string]: boolean
-  }
+  provider: string                  // 'HEALTHKIT', 'SCREENTIME', 'LOCATION', 'CALENDAR'
+  accessToken?: string              // Encrypted
+  refreshToken?: string             // Encrypted
+  expiresAt?: timestamp
+  scopes?: string                   // JSON array of permissions
+  isEnabled: boolean
   lastSyncAt?: timestamp
   createdAt: timestamp
+  updatedAt: timestamp
+  syncedAt?: timestamp
 }
 ```
 
@@ -1189,19 +1229,36 @@ ChallengeParticipant {
 ### AutoLog (M5)
 
 ```typescript
+enum ValueType {
+  NUMBER = 'NUMBER',                // Numeric values (steps, minutes, etc.)
+  BOOLEAN = 'BOOLEAN',              // True/false (workout completed, etc.)
+  TIMESTAMP = 'TIMESTAMP',          // Time-based values (sleep time, etc.)
+  DURATION = 'DURATION',            // Duration in seconds
+}
+
 {
   id: string (uuid)
   userId: string
-  habitId: string
-  source: string                    // e.g., 'healthkit:steps'
-  confidence: number (0-1)          // ML confidence score
-  suggestedAt: timestamp
-  acceptedAt?: timestamp
-  rejectedAt?: timestamp
+  integrationId: string             // Reference to integration
+  metricType: string                // 'steps', 'screentime', 'workout', 'sleep', etc.
+  valueType: ValueType              // Type of the value
+  valueNumber?: number              // For NUMBER, DURATION types
+  valueBoolean?: boolean            // For BOOLEAN type
+  valueTimestamp?: timestamp        // For TIMESTAMP type
+  unit?: string                     // 'steps', 'minutes', 'km', etc.
+  occurredAt: timestamp             // When the activity occurred
+  rawData?: string                  // JSON metadata (optional)
+  createdAt: timestamp
+  syncedAt?: timestamp
 }
 ```
 
 **Purpose:** ML-suggested check-ins (user can accept/reject)
+
+**Notes:**
+
+- valueType determines which value field is populated
+- Only one value field should be set based on valueType
 
 ---
 
@@ -1214,23 +1271,25 @@ User
   │    └─ Goal (optional) - "Proof I'm that person"
   │         └─ Habit (optional) - "What I do daily"
   ├─ Goal (M2/M3) - Quantitative milestones
-  │    └─ Habit (linked habits contribute to goal.metric.current)
+  │    └─ Habit (linked habits contribute to goal progress)
   ├─ Habit (M2) - Recurring actions
   │    ├─ HabitCheckIn (logs)
   │    └─ HabitTrigger (automation, M5)
   ├─ Post (M3) - Permanent shares
   │    ├─ Comment (text responses)
   │    ├─ Reaction (emoji)
-  │    └─ linkedCheckInId → HabitCheckIn
+  │    └─ checkInId → HabitCheckIn
   ├─ Story (M3) - 24h ephemeral shares
   │    ├─ Reaction (emoji only)
-  │    └─ linkedCheckInId → HabitCheckIn
-  ├─ BadgeEarned (M3) - Auto-celebrations
-  │    └─ sharedAsPostId → Post
+  │    └─ checkInId → HabitCheckIn
+  ├─ Badge (M3) - Auto-celebrations
+  │    └─ sharedAt (optional post timestamp)
   ├─ Nudge (M3) - Friend encouragement
   ├─ Tag (M4) - Rich tag metadata
   ├─ JournalEntry (M4)
   ├─ MoodEntry (M4)
+  ├─ Integration (M5)
+  │    └─ AutoLog (M5)
   └─ Challenge (M4)
        └─ ChallengeParticipant
 ```
@@ -1284,62 +1343,238 @@ function getHabits(viewerId: string, scope: "mine" | "friends" | "public") {
 
 ---
 
-## SQLite Migration Strategy
+---
+
+## Future Tables (In Progress)
+
+> **Note:** These tables are drafted but not finalized. Implementation should wait until requirements are confirmed.
+
+### HabitFollower (M5+)
+
+**Purpose:** Allow friends to join/follow someone's habit for social accountability
 
 ```typescript
-const SCHEMA_VERSION = 5;
-
-async function migrate(db: SQLiteDatabase) {
-  const { user_version } = await db.getFirstAsync("PRAGMA user_version");
-
-  if (user_version < 1) {
-    // M1 tables
-    await db.execAsync(`
-      CREATE TABLE users (...);
-      CREATE TABLE friendships (...);
-    `);
-  }
-
-  if (user_version < 2) {
-    // M2 tables
-    await db.execAsync(`
-      CREATE TABLE habits (...);
-      CREATE TABLE habit_checkins (...);
-    `);
-  }
-
-  if (user_version < 3) {
-    // M3 tables
-    await db.execAsync(`
-      CREATE TABLE posts (...);
-      CREATE TABLE reactions (...);
-      CREATE TABLE nudges (...);
-    `);
-  }
-
-  if (user_version < 4) {
-    // M4 tables
-    await db.execAsync(`
-      CREATE TABLE goals (...);
-      CREATE TABLE identities (...);
-      CREATE TABLE journal_entries (...);
-      CREATE TABLE mood_entries (...);
-      CREATE TABLE challenges (...);
-      ALTER TABLE friendships ADD COLUMN isCloseFriend BOOLEAN DEFAULT false;
-    `);
-  }
-
-  if (user_version < 5) {
-    // M5 tables
-    await db.execAsync(`
-      CREATE TABLE integrations (...);
-      CREATE TABLE auto_logs (...);
-    `);
-  }
-
-  await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+{
+  id: string (uuid)
+  habitId: string                   // The habit being followed
+  userId: string                    // The follower
+  ownerId: string                   // The habit owner (denormalized for queries)
+  role: 'FOLLOWER' | 'PARTNER'      // FOLLOWER = one-way, PARTNER = mutual accountability
+  notifyOnCheckIn: boolean          // Get notified when owner checks in
+  notifyOnMiss: boolean             // Get notified when owner misses
+  joinedAt: timestamp
+  leftAt?: timestamp                // Soft leave (keeps history)
+  syncedAt?: timestamp
 }
 ```
+
+**Indexes:**
+
+- PRIMARY KEY (id)
+- UNIQUE (habitId, userId)
+- INDEX (userId, leftAt IS NULL) - habits I'm following
+- INDEX (ownerId, leftAt IS NULL) - who's following my habits
+
+---
+
+### AccountabilityPartner (M5+)
+
+**Purpose:** Dedicated partner relationship beyond regular friendship for deeper accountability
+
+```typescript
+{
+  id: string (uuid)
+  userId: string                    // User A
+  partnerId: string                 // User B
+  status: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'ENDED'
+  focusPillar?: Pillar              // Optional focus area
+  checkInFrequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY'  // How often to sync
+  lastCheckInAt?: timestamp         // Last accountability check-in
+  nextCheckInAt?: timestamp         // Scheduled next check-in
+  sharedHabitIds?: string           // JSON array - habits shared with partner
+  sharedGoalIds?: string            // JSON array - goals shared with partner
+  notes?: string                    // Private notes about partnership
+  startedAt: timestamp
+  endedAt?: timestamp
+  createdAt: timestamp
+  updatedAt: timestamp
+  syncedAt?: timestamp
+}
+```
+
+**Indexes:**
+
+- PRIMARY KEY (id)
+- UNIQUE (userId, partnerId)
+- INDEX (userId, status)
+- INDEX (partnerId, status)
+- INDEX (nextCheckInAt) - for reminder scheduling
+
+**Notes:**
+
+- Bidirectional relationship (creates single record, not two)
+- Different from Friendship - focused on accountability, not social
+- checkInFrequency drives reminder notifications
+
+---
+
+### UserStats (M4+)
+
+**Purpose:** Aggregated statistics for user dashboard and profile
+
+```typescript
+{
+  id: string (uuid)
+  userId: string
+  periodType: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ALL_TIME'
+  periodStart: timestamp            // Start of period (null for ALL_TIME)
+
+  // Habit stats
+  totalCheckIns: number
+  successfulCheckIns: number
+  completionRate: number (0-100)
+  currentStreakMax: number          // Longest active streak
+  longestStreakEver: number
+
+  // Pillar breakdown
+  pillarCheckIns: string            // JSON: { MIND: 10, BODY: 20, HEART: 5, SOUL: 3 }
+  pillarCompletionRates: string     // JSON: { MIND: 85, BODY: 90, HEART: 70, SOUL: 60 }
+
+  // Goal stats
+  goalsCompleted: number
+  goalsInProgress: number
+
+  // Social stats
+  reactionsGiven: number
+  reactionsReceived: number
+  nudgesSent: number
+  nudgesReceived: number
+  postsCreated: number
+  commentsGiven: number
+
+  // Engagement
+  activeDays: number                // Days with at least 1 check-in
+  bestDayOfWeek?: number (0-6)      // Most productive day
+  bestTimeOfDay?: number (0-23)     // Most productive hour
+
+  calculatedAt: timestamp           // When stats were computed
+  syncedAt?: timestamp
+}
+```
+
+**Indexes:**
+
+- PRIMARY KEY (id)
+- UNIQUE (userId, periodType, periodStart)
+- INDEX (userId, periodType)
+- INDEX (calculatedAt) - for stale data cleanup
+
+**Notes:**
+
+- Recalculated periodically (daily for daily stats, weekly for weekly, etc.)
+- ALL_TIME stats updated on each check-in
+- Stored vs computed trade-off: store for expensive aggregations, compute for simple counts
+
+---
+
+### HabitStats (M4+)
+
+**Purpose:** Per-habit aggregated statistics
+
+```typescript
+{
+  id: string (uuid)
+  habitId: string
+  userId: string                    // Denormalized for queries
+  periodType: 'WEEKLY' | 'MONTHLY' | 'ALL_TIME'
+  periodStart?: timestamp
+
+  totalCheckIns: number
+  successfulCheckIns: number
+  completionRate: number (0-100)
+  currentStreak: number
+  longestStreak: number
+
+  // Time patterns
+  avgCheckInHour?: number (0-23)
+  mostFrequentDay?: number (0-6)
+  avgTimeBetweenCheckIns?: number   // In hours
+
+  // Value tracking (for numeric habits)
+  avgValue?: number
+  maxValue?: number
+  totalValue?: number
+
+  // Mood correlation (M4)
+  avgMoodBefore?: number (1-5)
+  avgMoodAfter?: number (1-5)
+  moodImpact?: number (-2 to +2)    // Avg mood change
+
+  calculatedAt: timestamp
+  syncedAt?: timestamp
+}
+```
+
+**Indexes:**
+
+- PRIMARY KEY (id)
+- UNIQUE (habitId, periodType, periodStart)
+- INDEX (userId, periodType)
+- INDEX (habitId, calculatedAt)
+
+---
+
+### HabitSignal (M6+)
+
+**Purpose:** Computed signals for habit health (warnings, ribbons)
+
+> **Decision:** May be computed at render time instead of stored. Storing provides history tracking and push notification triggers.
+
+```typescript
+{
+  id: string (uuid)
+  habitId: string
+  userId: string                    // Denormalized
+  signalType: 'AT_RISK' | 'RECOVERY' | 'HOT_STREAK' | 'MOMENTUM_LOSS' | 'PERSONAL_BEST' | 'NEEDS_ATTENTION'
+  severity: 'INFO' | 'WARNING' | 'CRITICAL'
+  message?: string                  // Optional display message
+  metadata?: string                 // JSON with signal-specific data
+  isActive: boolean                 // Currently displayed
+  triggeredAt: timestamp
+  resolvedAt?: timestamp            // When signal no longer applies
+  acknowledgedAt?: timestamp        // User dismissed
+  syncedAt?: timestamp
+}
+```
+
+**Indexes:**
+
+- PRIMARY KEY (id)
+- INDEX (habitId, isActive)
+- INDEX (userId, isActive, severity)
+- INDEX (signalType, isActive)
+- INDEX (triggeredAt DESC)
+
+**Signal Types:**
+
+- **AT_RISK**: Streak about to break (1 day left in grace period)
+- **RECOVERY**: User bouncing back after break
+- **HOT_STREAK**: Exceptional consistency (10+ days)
+- **MOMENTUM_LOSS**: Declining check-in frequency
+- **PERSONAL_BEST**: New longest streak
+- **NEEDS_ATTENTION**: Habit neglected (no check-in in 7+ days)
+
+---
+
+## Not Yet Designed
+
+The following features are identified but need more research before modeling:
+
+1. **Goal Statistics** - Similar to HabitStats but for goals (may be simpler due to fewer dimensions)
+2. **Identity Statistics** - Aggregate stats per identity (derived from linked goals/habits)
+3. **Social Graph Analytics** - Friend influence, engagement patterns (privacy considerations)
+4. **Push Notification Queue** - May use existing sync_queue or separate table
+5. **A/B Test Assignments** - Feature flag and experiment tracking
 
 ---
 

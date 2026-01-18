@@ -38,7 +38,7 @@ const FREQUENCY_OPTIONS: { value: HabitFrequency; label: string }[] = [
 ];
 const HABIT_TYPE_OPTIONS: { value: HabitType; label: string; desc: string }[] = [
   { value: "BUILD", label: "Build", desc: "A habit to develop" },
-  { value: "QUIT", label: "Quit", desc: "A habit to break" },
+  { value: "BREAK", label: "Break", desc: "A habit to break" },
 ];
 const COMPLETION_TYPE_OPTIONS: { value: CompletionType; label: string; desc: string }[] = [
   { value: "BINARY", label: "Yes/No", desc: "Did you do it?" },

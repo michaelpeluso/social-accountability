@@ -51,7 +51,7 @@ describe("Posts Storage", () => {
       (queryFirst as jest.Mock).mockResolvedValue({
         id: mockId,
         userId: TEST_USER_ID,
-        bodyText: "Test post",
+        text: "Test post",
         pillar: "MIND",
         privacy: "FRIENDS",
         createdAt: new Date().toISOString(),
@@ -59,7 +59,7 @@ describe("Posts Storage", () => {
       });
 
       const result = await createPost(TEST_USER_ID, {
-        bodyText: "Test post",
+        text: "Test post",
         pillar: "MIND" as Pillar,
         privacy: "FRIENDS" as Privacy,
       });
@@ -68,7 +68,7 @@ describe("Posts Storage", () => {
       expect("error" in result).toBe(false);
 
       if (!("error" in result)) {
-        expect(result.bodyText).toBe("Test post");
+        expect(result.text).toBe("Test post");
         expect(result.pillar).toBe("MIND");
         expect(result.privacy).toBe("FRIENDS");
       }
@@ -78,7 +78,7 @@ describe("Posts Storage", () => {
       (checkRateLimit as jest.Mock).mockResolvedValue(false);
 
       const result = await createPost("rate_limit_user_0", {
-        bodyText: "Should fail",
+        text: "Should fail",
         pillar: "BODY" as Pillar,
         privacy: "PUBLIC" as Privacy,
       });
@@ -95,7 +95,7 @@ describe("Posts Storage", () => {
       const mockPost = {
         id: "post-123",
         userId: TEST_USER_ID,
-        bodyText: "Find me",
+        text: "Find me",
         pillar: "HEART",
         privacy: "SELF",
         createdAt: new Date().toISOString(),
@@ -106,7 +106,7 @@ describe("Posts Storage", () => {
       const retrieved = await getPostById("post-123");
       expect(retrieved).not.toBeNull();
       expect(retrieved?.id).toBe("post-123");
-      expect(retrieved?.bodyText).toBe("Find me");
+      expect(retrieved?.text).toBe("Find me");
     });
 
     it("should return null for non-existent post", async () => {
@@ -122,8 +122,7 @@ describe("Posts Storage", () => {
       const mockPost = {
         id: "post-123",
         userId: TEST_USER_ID,
-        authorUserId: TEST_USER_ID, // Add authorUserId for auth check
-        bodyText: "Original text",
+        text: "Original text",
         pillar: "SOUL",
         privacy: "PUBLIC",
         createdAt: new Date().toISOString(),
@@ -135,12 +134,12 @@ describe("Posts Storage", () => {
       (execute as jest.Mock).mockResolvedValue({});
 
       const updated = await updatePost("post-123", TEST_USER_ID, {
-        bodyText: "Updated text",
+        text: "Updated text",
       });
 
       expect("error" in updated).toBe(false);
       if (!("error" in updated)) {
-        expect(updated.bodyText).toBe("Updated text");
+        expect(updated.text).toBe("Updated text");
         expect(updated.editedAt).toBeDefined();
       }
     });
@@ -149,8 +148,7 @@ describe("Posts Storage", () => {
       const mockPost = {
         id: "post-123",
         userId: TEST_USER_ID,
-        authorUserId: TEST_USER_ID, // Different from TEST_USER_ID_2
-        bodyText: "My post",
+        text: "My post",
         pillar: "MIND",
         privacy: "FRIENDS",
         createdAt: new Date().toISOString(),
@@ -160,7 +158,7 @@ describe("Posts Storage", () => {
       (queryFirst as jest.Mock).mockResolvedValue(mockPost);
 
       const result = await updatePost("post-123", TEST_USER_ID_2, {
-        bodyText: "Hacked",
+        text: "Hacked",
       });
 
       expect(result).toHaveProperty("error");
@@ -174,8 +172,8 @@ describe("Posts Storage", () => {
     it("should delete post within 24 hours", async () => {
       const mockPost = {
         id: "post-123",
-        authorUserId: TEST_USER_ID,
-        bodyText: "Delete me",
+        userId: TEST_USER_ID,
+        text: "Delete me",
         pillar: "BODY",
         privacy: "SELF",
         createdAt: new Date().toISOString(),
@@ -191,10 +189,9 @@ describe("Posts Storage", () => {
 
     it("should not allow delete by different user", async () => {
       const mockPost = {
-        authorUserId: TEST_USER_ID, // Different from TEST_USER_ID_2
         id: "post-123",
         userId: TEST_USER_ID,
-        bodyText: "Protected",
+        text: "Protected",
         pillar: "HEART",
         privacy: "PUBLIC",
         createdAt: new Date().toISOString(),
@@ -213,14 +210,14 @@ describe("Posts Storage", () => {
       const mockPosts = [
         {
           id: "post-1",
-          authorUserId: TEST_USER_ID,
-          authorName: "Test User",
-          authorAvatar: null,
-          bodyText: "My post 1",
+          userId: TEST_USER_ID,
+          userName: "Test User",
+          userPhotoUrl: null,
+          text: "My post 1",
           pillar: "MIND",
           privacy: "FRIENDS",
-          linkedHabitId: null,
-          linkedHabitTitle: null,
+          habitId: null,
+          habitTitle: null,
           mediaUrl: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -234,26 +231,26 @@ describe("Posts Storage", () => {
 
       const posts = await getFeedPosts(TEST_USER_ID, "mine", 10);
       expect(posts.length).toBeGreaterThan(0);
-      expect(posts[0].authorUserId).toBe(TEST_USER_ID);
+      expect(posts[0].userId).toBe(TEST_USER_ID);
     });
 
     it("should include reactions in feed posts", async () => {
       const mockPosts = [
         {
           id: "post-with-reactions",
-          authorUserId: TEST_USER_ID,
-          authorName: "Test User",
-          authorAvatar: null,
-          bodyText: "Post with reactions",
+          userId: TEST_USER_ID,
+          userName: "Test User",
+          userPhotoUrl: null,
+          text: "Post with reactions",
           pillar: "BODY",
           privacy: "PUBLIC",
-          linkedHabitId: null,
-          linkedHabitTitle: null,
+          habitId: null,
+          habitTitle: null,
           mediaUrl: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           editedAt: null,
-          reactions: ["👏", "🔥"],
+          reactions: [],
           userReaction: null,
         },
       ];

@@ -12,6 +12,7 @@ import type { Goal, Privacy } from "../../../types";
 const PRIVACY_LABELS: Record<Privacy, string> = {
   SELF: "Private",
   FRIENDS: "Friends",
+  CLOSE_FRIENDS: "Close Friends",
   PUBLIC: "Public",
 };
 

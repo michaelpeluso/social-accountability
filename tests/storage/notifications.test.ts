@@ -47,7 +47,7 @@ describe("Notifications Storage", () => {
 
       expect(notif).toHaveProperty("id");
       expect(notif.userId).toBe(TEST_USER);
-      expect(notif.read).toBe(false);
+      expect(notif.isRead).toBe(false);
     });
   });
 
@@ -59,9 +59,9 @@ describe("Notifications Storage", () => {
           userId: TEST_USER,
           type: "BADGE_EARNED",
           title: "Badge earned",
-          body: "You earned a new badge!",
+          text: "You earned a new badge!",
           data: JSON.stringify({ badgeType: "streak-7" }),
-          read: false,
+          isRead: false,
           createdAt: new Date().toISOString(),
         },
       ];

@@ -52,10 +52,7 @@ export async function clearDemoData(): Promise<void> {
     `DELETE FROM reactions WHERE userId IN (${demoIds.map(() => "?").join(",")})`,
     demoIds
   );
-  await execute(
-    `DELETE FROM posts WHERE authorUserId IN (${demoIds.map(() => "?").join(",")})`,
-    demoIds
-  );
+  await execute(`DELETE FROM posts WHERE userId IN (${demoIds.map(() => "?").join(",")})`, demoIds);
   await execute(
     `DELETE FROM habit_check_ins WHERE userId IN (${demoIds.map(() => "?").join(",")})`,
     demoIds
@@ -377,7 +374,7 @@ export async function seedDemoData(
 
     for (const post of posts) {
       await execute(
-        `INSERT OR REPLACE INTO posts (id, authorUserId, bodyText, pillar, privacy, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO posts (id, userId, text, pillar, privacy, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           post.id,
           post.userId,
@@ -410,7 +407,7 @@ export async function seedDemoData(
 
     // 8. Comments (on posts)
     await execute(
-      `INSERT OR REPLACE INTO comments (id, postId, authorUserId, bodyText, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO comments (id, postId, userId, text, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
       [
         genId("comment"),
         posts[0].id,
@@ -421,7 +418,7 @@ export async function seedDemoData(
       ]
     );
     await execute(
-      `INSERT OR REPLACE INTO comments (id, postId, authorUserId, bodyText, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO comments (id, postId, userId, text, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
       [genId("comment"), posts[2].id, mainUserId, "Amazing progress Alice! 🏃‍♀️", daysAgo(1), now]
     );
 
@@ -437,7 +434,7 @@ export async function seedDemoData(
 
     // 10. Notifications (using new emoji set, for main user)
     await execute(
-      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, data, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, text, data, isRead, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         genId("notif"),
         mainUserId,
@@ -450,7 +447,7 @@ export async function seedDemoData(
       ]
     );
     await execute(
-      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, data, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, text, data, isRead, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         genId("notif"),
         mainUserId,
@@ -463,19 +460,20 @@ export async function seedDemoData(
       ]
     );
     await execute(
-      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, text, data, isRead, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         genId("notif"),
         mainUserId,
         "FRIEND_REQUEST",
         "New friend request",
         "Carol wants to be friends",
+        null,
         0,
         daysAgo(1),
       ]
     );
     await execute(
-      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, data, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, text, data, isRead, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         genId("notif"),
         mainUserId,
@@ -488,7 +486,7 @@ export async function seedDemoData(
       ]
     );
     await execute(
-      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, data, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, text, data, isRead, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         genId("notif"),
         mainUserId,

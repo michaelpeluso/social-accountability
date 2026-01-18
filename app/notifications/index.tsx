@@ -52,10 +52,10 @@ export default function NotificationsScreen() {
 
   const handleNotificationPress = async (notification: AppNotification) => {
     // Mark as read
-    if (!notification.read) {
+    if (!notification.isRead) {
       await markAsRead(notification.id);
       setNotifications((prev) =>
-        prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n))
+        prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n))
       );
     }
 
@@ -75,14 +75,14 @@ export default function NotificationsScreen() {
 
   const handleMarkAllRead = async () => {
     await markAllAsRead(currentUserId);
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
   };
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const renderNotification = ({ item }: { item: AppNotification }) => (
     <Pressable
-      style={[styles.notificationItem, !item.read && styles.notificationUnread]}
+      style={[styles.notificationItem, !item.isRead && styles.notificationUnread]}
       onPress={() => handleNotificationPress(item)}
     >
       <View style={styles.iconContainer}>
@@ -90,10 +90,10 @@ export default function NotificationsScreen() {
       </View>
       <View style={styles.contentContainer}>
         <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.body}>{item.body}</Text>
+        <Text style={styles.body}>{item.text}</Text>
         <Text style={styles.time}>{formatRelativeTime(item.createdAt)}</Text>
       </View>
-      {!item.read && <View style={styles.unreadDot} />}
+      {!item.isRead && <View style={styles.unreadDot} />}
     </Pressable>
   );
 

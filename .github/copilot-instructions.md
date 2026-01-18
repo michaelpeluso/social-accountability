@@ -100,11 +100,11 @@ npm run test:watch     # Jest watch mode
 
 ### Milestone Status
 
-- ✅ **M0** (Foundation) - In progress: types, routing, auth stubs
-- 📋 **M1** (Account & Privacy) - Next: Apple Sign-In, friends
-- 🔜 **M2** (Goals & Habits) - Manual tracking, streaks
-- 🔜 **M3** (Social) - Posts, stories, reactions, nudges
-- 🔜 **M4** (Identity & Analytics) - Identities, journal, HealthKit proof-of-concept
+- **M0** (Foundation) - In progress: types, routing, auth stubs
+- **M1** (Account & Privacy) - Next: Apple Sign-In, friends
+- **M2** (Goals & Habits) - Manual tracking, streaks
+- **M3** (Social) - Posts, stories, reactions, nudges
+- **M4** (Identity & Analytics) - Identities, journal, HealthKit proof-of-concept
 - 💡 **M5+** (Future) - Full automation, ML, location triggers
 
 ### Key Files for Each Milestone

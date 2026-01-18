@@ -133,7 +133,7 @@ export default function FeedScreen() {
             <PostCard
               post={item}
               onPress={() => handlePostPress(item.id)}
-              onAuthorPress={() => handleAuthorPress(item.authorUserId)}
+              onAuthorPress={() => handleAuthorPress(item.userId)}
               currentUserId={userId ?? ""}
             />
           )}

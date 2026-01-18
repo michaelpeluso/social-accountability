@@ -41,7 +41,7 @@ type LinkedObject = {
 
 export default function CreatePostScreen() {
   const { theme } = useTheme();
-  const [bodyText, setBodyText] = useState("");
+  const [text, setText] = useState("");
   const [pillar, setPillar] = useState<Pillar>("MIND");
   const [privacy, setPrivacy] = useState<Privacy>("FRIENDS");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -76,12 +76,12 @@ export default function CreatePostScreen() {
   }, []);
 
   const handleSubmit = async () => {
-    if (!bodyText.trim()) {
+    if (!text.trim()) {
       Alert.alert("Error", "Please write something to share");
       return;
     }
 
-    if (bodyText.length > 500) {
+    if (text.length > 500) {
       Alert.alert("Error", "Post text must be 500 characters or less");
       return;
     }
@@ -96,7 +96,7 @@ export default function CreatePostScreen() {
       }
 
       const result = await createPost(user.id, {
-        bodyText: bodyText.trim(),
+        text: text.trim(),
         pillar,
         privacy,
         mediaUrl: mediaUri ?? undefined,
@@ -105,7 +105,7 @@ export default function CreatePostScreen() {
         customTags: customTags.length > 0 ? customTags : undefined,
         linkedObjectId: linkedObject?.id,
         linkedObjectType: linkedObject?.type,
-        linkedHabitId: linkedObject?.type === "habit" ? linkedObject.id : undefined,
+        habitId: linkedObject?.type === "habit" ? linkedObject.id : undefined,
       });
 
       if ("error" in result) {
@@ -138,18 +138,18 @@ export default function CreatePostScreen() {
           rightAction={
             <Pressable
               onPress={handleSubmit}
-              disabled={isSubmitting || !bodyText.trim()}
+              disabled={isSubmitting || !text.trim()}
               style={[
                 styles.postButton,
                 { backgroundColor: theme.button.primary.background },
-                (!bodyText.trim() || isSubmitting) && styles.postButtonDisabled,
+                (!text.trim() || isSubmitting) && styles.postButtonDisabled,
               ]}
             >
               <Text
                 style={[
                   styles.postButtonText,
                   { color: theme.button.primary.text },
-                  (!bodyText.trim() || isSubmitting) && { color: theme.text.tertiary },
+                  (!text.trim() || isSubmitting) && { color: theme.text.tertiary },
                 ]}
               >
                 {isSubmitting ? "Posting..." : "Post"}
@@ -167,12 +167,12 @@ export default function CreatePostScreen() {
               placeholderTextColor={theme.text.tertiary}
               multiline
               maxLength={500}
-              value={bodyText}
-              onChangeText={setBodyText}
+              value={text}
+              onChangeText={setText}
               autoFocus
             />
             <Text style={[styles.charCount, { color: theme.text.tertiary }]}>
-              {bodyText.length}/500
+              {text.length}/500
             </Text>
           </View>
 

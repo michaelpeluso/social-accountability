@@ -21,14 +21,14 @@ export async function createComment(
   userId: string,
   request: CreateCommentRequest
 ): Promise<Comment | { error: string }> {
-  const { postId, bodyText } = request;
+  const { postId, text } = request;
 
   // Validate comment length
-  if (!bodyText || bodyText.trim().length === 0) {
+  if (!text || text.trim().length === 0) {
     return { error: "Comment cannot be empty" };
   }
 
-  if (bodyText.length > 50) {
+  if (text.length > 50) {
     return { error: "Comment must be 50 characters or less" };
   }
 
@@ -40,8 +40,8 @@ export async function createComment(
   }
 
   // Verify post exists
-  const post = await queryFirst<{ id: string; authorUserId: string }>(
-    "SELECT id, authorUserId FROM posts WHERE id = ?",
+  const post = await queryFirst<{ id: string; userId: string }>(
+    "SELECT id, userId FROM posts WHERE id = ?",
     [postId]
   );
 
@@ -56,7 +56,7 @@ export async function createComment(
     id,
     postId,
     userId,
-    bodyText: bodyText.trim(),
+    text: text.trim(),
     isArchived: false,
     createdAt: now,
     updatedAt: now,
@@ -64,13 +64,13 @@ export async function createComment(
 
   try {
     await execute(
-      `INSERT INTO comments (id, postId, userId, bodyText, isArchived, createdAt, updatedAt)
+      `INSERT INTO comments (id, postId, userId, text, isArchived, createdAt, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         comment.id,
         comment.postId,
         comment.userId,
-        comment.bodyText,
+        comment.text,
         comment.isArchived ? 1 : 0,
         comment.createdAt,
         comment.updatedAt,
@@ -80,7 +80,7 @@ export async function createComment(
     await incrementRateLimit(userId, "comment", null);
 
     // Notify post owner (unless they're commenting on their own post)
-    if (post.authorUserId !== userId) {
+    if (post.userId !== userId) {
       // Get commenter's name
       const commenter = await queryFirst<{ displayName: string }>(
         "SELECT displayName FROM users WHERE id = ?",
@@ -90,9 +90,9 @@ export async function createComment(
 
       // Create notification record
       const notification = await notifyCommentReceived(
-        post.authorUserId,
+        post.userId,
         commenterName,
-        comment.bodyText,
+        comment.text,
         postId
       );
 
@@ -113,7 +113,7 @@ export async function createComment(
  */
 export async function getPostComments(postId: string): Promise<Comment[]> {
   return query<Comment>(
-    `SELECT c.*, u.displayName as authorName, u.photoUrl as authorPhotoUrl
+    `SELECT c.*, u.displayName as userName, u.photoUrl as userPhotoUrl
      FROM comments c
      LEFT JOIN users u ON c.userId = u.id
      WHERE c.postId = ? AND c.isArchived = 0
@@ -128,14 +128,14 @@ export async function getPostComments(postId: string): Promise<Comment[]> {
 export async function updateComment(
   userId: string,
   commentId: string,
-  bodyText: string
+  text: string
 ): Promise<Comment | { error: string }> {
   // Validate comment length
-  if (!bodyText || bodyText.trim().length === 0) {
+  if (!text || text.trim().length === 0) {
     return { error: "Comment cannot be empty" };
   }
 
-  if (bodyText.length > 50) {
+  if (text.length > 50) {
     return { error: "Comment must be 50 characters or less" };
   }
 
@@ -155,8 +155,8 @@ export async function updateComment(
 
   const now = new Date().toISOString();
 
-  await execute("UPDATE comments SET bodyText = ?, updatedAt = ? WHERE id = ?", [
-    bodyText.trim(),
+  await execute("UPDATE comments SET text = ?, updatedAt = ? WHERE id = ?", [
+    text.trim(),
     now,
     commentId,
   ]);
@@ -165,7 +165,7 @@ export async function updateComment(
 
   return {
     ...existing,
-    bodyText: bodyText.trim(),
+    text: text.trim(),
     updatedAt: now,
   };
 }

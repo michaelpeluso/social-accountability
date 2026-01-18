@@ -70,7 +70,7 @@ export default function UserProfileScreen() {
       // Load posts (privacy aware - only public and friends' posts if friend)
       const scope = isOwnProfile ? "mine" : isFriend ? "friends" : "discover";
       const userPosts = await getFeedPosts(currentUser?.id || id, scope, 20);
-      setPosts(userPosts.filter((p) => p.authorUserId === id));
+      setPosts(userPosts.filter((p) => p.userId === id));
     } catch (error) {
       console.error("Failed to load profile:", error);
       Alert.alert("Error", "Failed to load profile");
@@ -222,7 +222,7 @@ export default function UserProfileScreen() {
                     key={post.id}
                     post={post}
                     onPress={() => router.push(`/feed/${post.id}`)}
-                    onAuthorPress={() => router.push(`/profile/${post.authorUserId}`)}
+                    onAuthorPress={() => router.push(`/profile/${post.userId}`)}
                     currentUserId={currentUserId ?? ""}
                   />
                 ))}

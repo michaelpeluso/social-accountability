@@ -28,7 +28,7 @@ export function showNotificationAlert(notification: AppNotification): void {
   }
 
   // Use Alert.alert to mock system notification
-  Alert.alert(notification.title, notification.body, [
+  Alert.alert(notification.title, notification.text, [
     {
       text: "View",
       onPress: () => {

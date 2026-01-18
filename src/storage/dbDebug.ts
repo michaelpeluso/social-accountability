@@ -82,7 +82,7 @@ export async function validateSchema(): Promise<{
 /**
  * Drop and recreate all tables (USE WITH CAUTION - DELETES ALL DATA)
  */
-export async function resetDatabase(): Promise<void> {
+export async function resetDatabaseDebug(): Promise<void> {
   try {
     const db = await getDatabase();
 

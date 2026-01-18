@@ -176,7 +176,7 @@ Response: { data: Habit }
 
 ```
 POST /habits/:id/checkins
-Body: { occurredAt: string, evidenceRef?: string }
+Body: { occurredAt: string, evidenceUrl?: string }
 Response: { data: HabitCheckIn }
 ```
 
@@ -184,7 +184,7 @@ Response: { data: HabitCheckIn }
 
 - source: MANUAL (INTEGRATION for M5+ auto-logging)
 - occurredAt: ISO 8601, user can backdate up to 7 days
-- evidenceRef: S3/Cloudinary URL if photo uploaded
+- evidenceUrl: S3/Cloudinary URL if photo uploaded
 - SQLite insert, trigger streak recalculation
 - Sync queue: retry on failure
 
