@@ -1,6 +1,10 @@
 /**
  * Authentication Service - M1 Implementation
- * Supports Apple Sign-In with mock fallback for development
+ * Supports Apple Sign-In with Supabase backend and mock fallback for development
+ *
+ * Architecture:
+ * - Real mode: Apple Sign-In → Supabase Auth → SQLite + Cloud
+ * - Mock mode: Fake token → SQLite only (no cloud)
  */
 
 import * as AppleAuthentication from "expo-apple-authentication";
@@ -8,15 +12,21 @@ import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { logger } from "../lib/logger";
 import { api } from "./api";
+import {
+  signInWithApple as supabaseSignInWithApple,
+  signOut as supabaseSignOut,
+  isSupabaseConfigured,
+} from "./supabase";
 import type { User, SignInWithAppleRequest } from "../types/user";
 import { saveUser } from "../storage/user";
+import { env } from "../config/env";
 
 const TOKEN_KEY = "auth_token";
 const USER_KEY = "auth_user";
 const TOKEN_EXPIRY_KEY = "auth_token_expiry";
 
 // Feature flag from environment
-const ENABLE_APPLE_AUTH = process.env.ENABLE_APPLE_AUTH === "true";
+const ENABLE_APPLE_AUTH = env.ENABLE_APPLE_AUTH;
 
 export type AuthSession = {
   user: User;
@@ -76,14 +86,17 @@ export async function isAppleAuthAvailable(): Promise<boolean> {
 export const auth = {
   /**
    * Sign in with Apple
-   * Uses real Apple auth when enabled, mock when disabled
+   * Uses Supabase when configured, mock API when not
    */
   async signInWithApple(): Promise<AuthResult> {
-    logger.info("Auth: signInWithApple called", { mockMode: !ENABLE_APPLE_AUTH });
+    const useSupabase = isSupabaseConfigured() && env.ENABLE_CLOUD_SYNC;
+    logger.info("Auth: signInWithApple called", {
+      mockMode: !ENABLE_APPLE_AUTH,
+      useSupabase,
+    });
 
     try {
-      let request: SignInWithAppleRequest;
-
+      // Real Apple Sign-In flow (iOS only, when enabled)
       if (ENABLE_APPLE_AUTH && Platform.OS !== "web") {
         const credential = await AppleAuthentication.signInAsync({
           requestedScopes: [
@@ -99,7 +112,57 @@ export const auth = {
           };
         }
 
-        request = {
+        // If Supabase is configured, use it for auth
+        if (useSupabase) {
+          const {
+            user: supabaseUser,
+            session,
+            error,
+          } = await supabaseSignInWithApple(credential.identityToken);
+
+          if (error || !supabaseUser) {
+            logger.error("Auth: Supabase sign-in failed", { error: error?.message });
+            return {
+              success: false,
+              error: { code: "SUPABASE_ERROR", message: error?.message || "Sign-in failed" },
+            };
+          }
+
+          // Build user from Supabase session
+          const user: User = {
+            id: supabaseUser.id,
+            appleId: credential.user,
+            displayName: credential.fullName
+              ? `${credential.fullName.givenName || ""} ${credential.fullName.familyName || ""}`.trim()
+              : supabaseUser.email?.split("@")[0] || "User",
+            email: supabaseUser.email || credential.email || undefined,
+            photoUrl: undefined,
+            bio: undefined,
+            defaultPrivacy: "SELF",
+            createdAt: supabaseUser.created_at || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: undefined,
+          };
+
+          const token = session?.access_token || "";
+          const expiresAt = session?.expires_at
+            ? session.expires_at * 1000
+            : Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days default
+
+          // Save to SecureStore
+          await secureSet(TOKEN_KEY, token);
+          await secureSet(USER_KEY, JSON.stringify(user));
+          await secureSet(TOKEN_EXPIRY_KEY, expiresAt.toString());
+
+          // Save to SQLite (device-first)
+          await saveUser(user);
+
+          logger.info("Auth: Supabase signIn successful", { userId: user.id });
+          return { success: true, session: { user, token, expiresAt } };
+        }
+
+        // Fallback to mock API if Supabase not configured
+        const request: SignInWithAppleRequest = {
           appleToken: credential.identityToken,
           appleUserId: credential.user,
           email: credential.email || undefined,
@@ -107,15 +170,32 @@ export const auth = {
             ? `${credential.fullName.givenName || ""} ${credential.fullName.familyName || ""}`.trim()
             : undefined,
         };
-      } else {
-        // Use stable dev user ID for consistent local development
-        request = {
-          appleToken: "mock-apple-token-dev",
-          appleUserId: "dev-user-12345",
-          email: "dev@example.com",
-          fullName: "Dev User",
-        };
+
+        const response = await api.auth.signInWithApple(request);
+
+        if ("error" in response) {
+          logger.error("Auth: API sign-in failed", { error: response.error });
+          return { success: false, error: response.error };
+        }
+
+        const { user, token, expiresAt } = response.data;
+
+        await secureSet(TOKEN_KEY, token);
+        await secureSet(USER_KEY, JSON.stringify(user));
+        await secureSet(TOKEN_EXPIRY_KEY, expiresAt.toString());
+        await saveUser(user);
+
+        logger.info("Auth: API signIn successful", { userId: user.id });
+        return { success: true, session: { user, token, expiresAt } };
       }
+
+      // Mock mode for development
+      const request: SignInWithAppleRequest = {
+        appleToken: "mock-apple-token-dev",
+        appleUserId: "dev-user-12345",
+        email: "dev@example.com",
+        fullName: "Dev User",
+      };
 
       const response = await api.auth.signInWithApple(request);
 
@@ -126,16 +206,12 @@ export const auth = {
 
       const { user, token, expiresAt } = response.data;
 
-      // Save to SecureStore for session management
       await secureSet(TOKEN_KEY, token);
       await secureSet(USER_KEY, JSON.stringify(user));
       await secureSet(TOKEN_EXPIRY_KEY, expiresAt.toString());
-
-      // Save to SQLite for local queries (device-first architecture)
       await saveUser(user);
 
-      logger.info("Auth: signIn successful", { userId: user.id });
-
+      logger.info("Auth: Mock signIn successful", { userId: user.id });
       return { success: true, session: { user, token, expiresAt } };
     } catch (error) {
       if (error instanceof Error && error.message.includes("ERR_CANCELED")) {
@@ -149,6 +225,13 @@ export const auth = {
 
   async signOut(): Promise<void> {
     logger.info("Auth: signOut called");
+
+    // Sign out from Supabase if configured
+    if (isSupabaseConfigured()) {
+      await supabaseSignOut();
+    }
+
+    // Clear local session
     await secureDelete(TOKEN_KEY);
     await secureDelete(USER_KEY);
     await secureDelete(TOKEN_EXPIRY_KEY);

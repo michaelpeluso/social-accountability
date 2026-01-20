@@ -16,7 +16,8 @@
         "gradleCommand": ":app:assembleDebug"
       },
       "env": {
-        "APP_VARIANT": "development"
+        "APP_VARIANT": "development",
+        "EXPO_PUBLIC_API_URL": "http://localhost:3000"
       },
       "channel": "development"
     },
@@ -30,7 +31,8 @@
         "gradleCommand": ":app:assembleRelease"
       },
       "env": {
-        "APP_VARIANT": "preview"
+        "APP_VARIANT": "preview",
+        "EXPO_PUBLIC_API_URL": "https://api-staging.pelsos.com"
       },
       "channel": "preview"
     },
@@ -43,23 +45,11 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "APP_VARIANT": "production"
+        "APP_VARIANT": "production",
+        "EXPO_PUBLIC_API_URL": "https://api.pelsos.com"
       },
       "channel": "production",
       "autoIncrement": true
-    }
-  },
-  "submit": {
-    "production": {
-      "ios": {
-        "appleId": "",
-        "ascAppId": "",
-        "appleTeamId": ""
-      },
-      "android": {
-        "serviceAccountKeyPath": "",
-        "track": "internal"
-      }
     }
   }
 }

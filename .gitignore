@@ -47,7 +47,11 @@ android/
 
 # Environment
 .env
-.env.local
+.env.local.user
+*.p8
+auth_keys/
+
+# Note: .env.local is COMMITTED (non-sensitive defaults)
 .env.*.local
 
 # Testing

@@ -179,7 +179,7 @@ Response: { data: User }
 
 - displayName: 1-50 chars, no special chars except space, -, '
 - bio: 0-280 chars, supports emoji
-- photoUrl: uploaded to S3/Cloudinary, return CDN URL
+- photoUrl: uploaded to S3/supabase, return CDN URL
 - Validate on client + server
 - SQLite stores profile locally
 - Background sync to cloud
@@ -196,7 +196,7 @@ Response: { data: User }
 - Scan uploads for malware (if using S3, enable virus scanning)
 - Rate limit: 10 profile updates per hour
 
-**Cost:** Cloudinary free tier (25GB storage, 25GB bandwidth)
+**Cost:** supabase free tier (25GB storage, 25GB bandwidth)
 
 **Reference:** spec/milestones.md#L19-L21
 
@@ -577,7 +577,7 @@ Before moving to M2:
 **Monthly Cost (1000 users):** $0
 
 - Supabase free tier
-- Cloudinary free tier
+- supabase free tier
 - SendGrid free tier (recovery emails)
 
 **Scale Trigger (move to paid):**

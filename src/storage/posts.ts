@@ -5,6 +5,7 @@
  */
 
 import { execute, query, queryFirst } from "./database";
+import { getCommentCount } from "./comments";
 import { logger } from "../lib/logger";
 import type {
   Post,
@@ -82,6 +83,7 @@ export async function createPost(
     privacy: request.privacy,
     text: request.text,
     mediaUrl: request.mediaUrl,
+    mediaAspectRatio: request.mediaAspectRatio,
     // M3: Advanced options
     mediaType: request.mediaType,
     postTypeTags: request.postTypeTags,
@@ -98,10 +100,10 @@ export async function createPost(
 
   try {
     await execute(
-      `INSERT INTO posts (id, userId, circleId, pillar, privacy, text, mediaUrl,
+      `INSERT INTO posts (id, userId, circleId, pillar, privacy, text, mediaUrl, mediaAspectRatio,
        mediaType, postTypeTags, customTags, checkInId, habitId, goalId,
        linkedObjectId, linkedObjectType, contextTimeOfDay, contextLocationId, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         post.id,
         post.userId,
@@ -110,6 +112,7 @@ export async function createPost(
         post.privacy,
         post.text ?? null,
         post.mediaUrl ?? null,
+        post.mediaAspectRatio ?? null,
         post.mediaType ?? null,
         post.postTypeTags ? JSON.stringify(post.postTypeTags) : null,
         post.customTags ? JSON.stringify(post.customTags) : null,
@@ -141,6 +144,35 @@ export async function createPost(
 export async function getPostById(postId: string): Promise<Post | null> {
   const post = await queryFirst<Post>("SELECT * FROM posts WHERE id = ?", [postId]);
   return post ? parsePostJsonFields(post) : null;
+}
+
+/**
+ * Get a single post by ID with reactions (for detail view)
+ */
+export async function getFeedPostById(postId: string, viewerId: string): Promise<FeedPost | null> {
+  const post = await queryFirst<
+    Post & { userName: string; userPhotoUrl: string | null; linkedHabitTitle?: string }
+  >(
+    `SELECT p.*, u.displayName as userName, u.photoUrl as userPhotoUrl,
+            h.title as linkedHabitTitle
+     FROM posts p
+     LEFT JOIN users u ON p.userId = u.id
+     LEFT JOIN habits h ON p.habitId = h.id
+     WHERE p.id = ?`,
+    [postId]
+  );
+
+  if (!post) return null;
+
+  const reactions = await getPostReactionSummary(postId, viewerId);
+  const commentCount = await getCommentCount(postId);
+  const parsedPost = parsePostJsonFields(post);
+
+  return {
+    ...parsedPost,
+    reactions,
+    commentCount,
+  };
 }
 
 /**
@@ -300,14 +332,16 @@ export async function getFeedPosts(
     params
   );
 
-  // Fetch reactions for each post and parse JSON fields
+  // Fetch reactions and comment count for each post and parse JSON fields
   const postsWithReactions: FeedPost[] = await Promise.all(
     posts.map(async (post) => {
       const reactions = await getPostReactionSummary(post.id, userId);
+      const commentCount = await getCommentCount(post.id);
       const parsedPost = parsePostJsonFields(post);
       return {
         ...parsedPost,
         reactions,
+        commentCount,
       };
     })
   );

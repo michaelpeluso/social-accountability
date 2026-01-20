@@ -27,7 +27,7 @@ import type { SQLiteBindValue, SQLiteRunResult } from "expo-sqlite";
 import { logger } from "../lib/logger";
 
 const DB_NAME = "social_accountability.db";
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -198,6 +198,14 @@ async function migrateSchema(database: SQLite.SQLiteDatabase, fromVersion: numbe
     await database.execAsync(`
       ALTER TABLE posts ADD COLUMN postTypeTags TEXT;
       ALTER TABLE posts ADD COLUMN customTags TEXT;
+    `);
+  }
+
+  if (fromVersion < 4) {
+    // Migration from v3 to v4: Add mediaAspectRatio to posts
+    logger.info("Migrating v3 → v4: Adding mediaAspectRatio column to posts");
+    await database.execAsync(`
+      ALTER TABLE posts ADD COLUMN mediaAspectRatio TEXT;
     `);
   }
 
@@ -638,6 +646,7 @@ async function initializeSchema(database: SQLite.SQLiteDatabase): Promise<void> 
       text TEXT,
       mediaUrl TEXT,
       mediaType TEXT,
+      mediaAspectRatio TEXT,
       postTypeTags TEXT,
       customTags TEXT,
       checkInId TEXT,

@@ -14,9 +14,11 @@ interface PrivacySelectorProps {
   onChange: (privacy: Privacy) => void;
   /** Optional label above the selector */
   label?: string;
+  /** Exclude SELF option (for posts - posts must be shared) */
+  excludeSelf?: boolean;
 }
 
-const PRIVACY_OPTIONS: { value: Privacy; label: string; description: string }[] = [
+const ALL_PRIVACY_OPTIONS: { value: Privacy; label: string; description: string }[] = [
   { value: "FRIENDS", label: "Friends", description: "Visible to friends only" },
   { value: "PUBLIC", label: "Public", description: "Visible to everyone" },
   { value: "SELF", label: "Only Me", description: "Private, just for you" },
@@ -26,14 +28,19 @@ export function PrivacySelector({
   value,
   onChange,
   label = "Who can see this?",
+  excludeSelf = false,
 }: PrivacySelectorProps) {
   const { theme } = useTheme();
+
+  const options = excludeSelf
+    ? ALL_PRIVACY_OPTIONS.filter((opt) => opt.value !== "SELF")
+    : ALL_PRIVACY_OPTIONS;
 
   return (
     <View style={styles.container}>
       {label && <Text style={[styles.label, { color: theme.text.secondary }]}>{label}</Text>}
       <View style={styles.options}>
-        {PRIVACY_OPTIONS.map((option) => (
+        {options.map((option) => (
           <Pressable
             key={option.value}
             style={[

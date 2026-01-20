@@ -9,10 +9,10 @@
     "jsEngine": "hermes",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.pelsos.socialaccountability"
+      "bundleIdentifier": "com.social.accountability"
     },
     "android": {
-      "package": "com.pelsos.socialaccountability"
+      "package": "com.social.accountability"
     },
     "extra": {
       "eas": {

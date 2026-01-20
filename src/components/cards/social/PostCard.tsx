@@ -19,19 +19,27 @@ import { typography } from "../../../theme/typography";
 
 type PostCardProps = {
   post: FeedPost;
-  onPress: () => void;
+  onPress?: () => void;
   onAuthorPress?: () => void;
   currentUserId: string;
+  /** When true, comments are expanded by default and card is not pressable */
+  isDetailView?: boolean;
 };
 
-export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCardProps) {
+export function PostCard({
+  post,
+  onPress,
+  onAuthorPress,
+  currentUserId,
+  isDetailView = false,
+}: PostCardProps) {
   const { theme } = useTheme();
   const [reactions, setReactions] = useState(post.reactions);
   const [userReaction, setUserReaction] = useState<ReactionEmoji | null>(
     // Find the user's current reaction (should be only one)
     post.reactions.find((r) => r.userReacted)?.emoji ?? null
   );
-  const [showCommentInput, setShowCommentInput] = useState(false);
+  const [showCommentInput, setShowCommentInput] = useState(isDetailView);
   const [commentText, setCommentText] = useState("");
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentsLoaded, setCommentsLoaded] = useState(false);
@@ -131,8 +139,10 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
     ? theme.pillars[post.pillar as keyof typeof theme.pillars]
     : undefined;
 
+  const CardWrapper = isDetailView ? View : Pressable;
+
   return (
-    <Pressable
+    <CardWrapper
       style={[
         styles.container,
         {
@@ -141,8 +151,9 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
           padding: theme.space.cardPadding,
           borderColor: theme.border.light,
         },
+        isDetailView && styles.detailContainer,
       ]}
-      onPress={onPress}
+      {...(!isDetailView && { onPress })}
     >
       {/* Author Header */}
       <View style={styles.header}>
@@ -236,12 +247,33 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
         </View>
       )}
 
+      {/* Media */}
+      {post.mediaUrl && (
+        <Image
+          source={{ uri: post.mediaUrl }}
+          style={[
+            styles.media,
+            {
+              aspectRatio:
+                post.mediaAspectRatio === "3:2"
+                  ? 3 / 2
+                  : post.mediaAspectRatio === "2:3"
+                    ? 2 / 3
+                    : post.mediaAspectRatio === "1:1"
+                      ? 1
+                      : 3 / 2, // default to 3:2 landscape
+            },
+          ]}
+          resizeMode="cover"
+        />
+      )}
+
       {/* Post Body */}
       {post.text && <Text style={[styles.text, { color: theme.text.primary }]}>{post.text}</Text>}
 
-      {/* Media */}
-      {post.mediaUrl && (
-        <Image source={{ uri: post.mediaUrl }} style={styles.media} resizeMode="cover" />
+      {/* Edited indicator */}
+      {post.editedAt && (
+        <Text style={[styles.editedText, { color: theme.text.tertiary }]}>Edited</Text>
       )}
 
       {/* Reactions Bar - Always visible */}
@@ -288,7 +320,7 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
           onPress={handleToggleComments}
         >
           <Text style={[styles.commentButtonText, { color: theme.text.secondary }]}>
-            💬 {comments.length > 0 ? comments.length : "Comment"}
+            💬{(post.commentCount ?? 0) > 0 ? ` ${post.commentCount}` : ""}
           </Text>
         </Pressable>
       </View>
@@ -359,12 +391,7 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
           </View>
         </View>
       )}
-
-      {/* Edited indicator */}
-      {post.editedAt && (
-        <Text style={[styles.editedText, { color: theme.text.tertiary }]}>Edited</Text>
-      )}
-    </Pressable>
+    </CardWrapper>
   );
 }
 
@@ -378,14 +405,16 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
+  detailContainer: {
+    marginBottom: 0,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: spacing.sm,
+    gap: spacing.sm,
   },
-  avatarPressable: {
-    marginRight: spacing.sm,
-  },
+  avatarPressable: {},
   avatar: {
     width: 40,
     height: 40,
@@ -476,7 +505,6 @@ const styles = StyleSheet.create({
   },
   media: {
     width: "100%",
-    height: 200,
     borderRadius: borderRadius.md,
     marginBottom: spacing.md,
   },

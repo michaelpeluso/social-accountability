@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Slot, router, useSegments, useRootNavigationState } from "expo-router";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { auth } from "../src/services/auth";
+import { initializeSyncHandlers } from "../src/services/syncHandlers";
+import { createSyncService } from "../src/services/sync";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
 import { ThemeProvider, useTheme } from "../src/theme";
 import { printDatabaseDiagnostics } from "../src/storage/databaseDebug";
+import { logger } from "../src/lib/logger";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
@@ -13,16 +16,41 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
   const navigationState = useRootNavigationState();
   const { theme } = useTheme();
+  const syncServiceRef = useRef<ReturnType<typeof createSyncService> | null>(null);
 
   useEffect(() => {
     checkAuth();
+    initializeApp();
+
     // Run database diagnostics in development
     if (__DEV__) {
       printDatabaseDiagnostics().catch((error) =>
         console.error("Database diagnostics failed:", error)
       );
     }
+
+    // Cleanup sync service on unmount
+    return () => {
+      if (syncServiceRef.current) {
+        syncServiceRef.current.stop();
+        logger.info("Sync service stopped");
+      }
+    };
   }, []);
+
+  async function initializeApp() {
+    try {
+      // Initialize sync handlers (registers handlers for each table)
+      initializeSyncHandlers();
+
+      // Create and start sync service (processes queue every 30s)
+      syncServiceRef.current = createSyncService(30000);
+      syncServiceRef.current.start();
+      logger.info("Sync service started");
+    } catch (error) {
+      logger.error("Failed to initialize app services", { error });
+    }
+  }
 
   async function checkAuth() {
     try {

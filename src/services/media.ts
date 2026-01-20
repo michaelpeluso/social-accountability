@@ -29,6 +29,8 @@ export const MEDIA_CONFIG = {
   },
 };
 
+export type MediaAspectRatio = "3:2" | "2:3" | "1:1";
+
 export interface MediaAsset {
   uri: string;
   type: "photo" | "video";
@@ -37,6 +39,7 @@ export interface MediaAsset {
   duration?: number; // for videos, in seconds
   fileSize?: number;
   fileName?: string;
+  aspectRatio?: MediaAspectRatio; // User-selected aspect ratio (horizontal 3:2, vertical 2:3, or square 1:1)
 }
 
 export interface MediaPickerResult {

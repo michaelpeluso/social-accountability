@@ -184,7 +184,7 @@ Response: { data: HabitCheckIn }
 
 - source: MANUAL (INTEGRATION for M5+ auto-logging)
 - occurredAt: ISO 8601, user can backdate up to 7 days
-- evidenceUrl: S3/Cloudinary URL if photo uploaded
+- evidenceUrl: S3/supabase URL if photo uploaded
 - SQLite insert, trigger streak recalculation
 - Sync queue: retry on failure
 
@@ -200,7 +200,7 @@ Response: { data: HabitCheckIn }
 - Validate occurredAt not in future
 - Rate limit: 200 check-ins per user per day
 
-**Cost:** Free tier covers photos (Cloudinary 25GB)
+**Cost:** Free tier covers photos (supabase 25GB)
 
 **Reference:** spec/api-contact.md#L40-L48
 
@@ -586,7 +586,7 @@ Before moving to M3:
 
 - All calculations on device
 - Cloud storage: Supabase free tier (< 500MB)
-- Photos: Cloudinary free tier (< 25GB)
+- Photos: supabase free tier (< 25GB)
 
 **Privacy Compliance:**
 

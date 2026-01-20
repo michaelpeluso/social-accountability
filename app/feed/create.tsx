@@ -23,6 +23,7 @@ import { createPost } from "../../src/storage/posts";
 import { getHabits } from "../../src/storage/habits";
 import { getGoals } from "../../src/storage/goals";
 import type { Pillar, Privacy, PostTypeTag, LinkedObjectType, Habit, Goal } from "../../src/types";
+import type { MediaAsset } from "../../src/services/media";
 import { useTheme, spacing, borderRadius, typography } from "../../src/theme";
 import {
   ScreenHeader,
@@ -31,6 +32,7 @@ import {
   PostTypeTagSelector,
   CustomTagInput,
   ObjectPicker,
+  MediaPicker,
 } from "../../src/components";
 
 type LinkedObject = {
@@ -52,11 +54,8 @@ export default function CreatePostScreen() {
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [linkedObject, setLinkedObject] = useState<LinkedObject | null>(null);
 
-  // Media upload state (placeholder for future implementation)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [mediaUri, _setMediaUri] = useState<string | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [mediaType, _setMediaType] = useState<"photo" | "video" | null>(null);
+  // Media upload state
+  const [media, setMedia] = useState<MediaAsset | null>(null);
 
   // Available objects to link
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -99,8 +98,9 @@ export default function CreatePostScreen() {
         text: text.trim(),
         pillar,
         privacy,
-        mediaUrl: mediaUri ?? undefined,
-        mediaType: mediaType ?? undefined,
+        mediaUrl: media?.uri,
+        mediaType: media?.type,
+        mediaAspectRatio: media?.aspectRatio,
         postTypeTags: postTypeTags.length > 0 ? postTypeTags : undefined,
         customTags: customTags.length > 0 ? customTags : undefined,
         linkedObjectId: linkedObject?.id,
@@ -159,6 +159,18 @@ export default function CreatePostScreen() {
         />
 
         <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="handled">
+          {/* Media Picker - Compact at top */}
+          <View style={[styles.mediaSection, { borderBottomColor: theme.border.light }]}>
+            <MediaPicker
+              value={media}
+              onChange={setMedia}
+              allowVideo={true}
+              allowCamera={true}
+              placeholder="Add photo or video"
+              compact={true}
+            />
+          </View>
+
           {/* Post Text */}
           <View style={[styles.inputSection, { borderBottomColor: theme.border.light }]}>
             <TextInput
@@ -176,9 +188,9 @@ export default function CreatePostScreen() {
             </Text>
           </View>
 
-          {/* Privacy Selection */}
+          {/* Privacy Selection - excludeSelf since posts are for sharing */}
           <View style={[styles.section, { borderBottomColor: theme.border.light }]}>
-            <PrivacySelector value={privacy} onChange={setPrivacy} />
+            <PrivacySelector value={privacy} onChange={setPrivacy} excludeSelf={true} />
           </View>
 
           {/* Advanced Toggle */}
@@ -250,6 +262,11 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  mediaSection: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
   },
   inputSection: {
     padding: spacing.md,

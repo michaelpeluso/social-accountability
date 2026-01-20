@@ -238,6 +238,7 @@ export type Post = {
   privacy: Privacy;
   text?: string; // Post body text (max 500 chars)
   mediaUrl?: string;
+  mediaAspectRatio?: "3:2" | "2:3" | "1:1"; // User-selected aspect ratio for media
   // M3: Advanced options
   mediaType?: MediaType; // Type of media (photo/video/chart)
   tags?: string[]; // Simple tags (M2-M3)
@@ -306,6 +307,7 @@ export type CreatePostRequest = {
   //   - Chart type posts cannot include user-uploaded images/videos
   mediaUrl?: string;
   mediaType?: MediaType;
+  mediaAspectRatio?: "3:2" | "2:3" | "1:1"; // User-selected aspect ratio
   // M3: Advanced options
   postTypeTags?: PostTypeTag[];
   customTags?: string[];
@@ -601,6 +603,7 @@ export type FeedPost = Post & {
   reactions: { emoji: ReactionEmoji; count: number; userReacted: boolean }[];
   linkedHabitTitle?: string;
   linkedCheckInDate?: string;
+  commentCount?: number;
 };
 
 // Rate limit constants

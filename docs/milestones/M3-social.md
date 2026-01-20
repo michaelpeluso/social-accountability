@@ -58,7 +58,7 @@ M3 adds social layer on top of tracking. Users post stories, react with emojis, 
 
 **Technical Requirements:**
 
-- Media upload: Cloudinary API (client-side upload for speed)
+- Media upload: supabase API (client-side upload for speed)
 - Video: max 10 seconds, auto-compress to 10MB
 - SQLite insert first (instant UX)
 - Sync queue: POST /posts with retry
@@ -77,7 +77,7 @@ M3 adds social layer on top of tracking. Users post stories, react with emojis, 
 - Rate limit: 20 posts per user per day
 - Validate media type (image/video only, no executables)
 
-**Cost:** Cloudinary free tier (25GB storage)
+**Cost:** supabase free tier (25GB storage)
 
 **Reference:** spec/high_level.md#L305-L312, spec/api-contact.md#L50-L59
 
@@ -699,7 +699,7 @@ Response: { data: HabitParticipant[] }
 
 - Feed bandwidth: ~1GB/month (Supabase free tier: 2GB)
 - Push notifications: Expo free tier (unlimited)
-- Media storage: Cloudinary free tier (25GB)
+- Media storage: supabase free tier (25GB)
 - Total: **$0**
 
 **Scale Trigger (move to paid):**

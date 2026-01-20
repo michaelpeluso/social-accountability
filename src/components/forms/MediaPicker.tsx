@@ -16,8 +16,9 @@ import {
   ActionSheetIOS,
   Platform,
   Alert,
+  type ViewStyle,
 } from "react-native";
-import { Video, ResizeMode } from "expo-av";
+import { VideoView, useVideoPlayer } from "expo-video";
 import { useTheme, spacing, typography, borderRadius } from "../../theme";
 import {
   pickPhoto,
@@ -25,8 +26,19 @@ import {
   takePhoto,
   recordVideo,
   type MediaAsset,
+  type MediaAspectRatio,
   MEDIA_CONFIG,
 } from "../../services/media";
+
+/** Helper component for video preview using expo-video */
+function VideoPreview({ uri, style }: { uri: string; style: ViewStyle }) {
+  const player = useVideoPlayer(uri, (player) => {
+    player.loop = false;
+    player.muted = true;
+  });
+
+  return <VideoView player={player} style={style} contentFit="cover" nativeControls={false} />;
+}
 
 interface MediaPickerProps {
   /** Current selected media */
@@ -39,12 +51,12 @@ interface MediaPickerProps {
   allowCamera?: boolean;
   /** Custom placeholder text */
   placeholder?: string;
-  /** Aspect ratio for image preview (default: 16:9) */
-  aspectRatio?: number;
   /** Whether picker is disabled */
   disabled?: boolean;
   /** Optional error message to display */
   error?: string;
+  /** Compact mode - shows small button when empty (default: false) */
+  compact?: boolean;
 }
 
 export function MediaPicker({
@@ -53,9 +65,9 @@ export function MediaPicker({
   allowVideo = true,
   allowCamera = true,
   placeholder = "Add photo or video",
-  aspectRatio = 16 / 9,
   disabled = false,
   error,
+  compact = false,
 }: MediaPickerProps) {
   const { theme } = useTheme();
 
@@ -203,58 +215,159 @@ export function MediaPicker({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   }
 
+  // Aspect ratio options
+  const ASPECT_RATIO_OPTIONS: { value: MediaAspectRatio; label: string; ratio: number }[] = [
+    { value: "3:2", label: "Horizontal", ratio: 3 / 2 },
+    { value: "1:1", label: "Square", ratio: 1 },
+    { value: "2:3", label: "Vertical", ratio: 2 / 3 },
+  ];
+
+  function handleAspectRatioChange(ratio: MediaAspectRatio) {
+    if (value) {
+      onChange({ ...value, aspectRatio: ratio });
+    }
+  }
+
   return (
     <View style={styles.container}>
-      <Pressable
-        style={[
-          styles.pickerArea,
-          {
-            aspectRatio,
-            backgroundColor: theme.background.secondary,
-            borderColor: error ? theme.text.error : theme.border.light,
-          },
-          disabled && styles.disabled,
-        ]}
-        onPress={handlePress}
-        disabled={disabled}
-      >
-        {value ? (
-          <View style={styles.preview}>
-            {value.type === "photo" ? (
-              <Image source={{ uri: value.uri }} style={styles.media} resizeMode="cover" />
-            ) : (
-              <Video
-                source={{ uri: value.uri }}
-                style={styles.media}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay={false}
-                isLooping={false}
-              />
-            )}
-
-            {/* Media type badge */}
-            <View style={[styles.typeBadge, { backgroundColor: theme.background.primary }]}>
-              <Text style={[styles.typeBadgeText, { color: theme.text.secondary }]}>
-                {value.type === "video" ? "🎬" : "📷"} {value.type.toUpperCase()}
-              </Text>
-            </View>
-
-            {/* Duration badge for videos */}
-            {value.type === "video" && value.duration && (
-              <View style={[styles.durationBadge, { backgroundColor: "rgba(0,0,0,0.7)" }]}>
-                <Text style={styles.durationText}>{formatDuration(value.duration)}</Text>
-              </View>
-            )}
-
-            {/* Change button */}
-            <Pressable
-              style={[styles.changeButton, { backgroundColor: theme.background.primary }]}
-              onPress={handlePress}
-            >
-              <Text style={[styles.changeButtonText, { color: theme.text.primary }]}>Change</Text>
-            </Pressable>
+      {value ? (
+        // Show full preview when media selected
+        <>
+          {/* Aspect Ratio Selector */}
+          <View style={styles.aspectRatioSelector}>
+            {ASPECT_RATIO_OPTIONS.map((option) => {
+              const isSelected = value.aspectRatio === option.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  style={[
+                    styles.aspectRatioOption,
+                    {
+                      backgroundColor: theme.background.secondary,
+                      borderColor: theme.border.light,
+                    },
+                    isSelected && {
+                      backgroundColor: `${theme.semantic.primary}20`,
+                      borderColor: theme.semantic.primary,
+                    },
+                  ]}
+                  onPress={() => handleAspectRatioChange(option.value)}
+                >
+                  <View
+                    style={[
+                      styles.aspectRatioIcon,
+                      {
+                        aspectRatio: option.ratio,
+                        backgroundColor: isSelected ? theme.semantic.primary : theme.text.tertiary,
+                      },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.aspectRatioLabel,
+                      { color: isSelected ? theme.semantic.primary : theme.text.secondary },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
-        ) : (
+
+          {/* Preview with selected aspect ratio */}
+          <View
+            style={[
+              styles.previewContainer,
+              {
+                backgroundColor: theme.background.secondary,
+                borderColor: error ? theme.text.error : theme.border.light,
+                aspectRatio:
+                  value.aspectRatio === "3:2"
+                    ? 3 / 2
+                    : value.aspectRatio === "2:3"
+                      ? 2 / 3
+                      : value.aspectRatio === "1:1"
+                        ? 1
+                        : 3 / 2, // default to horizontal
+              },
+            ]}
+          >
+            <View style={styles.preview}>
+              {value.type === "photo" ? (
+                <Image source={{ uri: value.uri }} style={styles.media} resizeMode="cover" />
+              ) : (
+                <VideoPreview uri={value.uri} style={styles.media} />
+              )}
+
+              {/* Media type badge */}
+              <View style={[styles.typeBadge, { backgroundColor: theme.background.primary }]}>
+                <Text style={[styles.typeBadgeText, { color: theme.text.secondary }]}>
+                  {value.type === "video" ? "🎬" : "📷"} {value.type.toUpperCase()}
+                </Text>
+              </View>
+
+              {/* Duration badge for videos */}
+              {value.type === "video" && value.duration && (
+                <View style={[styles.durationBadge, { backgroundColor: "rgba(0,0,0,0.7)" }]}>
+                  <Text style={styles.durationText}>{formatDuration(value.duration)}</Text>
+                </View>
+              )}
+
+              {/* Change button */}
+              <Pressable
+                style={[styles.changeButton, { backgroundColor: theme.background.primary }]}
+                onPress={handlePress}
+                disabled={disabled}
+              >
+                <Text style={[styles.changeButtonText, { color: theme.text.primary }]}>Change</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* File info */}
+          {value.fileSize && (
+            <Text style={[styles.fileInfo, { color: theme.text.tertiary }]}>
+              {formatFileSize(value.fileSize)}
+              {value.width && value.height && ` · ${value.width}×${value.height}`}
+            </Text>
+          )}
+        </>
+      ) : compact ? (
+        // Compact mode: small horizontal button when empty
+        <Pressable
+          style={[
+            styles.compactPickerButton,
+            {
+              backgroundColor: theme.background.secondary,
+              borderColor: error ? theme.text.error : theme.border.light,
+            },
+            disabled && styles.disabled,
+          ]}
+          onPress={handlePress}
+          disabled={disabled}
+        >
+          <View style={styles.compactPlaceholder}>
+            <Text style={{ fontSize: 20 }}>{allowVideo ? "📷" : "📷"}</Text>
+            <Text style={[styles.placeholderText, { color: theme.text.secondary }]}>
+              {placeholder}
+            </Text>
+          </View>
+        </Pressable>
+      ) : (
+        // Regular mode: large placeholder area when empty
+        <Pressable
+          style={[
+            styles.pickerArea,
+            {
+              backgroundColor: theme.background.secondary,
+              borderColor: error ? theme.text.error : theme.border.light,
+            },
+            disabled && styles.disabled,
+          ]}
+          onPress={handlePress}
+          disabled={disabled}
+        >
           <View style={styles.placeholder}>
             <Text style={[styles.placeholderIcon, { color: theme.text.tertiary }]}>
               {allowVideo ? "📷 🎬" : "📷"}
@@ -268,15 +381,7 @@ export function MediaPicker({
                 : `Max ${MEDIA_CONFIG.photo.maxSizeMB}MB · JPG, PNG`}
             </Text>
           </View>
-        )}
-      </Pressable>
-
-      {/* File info */}
-      {value && value.fileSize && (
-        <Text style={[styles.fileInfo, { color: theme.text.tertiary }]}>
-          {formatFileSize(value.fileSize)}
-          {value.width && value.height && ` · ${value.width}×${value.height}`}
-        </Text>
+        </Pressable>
       )}
 
       {/* Error message */}
@@ -289,8 +394,33 @@ const styles = StyleSheet.create({
   container: {
     width: "100%",
   },
+  aspectRatioSelector: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  aspectRatioOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+  },
+  aspectRatioIcon: {
+    width: 16,
+    height: 20,
+    borderRadius: 2,
+  },
+  aspectRatioLabel: {
+    ...typography.caption,
+    fontWeight: "600",
+  },
   pickerArea: {
     width: "100%",
+    minHeight: 200,
     borderRadius: borderRadius.lg,
     borderWidth: 2,
     borderStyle: "dashed",
@@ -298,12 +428,33 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  compactPickerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+  },
+  previewContainer: {
+    width: "100%",
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
   disabled: {
     opacity: 0.5,
   },
   placeholder: {
     alignItems: "center",
     padding: spacing.lg,
+  },
+  compactPlaceholder: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
   },
   placeholderIcon: {
     fontSize: 32,
@@ -319,11 +470,12 @@ const styles = StyleSheet.create({
   },
   preview: {
     width: "100%",
-    height: "100%",
+    minHeight: 200,
   },
   media: {
     width: "100%",
     height: "100%",
+    minHeight: 200,
   },
   typeBadge: {
     position: "absolute",
