@@ -6,7 +6,7 @@
 import { query, queryFirst, execute } from "./database";
 import { logger } from "../lib/logger";
 import { enqueue } from "../services/sync";
-import type { Goal, Pillar, Privacy, GoalDataSource } from "../types";
+import type { Goal, GoalWithMeta, Pillar, Privacy, GoalDataSource } from "../types";
 
 /**
  * Generate a UUID for new goals (device-side for offline support)
@@ -128,6 +128,74 @@ export async function getGoals(
 
   const rows = await query<GoalRow>(sql, params);
   return rows.map(rowToGoal);
+}
+
+/**
+ * Get all goals for a user with metadata (owned + joined)
+ * Returns owned goals first, then joined goals from friends
+ */
+export async function getGoalsWithMeta(
+  userId: string,
+  options: { includeArchived?: boolean } = {}
+): Promise<GoalWithMeta[]> {
+  const { includeArchived = false } = options;
+
+  // Get owned goals with participant count
+  let ownedSql = `
+    SELECT g.*, 
+           (SELECT COUNT(*) FROM goal_participants WHERE goalId = g.id) as participantCount
+    FROM goals g
+    WHERE g.userId = ?
+  `;
+  const ownedParams: (string | number)[] = [userId];
+
+  if (!includeArchived) {
+    ownedSql += " AND g.isArchived = 0";
+  }
+
+  ownedSql += " ORDER BY g.createdAt DESC";
+
+  const ownedRows = await query<GoalRow & { participantCount: number }>(ownedSql, ownedParams);
+  const ownedGoals: GoalWithMeta[] = ownedRows.map((row) => ({
+    ...rowToGoal(row),
+    isJoined: false,
+    participantCount: row.participantCount,
+  }));
+
+  // Get joined goals with owner info
+  const joinedSql = `
+    SELECT g.*, 
+           u.displayName as ownerName, 
+           u.photoUrl as ownerPhotoUrl,
+           gp.performancePrivacy as participantPerformancePrivacy,
+           (SELECT COUNT(*) FROM goal_participants WHERE goalId = g.id) as participantCount
+    FROM goal_participants gp
+    JOIN goals g ON gp.goalId = g.id
+    JOIN users u ON g.userId = u.id
+    WHERE gp.userId = ? AND g.isArchived = 0
+    ORDER BY gp.joinedAt DESC
+  `;
+
+  const joinedRows = await query<
+    GoalRow & {
+      ownerName: string;
+      ownerPhotoUrl: string | null;
+      participantPerformancePrivacy: string;
+      participantCount: number;
+    }
+  >(joinedSql, [userId]);
+
+  const joinedGoals: GoalWithMeta[] = joinedRows.map((row) => ({
+    ...rowToGoal(row),
+    isJoined: true,
+    ownerName: row.ownerName,
+    ownerPhotoUrl: row.ownerPhotoUrl ?? undefined,
+    participantPerformancePrivacy: row.participantPerformancePrivacy as Privacy,
+    participantCount: row.participantCount,
+  }));
+
+  // Combine and return owned first, then joined
+  return [...ownedGoals, ...joinedGoals];
 }
 
 /**
@@ -363,4 +431,26 @@ function rowToGoal(row: GoalRow): Goal {
     updatedAt: row.updatedAt,
     syncedAt: row.syncedAt ?? undefined,
   };
+}
+
+/**
+ * Count total goals for a user (for badge tracking)
+ */
+export async function countUserGoals(userId: string): Promise<number> {
+  const result = await queryFirst<{ count: number }>(
+    "SELECT COUNT(*) as count FROM goals WHERE userId = ?",
+    [userId]
+  );
+  return result?.count ?? 0;
+}
+
+/**
+ * Count completed goals for a user (for badge tracking)
+ */
+export async function countCompletedGoals(userId: string): Promise<number> {
+  const result = await queryFirst<{ count: number }>(
+    "SELECT COUNT(*) as count FROM goals WHERE userId = ? AND completedAt IS NOT NULL",
+    [userId]
+  );
+  return result?.count ?? 0;
 }

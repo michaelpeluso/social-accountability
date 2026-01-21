@@ -1,6 +1,10 @@
 /**
  * EditHabitModal Component
  * Modal for editing habit title, frequency, target, and privacy
+ *
+ * Privacy model:
+ * - privacy: Who can see the habit exists and its requirements
+ * - performancePrivacy: Who can see your progress/streaks/check-ins
  */
 
 import { View, Text, TextInput, Pressable, Modal, ScrollView, StyleSheet } from "react-native";
@@ -13,6 +17,15 @@ import type { Privacy, HabitFrequency } from "../../types";
 
 const PRIVACY_OPTIONS: Privacy[] = ["SELF", "FRIENDS", "PUBLIC"];
 const FREQUENCY_OPTIONS: HabitFrequency[] = ["daily", "weekly"];
+
+// Performance privacy allows all levels - SELF means only you see your progress
+const PERFORMANCE_PRIVACY_OPTIONS: Privacy[] = ["SELF", "FRIENDS", "PUBLIC"];
+
+const PERFORMANCE_PRIVACY_INFO: Partial<Record<Privacy, { label: string; description: string }>> = {
+  SELF: { label: "Only Me", description: "Only you can see your progress" },
+  FRIENDS: { label: "Friends", description: "Friends can see your streaks and check-ins" },
+  PUBLIC: { label: "Public", description: "Anyone can see your progress" },
+};
 
 interface EditHabitModalProps {
   visible: boolean;
@@ -27,6 +40,9 @@ interface EditHabitModalProps {
   onTargetCountChange: (count: string) => void;
   privacy: Privacy;
   onPrivacyChange: (privacy: Privacy) => void;
+  /** Performance privacy - who can see streaks/check-ins */
+  performancePrivacy?: Privacy;
+  onPerformancePrivacyChange?: (privacy: Privacy) => void;
 }
 
 export function EditHabitModal({
@@ -42,6 +58,8 @@ export function EditHabitModal({
   onTargetCountChange,
   privacy,
   onPrivacyChange,
+  performancePrivacy,
+  onPerformancePrivacyChange,
 }: EditHabitModalProps) {
   const { theme } = useTheme();
 
@@ -140,7 +158,10 @@ export function EditHabitModal({
           />
 
           {/* Privacy */}
-          <Text style={[styles.label, { color: theme.text.primary }]}>Privacy</Text>
+          <Text style={[styles.label, { color: theme.text.primary }]}>Habit Visibility</Text>
+          <Text style={[styles.sectionHint, { color: theme.text.tertiary }]}>
+            Who can see this habit exists
+          </Text>
           <View style={styles.optionsRow}>
             {PRIVACY_OPTIONS.map((p) => (
               <Pressable
@@ -170,6 +191,45 @@ export function EditHabitModal({
           <Text style={[styles.privacyDescription, { color: theme.text.tertiary }]}>
             {PRIVACY_INFO[privacy].description}
           </Text>
+
+          {/* Performance Privacy - only show if callback provided */}
+          {performancePrivacy && onPerformancePrivacyChange && (
+            <>
+              <Text style={[styles.label, { color: theme.text.primary }]}>Progress Visibility</Text>
+              <Text style={[styles.sectionHint, { color: theme.text.tertiary }]}>
+                Who can see your streaks and check-ins
+              </Text>
+              <View style={styles.optionsRow}>
+                {PERFORMANCE_PRIVACY_OPTIONS.map((p) => (
+                  <Pressable
+                    key={p}
+                    style={[
+                      styles.option,
+                      { borderColor: theme.border.medium, backgroundColor: theme.input.background },
+                      performancePrivacy === p && {
+                        borderColor: theme.semantic.primary,
+                        backgroundColor: theme.semantic.primary + "15",
+                      },
+                    ]}
+                    onPress={() => onPerformancePrivacyChange(p)}
+                  >
+                    <Text
+                      style={[
+                        styles.optionText,
+                        { color: theme.text.secondary },
+                        performancePrivacy === p && { color: theme.semantic.primary },
+                      ]}
+                    >
+                      {PERFORMANCE_PRIVACY_INFO[p]?.label ?? p}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={[styles.privacyDescription, { color: theme.text.tertiary }]}>
+                {PERFORMANCE_PRIVACY_INFO[performancePrivacy]?.description ?? ""}
+              </Text>
+            </>
+          )}
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -232,6 +292,11 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: typography.fontSize.base,
+  },
+  sectionHint: {
+    fontSize: typography.fontSize.xs,
+    marginBottom: spacing.sm,
+    marginTop: -spacing.xmd + 2,
   },
   privacyDescription: {
     fontSize: 13,

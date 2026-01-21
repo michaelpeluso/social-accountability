@@ -1,6 +1,7 @@
 /**
  * Goals Screen - Display and manage user goals
  * M2-2.1: Create Goal feature with comprehensive goal setup
+ * M5: Goal joining - shows owned goals + joined goals
  * Refactored to use reusable components for maintainability
  */
 
@@ -9,9 +10,9 @@ import { FlatList, RefreshControl, Alert, StyleSheet, Text } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { auth } from "../../src/services/auth";
-import { createGoal, getGoals, archiveGoal } from "../../src/storage/goals";
+import { createGoal, getGoalsWithMeta, archiveGoal } from "../../src/storage/goals";
 import { ALL_PILLARS } from "../../src/types/goals";
-import type { Goal, Pillar } from "../../src/types";
+import type { GoalWithMeta, Pillar } from "../../src/types";
 import {
   ScreenHeader,
   EmptyState,
@@ -26,7 +27,7 @@ import { typography } from "../../src/theme/typography";
 
 export default function GoalsScreen() {
   const { theme } = useTheme();
-  const [goals, setGoals] = useState<Goal[]>([]);
+  const [goals, setGoals] = useState<GoalWithMeta[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -47,7 +48,7 @@ export default function GoalsScreen() {
 
   async function loadGoals(uid: string) {
     try {
-      const userGoals = await getGoals(uid);
+      const userGoals = await getGoalsWithMeta(uid);
       setGoals(userGoals);
     } catch {
       Alert.alert("Error", "Failed to load goals");
@@ -81,16 +82,25 @@ export default function GoalsScreen() {
     await loadGoals(userId);
   }
 
-  async function handleArchiveGoal(goalId: string, goalTitle: string) {
+  async function handleArchiveGoal(goal: GoalWithMeta) {
     if (!userId) return;
 
-    Alert.alert("Archive Goal", `Archive "${goalTitle}"? You can restore it later.`, [
+    // Only allow archiving owned goals
+    if (goal.isJoined) {
+      Alert.alert(
+        "Cannot Archive",
+        "You can only archive your own goals. Use 'Leave Goal' to leave a joined goal."
+      );
+      return;
+    }
+
+    Alert.alert("Archive Goal", `Archive "${goal.title}"? You can restore it later.`, [
       { text: "Cancel", style: "cancel" },
       {
         text: "Archive",
         onPress: async () => {
           try {
-            await archiveGoal(goalId);
+            await archiveGoal(goal.id);
             await loadGoals(userId);
           } catch {
             Alert.alert("Error", "Failed to archive goal");
@@ -109,7 +119,7 @@ export default function GoalsScreen() {
       acc[goal.pillar].push(goal);
       return acc;
     },
-    {} as Record<Pillar, Goal[]>
+    {} as Record<Pillar, GoalWithMeta[]>
   );
 
   if (isLoading) {
@@ -159,7 +169,7 @@ export default function GoalsScreen() {
                   key={goal.id}
                   goal={goal}
                   onPress={() => router.push(`/goals/${goal.id}`)}
-                  onLongPress={() => handleArchiveGoal(goal.id, goal.title)}
+                  onLongPress={() => handleArchiveGoal(goal)}
                 />
               ))}
             </PillarSection>

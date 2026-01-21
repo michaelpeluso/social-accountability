@@ -6,7 +6,15 @@
 import { query, queryFirst, execute } from "./database";
 import { logger } from "../lib/logger";
 import { enqueue } from "../services/sync";
-import type { Habit, HabitSchedule, Pillar, Privacy, HabitType, CompletionType } from "../types";
+import type {
+  Habit,
+  HabitWithMeta,
+  HabitSchedule,
+  Pillar,
+  Privacy,
+  HabitType,
+  CompletionType,
+} from "../types";
 
 /**
  * Generate a UUID for new habits (device-side for offline support)
@@ -154,6 +162,83 @@ export async function getHabits(
 }
 
 /**
+ * Get all habits for a user including joined habits, with metadata
+ * Returns owned habits (with participant count) and joined habits (with owner info)
+ */
+export async function getHabitsWithMeta(
+  userId: string,
+  options: { includeArchived?: boolean; goalId?: string } = {}
+): Promise<HabitWithMeta[]> {
+  const { includeArchived = false, goalId } = options;
+
+  // Get owned habits with participant count
+  let ownedSql = `
+    SELECT h.*, 
+           (SELECT COUNT(*) FROM habit_participants WHERE habitId = h.id) as participantCount
+    FROM habits h
+    WHERE h.userId = ?
+  `;
+  const ownedParams: (string | number)[] = [userId];
+
+  if (!includeArchived) {
+    ownedSql += " AND h.isArchived = 0";
+  }
+
+  if (goalId) {
+    ownedSql += " AND h.goalId = ?";
+    ownedParams.push(goalId);
+  }
+
+  ownedSql += " ORDER BY h.createdAt DESC";
+
+  const ownedRows = await query<HabitRow & { participantCount: number }>(ownedSql, ownedParams);
+  const ownedHabits: HabitWithMeta[] = ownedRows.map((row) => ({
+    ...rowToHabit(row),
+    isJoined: false,
+    participantCount: row.participantCount,
+  }));
+
+  // Get joined habits with owner info (skip if filtering by goalId as joined habits don't have goals from joiner's perspective)
+  if (goalId) {
+    return ownedHabits;
+  }
+
+  const joinedSql = `
+    SELECT h.*, 
+           u.displayName as ownerName, 
+           u.photoUrl as ownerPhotoUrl,
+           hp.performancePrivacy as participantPerformancePrivacy,
+           (SELECT COUNT(*) FROM habit_participants WHERE habitId = h.id) as participantCount
+    FROM habit_participants hp
+    JOIN habits h ON hp.habitId = h.id
+    JOIN users u ON h.userId = u.id
+    WHERE hp.userId = ? AND h.isArchived = 0
+    ORDER BY hp.joinedAt DESC
+  `;
+
+  const joinedRows = await query<
+    HabitRow & {
+      ownerName: string;
+      ownerPhotoUrl: string | null;
+      participantPerformancePrivacy: string;
+      participantCount: number;
+    }
+  >(joinedSql, [userId]);
+
+  const joinedHabits: HabitWithMeta[] = joinedRows.map((row) => ({
+    ...rowToHabit(row),
+    isJoined: true,
+    ownerName: row.ownerName,
+    ownerPhotoUrl: row.ownerPhotoUrl ?? undefined,
+    participantPerformancePrivacy: row.participantPerformancePrivacy as Privacy,
+    participantCount: row.participantCount,
+  }));
+
+  // Combine and return owned first, then joined
+  return [...ownedHabits, ...joinedHabits];
+}
+
+/**
  * Get habits for a specific goal
  */
 export async function getHabitsByGoal(goalId: string): Promise<Habit[]> {
@@ -172,6 +257,43 @@ export async function getSubHabits(parentHabitId: string): Promise<Habit[]> {
     "SELECT * FROM habits WHERE parentHabitId = ? AND isArchived = 0 ORDER BY createdAt ASC",
     [parentHabitId]
   );
+  return rows.map(rowToHabit);
+}
+
+/**
+ * Get habits for a specific user (respecting privacy for viewer)
+ * Used when viewing another user's profile
+ *
+ * @param targetUserId - The user whose habits we want to view
+ * @param viewerUserId - The user who is viewing
+ * @param isFriend - Whether viewer is a friend of target
+ */
+export async function getHabitsByUserId(
+  targetUserId: string,
+  viewerUserId: string,
+  isFriend: boolean
+): Promise<Habit[]> {
+  // If viewing own habits, show all non-archived
+  if (targetUserId === viewerUserId) {
+    return getHabits(targetUserId);
+  }
+
+  // For other users, respect privacy settings
+  // SELF = not visible, FRIENDS = visible if friend, PUBLIC = visible to all
+  let sql = "SELECT * FROM habits WHERE userId = ? AND isArchived = 0";
+  const params: string[] = [targetUserId];
+
+  if (isFriend) {
+    // Friends can see FRIENDS and PUBLIC habits
+    sql += " AND privacy IN ('FRIENDS', 'PUBLIC')";
+  } else {
+    // Non-friends can only see PUBLIC habits
+    sql += " AND privacy = 'PUBLIC'";
+  }
+
+  sql += " ORDER BY createdAt DESC";
+
+  const rows = await query<HabitRow>(sql, params);
   return rows.map(rowToHabit);
 }
 
@@ -198,6 +320,7 @@ export async function updateHabit(
     pillar?: Pillar;
     schedule?: HabitSchedule;
     privacy?: Privacy;
+    performancePrivacy?: Privacy;
     description?: string;
     // New fields
     habitType?: HabitType;
@@ -238,6 +361,10 @@ export async function updateHabit(
   if (updates.privacy !== undefined) {
     setClauses.push("privacy = ?");
     params.push(updates.privacy);
+  }
+  if (updates.performancePrivacy !== undefined) {
+    setClauses.push("performancePrivacy = ?");
+    params.push(updates.performancePrivacy);
   }
   if (updates.description !== undefined) {
     setClauses.push("description = ?");
@@ -390,6 +517,7 @@ interface HabitRow {
   graceDays: number;
   // Status
   privacy: string;
+  performancePrivacy: string | null;
   description: string | null;
   isArchived: number;
   archivedAt: string | null;
@@ -446,6 +574,7 @@ function rowToHabit(row: HabitRow): Habit {
       graceDays: row.graceDays ?? 0,
       // Status
       privacy: row.privacy as Privacy,
+      performancePrivacy: (row.performancePrivacy as Privacy) ?? undefined,
       description: row.description ?? undefined,
       isArchived: row.isArchived === 1,
       archivedAt: row.archivedAt ?? undefined,
@@ -462,4 +591,26 @@ function rowToHabit(row: HabitRow): Habit {
     logger.error("Failed to parse habit row", { habitId: row.id, error });
     throw error;
   }
+}
+
+/**
+ * Count total habits for a user (for badge tracking)
+ */
+export async function countUserHabits(userId: string): Promise<number> {
+  const result = await queryFirst<{ count: number }>(
+    "SELECT COUNT(*) as count FROM habits WHERE userId = ?",
+    [userId]
+  );
+  return result?.count ?? 0;
+}
+
+/**
+ * Count total check-ins for a user (for badge tracking)
+ */
+export async function countUserCheckIns(userId: string): Promise<number> {
+  const result = await queryFirst<{ count: number }>(
+    "SELECT COUNT(*) as count FROM habit_check_ins WHERE userId = ?",
+    [userId]
+  );
+  return result?.count ?? 0;
 }

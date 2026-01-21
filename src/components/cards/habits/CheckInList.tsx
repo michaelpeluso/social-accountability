@@ -11,7 +11,7 @@ import type { HabitCheckIn } from "../../../types";
 
 interface CheckInListProps {
   checkIns: HabitCheckIn[];
-  onDeleteCheckIn: (id: string) => void;
+  onDeleteCheckIn?: (id: string) => void;
   formatDate: (dateStr: string) => string;
 }
 
@@ -30,7 +30,7 @@ export function CheckInList({ checkIns, onDeleteCheckIn, formatDate }: CheckInLi
           <Pressable
             key={checkIn.id}
             style={[styles.checkInRow, { borderBottomColor: theme.border.light }]}
-            onLongPress={() => onDeleteCheckIn(checkIn.id)}
+            onLongPress={onDeleteCheckIn ? () => onDeleteCheckIn(checkIn.id) : undefined}
           >
             <View style={styles.checkInInfo}>
               <Text style={[styles.checkInTime, { color: theme.text.primary }]}>

@@ -420,3 +420,14 @@ export async function countPostsToday(userId: string): Promise<number> {
   );
   return result?.count ?? 0;
 }
+
+/**
+ * Count total posts for a user (for badge tracking)
+ */
+export async function countUserPosts(userId: string): Promise<number> {
+  const result = await queryFirst<{ count: number }>(
+    "SELECT COUNT(*) as count FROM posts WHERE userId = ?",
+    [userId]
+  );
+  return result?.count ?? 0;
+}

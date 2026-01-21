@@ -24,6 +24,13 @@ const NOTIFICATION_ICONS: Record<NotificationType, string> = {
   CIRCLE_MESSAGE: "💬",
   CIRCLE_INVITE: "📩",
   CIRCLE_MEMBER_JOINED: "👋",
+  HABIT_JOIN_REQUEST: "🙋",
+  HABIT_JOIN_ACCEPTED: "✅",
+  HABIT_MEMBER_JOINED: "🤝",
+  GOAL_JOIN_REQUEST: "🎯",
+  GOAL_JOIN_ACCEPTED: "✅",
+  GOAL_MEMBER_JOINED: "🤝",
+  FRIEND_REQUEST: "👥",
 };
 
 export default function NotificationsScreen() {

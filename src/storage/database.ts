@@ -27,7 +27,7 @@ import type { SQLiteBindValue, SQLiteRunResult } from "expo-sqlite";
 import { logger } from "../lib/logger";
 
 const DB_NAME = "social_accountability.db";
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 6;
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -173,43 +173,14 @@ async function setSchemaVersion(database: SQLite.SQLiteDatabase, version: number
 
 /**
  * Run schema migrations from old version to current
+ * NOTE: Pre-alpha - use Reset Database button instead of migrations
  */
-async function migrateSchema(database: SQLite.SQLiteDatabase, fromVersion: number): Promise<void> {
-  logger.info("Running schema migration", { fromVersion, toVersion: SCHEMA_VERSION });
-
-  if (fromVersion < 1) {
-    // Fresh install - no migration needed
-    return;
-  }
-
-  if (fromVersion < 2) {
-    // Migration from v1 to v2: Add progressive overload fields to habits table
-    logger.info("Migrating v1 → v2: Adding progressive overload fields");
-    await database.execAsync(`
-      ALTER TABLE habits ADD COLUMN progressiveOverloadStart REAL;
-      ALTER TABLE habits ADD COLUMN progressiveOverloadPrevious REAL;
-      ALTER TABLE habits ADD COLUMN progressiveOverloadLastAppliedAt TEXT;
-    `);
-  }
-
-  if (fromVersion < 3) {
-    // Migration from v2 to v3: Rename tags to postTypeTags and add customTags
-    logger.info("Migrating v2 → v3: Adding postTypeTags and customTags columns");
-    await database.execAsync(`
-      ALTER TABLE posts ADD COLUMN postTypeTags TEXT;
-      ALTER TABLE posts ADD COLUMN customTags TEXT;
-    `);
-  }
-
-  if (fromVersion < 4) {
-    // Migration from v3 to v4: Add mediaAspectRatio to posts
-    logger.info("Migrating v3 → v4: Adding mediaAspectRatio column to posts");
-    await database.execAsync(`
-      ALTER TABLE posts ADD COLUMN mediaAspectRatio TEXT;
-    `);
-  }
-
-  logger.info("Schema migration complete", { fromVersion, toVersion: SCHEMA_VERSION });
+async function migrateSchema(_database: SQLite.SQLiteDatabase, fromVersion: number): Promise<void> {
+  logger.warn("Schema migration skipped - pre-alpha mode", {
+    fromVersion,
+    toVersion: SCHEMA_VERSION,
+    message: "Use Reset Database button in dev tools to apply schema changes",
+  });
 }
 
 /**
@@ -350,6 +321,7 @@ async function initializeSchema(database: SQLite.SQLiteDatabase): Promise<void> 
       description TEXT,
       pillar TEXT NOT NULL,
       privacy TEXT NOT NULL DEFAULT 'SELF',
+      performancePrivacy TEXT DEFAULT 'FRIENDS',
       isIndefinite INTEGER NOT NULL DEFAULT 0,
       metricType TEXT NOT NULL DEFAULT 'COUNT',
       metricUnit TEXT,
@@ -370,6 +342,20 @@ async function initializeSchema(database: SQLite.SQLiteDatabase): Promise<void> 
       syncedAt TEXT,
       FOREIGN KEY (userId) REFERENCES users(id),
       FOREIGN KEY (identityId) REFERENCES identities(id)
+    );
+
+    -- Goal participants (for goal joining feature, M5)
+    CREATE TABLE IF NOT EXISTS goal_participants (
+      id TEXT PRIMARY KEY,
+      goalId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'MEMBER',
+      performancePrivacy TEXT NOT NULL DEFAULT 'FRIENDS',
+      joinedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (goalId) REFERENCES goals(id),
+      FOREIGN KEY (userId) REFERENCES users(id),
+      UNIQUE(goalId, userId)
     );
 
     -- ============================================
@@ -399,6 +385,7 @@ async function initializeSchema(database: SQLite.SQLiteDatabase): Promise<void> 
       miniVersion TEXT,
       graceDays INTEGER NOT NULL DEFAULT 0,
       privacy TEXT NOT NULL DEFAULT 'SELF',
+      performancePrivacy TEXT DEFAULT 'FRIENDS',
       isArchived INTEGER NOT NULL DEFAULT 0,
       archivedAt TEXT,
       currentStreak INTEGER NOT NULL DEFAULT 0,
@@ -439,6 +426,7 @@ async function initializeSchema(database: SQLite.SQLiteDatabase): Promise<void> 
       evidenceUrl TEXT,
       note TEXT,
       intensity INTEGER,
+      outcome TEXT,
       moodBefore INTEGER,
       moodAfter INTEGER,
       createdAt TEXT NOT NULL,
@@ -453,6 +441,7 @@ async function initializeSchema(database: SQLite.SQLiteDatabase): Promise<void> 
       habitId TEXT NOT NULL,
       userId TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'MEMBER',
+      performancePrivacy TEXT NOT NULL DEFAULT 'FRIENDS',
       joinedAt TEXT NOT NULL,
       syncedAt TEXT,
       FOREIGN KEY (habitId) REFERENCES habits(id),
@@ -864,6 +853,10 @@ async function initializeSchema(database: SQLite.SQLiteDatabase): Promise<void> 
     CREATE INDEX IF NOT EXISTS idx_goals_completedAt ON goals(userId, completedAt);
     CREATE INDEX IF NOT EXISTS idx_goals_deadline ON goals(deadline);
     CREATE INDEX IF NOT EXISTS idx_goals_isArchived ON goals(isArchived);
+
+    -- Goal participants
+    CREATE INDEX IF NOT EXISTS idx_goal_participants_goalId ON goal_participants(goalId);
+    CREATE INDEX IF NOT EXISTS idx_goal_participants_userId ON goal_participants(userId);
 
     -- Habits
     CREATE INDEX IF NOT EXISTS idx_habits_userId ON habits(userId);

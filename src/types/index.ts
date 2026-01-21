@@ -8,7 +8,7 @@ export type CheckInSource = "MANUAL" | "INTEGRATION";
 export type CircleRole = "OWNER" | "MEMBER";
 
 // M5: Check-in outcome for BREAK habits
-export type CheckInOutcome = "COMPLETED" | "RESISTED" | "LAPSED";
+export type CheckInOutcome = "COMPLETED" | "RESISTED" | "LAPSED" | "SKIPPED";
 
 // M3: Advanced Post Options
 // MediaType: photo/video = user-uploaded media, chart = auto-generated visualization
@@ -195,7 +195,11 @@ export type Habit = {
   reminderText?: string; // Custom reminder text
   reflectionPrompt?: string; // Post-completion prompt
 
+  // Privacy: who can see this habit exists/requirements (owner controls)
   privacy: Privacy;
+  // Performance privacy: who can see the owner's progress on this habit (owner controls)
+  // For joined habits, each participant has their own performancePrivacy in habit_participants
+  performancePrivacy?: Privacy;
   isArchived: boolean;
   archivedAt?: string;
   // Streak data (cached, recalculated on check-in)
@@ -207,6 +211,22 @@ export type Habit = {
   createdAt: string;
   updatedAt: string;
   syncedAt?: string;
+};
+
+/**
+ * Extended habit type with additional metadata for display
+ * Includes owner info (for joined habits) and participant count
+ */
+export type HabitWithMeta = Habit & {
+  // Owner info (populated when viewing joined habits)
+  ownerName?: string;
+  ownerPhotoUrl?: string;
+  // Is this a habit the user joined (vs created)?
+  isJoined?: boolean;
+  // Participant performance privacy (for joined habits)
+  participantPerformancePrivacy?: Privacy;
+  // Participant count (for both owned and joined habits)
+  participantCount?: number;
 };
 
 export type HabitCheckIn = {
@@ -226,6 +246,52 @@ export type HabitCheckIn = {
   moodAfter?: number; // M6: mood after check-in (1-5)
   createdAt: string;
   syncedAt?: string;
+};
+
+// Habit participant role
+export type HabitParticipantRole = "OWNER" | "MEMBER";
+
+// Habit participant (for habit joining feature)
+export type HabitParticipant = {
+  id: string;
+  habitId: string;
+  userId: string;
+  role: HabitParticipantRole;
+  joinedAt: string;
+  // Performance privacy: who can see this user's progress on this habit
+  // Independent of habit visibility (controlled by habit owner)
+  performancePrivacy: Privacy;
+  syncedAt?: string;
+  // Joined user info (for display)
+  userName?: string;
+  userPhotoUrl?: string;
+};
+
+// Goal participant role
+export type GoalParticipantRole = "OWNER" | "MEMBER";
+
+// Goal participant (for goal joining feature)
+export type GoalParticipant = {
+  id: string;
+  goalId: string;
+  userId: string;
+  role: GoalParticipantRole;
+  joinedAt: string;
+  // Performance privacy: who can see this user's progress on this goal
+  performancePrivacy: Privacy;
+  syncedAt?: string;
+  // Joined user info (for display)
+  userName?: string;
+  userPhotoUrl?: string;
+};
+
+// Goal with metadata for lists (includes owner info for joined goals)
+export type GoalWithMeta = Goal & {
+  ownerName?: string;
+  ownerPhotoUrl?: string;
+  isJoined?: boolean;
+  participantPerformancePrivacy?: Privacy;
+  participantCount?: number;
 };
 
 export type Post = {
@@ -384,13 +450,76 @@ export const NUDGE_TEMPLATES: Record<NudgeTemplateId, { text: string; emoji: str
   "lets-do-together": { text: "Let's do this together!", emoji: "🙌" },
 };
 
-// Badge Types
+// Badge Tier System
+export type BadgeTier = "bronze" | "silver" | "gold" | "platinum";
+
+export const BADGE_TIER_THRESHOLDS: Record<BadgeTier, number> = {
+  bronze: 1, // First tier (e.g., 10, 3, 1)
+  silver: 2, // Second tier (e.g., 30, 10, 5)
+  gold: 3, // Third tier (e.g., 100, 30, 15)
+  platinum: 4, // Fourth tier (e.g., 500, 100, 50)
+};
+
+export const BADGE_TIER_COLORS: Record<BadgeTier, string> = {
+  bronze: "#CD7F32",
+  silver: "#C0C0C0",
+  gold: "#FFD700",
+  platinum: "#E5E4E2",
+};
+
+// Badge Categories (for grouping in UI)
+export type BadgeCategory =
+  | "posts" // Sharing posts
+  | "habits" // Creating habits
+  | "goals" // Completing goals
+  | "checkins" // Logging check-ins
+  | "streaks" // Maintaining streaks
+  | "social" // Reactions, nudges, comments
+  | "recovery" // Coming back after misses
+  | "pillar"; // Pillar completion
+
+// Badge Types - Now with tiered structure
 export type BadgeType =
-  // Streak badges
+  // Tiered Badges - Posts (10, 30, 100, 500)
+  | "posts-bronze"
+  | "posts-silver"
+  | "posts-gold"
+  | "posts-platinum"
+  // Tiered Badges - Habits Created (3, 10, 30, 100)
+  | "habits-bronze"
+  | "habits-silver"
+  | "habits-gold"
+  | "habits-platinum"
+  // Tiered Badges - Goals Completed (1, 5, 15, 50)
+  | "goals-bronze"
+  | "goals-silver"
+  | "goals-gold"
+  | "goals-platinum"
+  // Tiered Badges - Check-ins (10, 50, 200, 1000)
+  | "checkins-bronze"
+  | "checkins-silver"
+  | "checkins-gold"
+  | "checkins-platinum"
+  // Tiered Badges - Reactions Given (10, 50, 200, 1000)
+  | "reactions-bronze"
+  | "reactions-silver"
+  | "reactions-gold"
+  | "reactions-platinum"
+  // Tiered Badges - Nudges Sent (5, 20, 75, 300)
+  | "nudges-bronze"
+  | "nudges-silver"
+  | "nudges-gold"
+  | "nudges-platinum"
+  // Tiered Badges - Comments Made (10, 30, 100, 500)
+  | "comments-bronze"
+  | "comments-silver"
+  | "comments-gold"
+  | "comments-platinum"
+  // Streak badges (legacy format kept for compatibility)
   | "streak-7"
   | "streak-30"
   | "streak-100"
-  // Milestone badges
+  // Legacy milestone badges (kept for backwards compatibility)
   | "habits-10"
   | "checkins-100"
   | "checkins-1000"
@@ -412,12 +541,115 @@ export type Badge = {
   badgeType: BadgeType;
   pillar?: Pillar; // For pillar-specific badges
   habitId?: string; // For habit-specific badges
-  tier?: number; // Badge tier (1, 2, 3)
+  tier?: BadgeTier; // Badge tier (bronze, silver, gold, platinum)
   metadata?: Record<string, unknown>; // Extra badge data
   earnedAt: string;
   sharedAt?: string; // If user shared badge as post
   syncedAt?: string;
 };
+
+// Tiered badge definitions with thresholds for each tier
+export type TieredBadgeDefinition = {
+  category: BadgeCategory;
+  name: string;
+  emoji: string;
+  thresholds: { bronze: number; silver: number; gold: number; platinum: number };
+  getDescription: (tier: BadgeTier, threshold: number) => string;
+};
+
+export const TIERED_BADGE_DEFINITIONS: Record<string, TieredBadgeDefinition> = {
+  posts: {
+    category: "posts",
+    name: "Storyteller",
+    emoji: "📝",
+    thresholds: { bronze: 10, silver: 30, gold: 100, platinum: 500 },
+    getDescription: (_tier, threshold) => `Shared ${threshold} posts`,
+  },
+  habits: {
+    category: "habits",
+    name: "Architect",
+    emoji: "🏗️",
+    thresholds: { bronze: 3, silver: 10, gold: 30, platinum: 100 },
+    getDescription: (_tier, threshold) => `Created ${threshold} habits`,
+  },
+  goals: {
+    category: "goals",
+    name: "Achiever",
+    emoji: "🎯",
+    thresholds: { bronze: 1, silver: 5, gold: 15, platinum: 50 },
+    getDescription: (_tier, threshold) =>
+      threshold === 1 ? "Completed first goal" : `Completed ${threshold} goals`,
+  },
+  checkins: {
+    category: "checkins",
+    name: "Consistent",
+    emoji: "✅",
+    thresholds: { bronze: 10, silver: 50, gold: 200, platinum: 1000 },
+    getDescription: (_tier, threshold) => `Logged ${threshold} check-ins`,
+  },
+  reactions: {
+    category: "social",
+    name: "Supporter",
+    emoji: "👏",
+    thresholds: { bronze: 10, silver: 50, gold: 200, platinum: 1000 },
+    getDescription: (_tier, threshold) => `Gave ${threshold} reactions`,
+  },
+  nudges: {
+    category: "social",
+    name: "Cheerleader",
+    emoji: "📣",
+    thresholds: { bronze: 5, silver: 20, gold: 75, platinum: 300 },
+    getDescription: (_tier, threshold) => `Sent ${threshold} nudges`,
+  },
+  comments: {
+    category: "social",
+    name: "Conversationalist",
+    emoji: "💬",
+    thresholds: { bronze: 10, silver: 30, gold: 100, platinum: 500 },
+    getDescription: (_tier, threshold) => `Made ${threshold} comments`,
+  },
+};
+
+// Helper to get tier rarity
+export const TIER_RARITY: Record<BadgeTier, "common" | "rare" | "epic" | "legendary"> = {
+  bronze: "common",
+  silver: "rare",
+  gold: "epic",
+  platinum: "legendary",
+};
+
+// Helper to get badge info for tiered badges
+export function getTieredBadgeInfo(
+  badgeType: BadgeType
+): {
+  name: string;
+  description: string;
+  emoji: string;
+  rarity: "common" | "rare" | "epic" | "legendary";
+  tier: BadgeTier;
+  category: BadgeCategory;
+} | null {
+  // Parse badge type (e.g., "posts-bronze" -> { base: "posts", tier: "bronze" })
+  const tiers: BadgeTier[] = ["bronze", "silver", "gold", "platinum"];
+  for (const tier of tiers) {
+    if (badgeType.endsWith(`-${tier}`)) {
+      const base = badgeType.replace(`-${tier}`, "");
+      const definition = TIERED_BADGE_DEFINITIONS[base];
+      if (definition) {
+        const threshold = definition.thresholds[tier];
+        return {
+          name: `${definition.name} (${tier.charAt(0).toUpperCase() + tier.slice(1)})`,
+          description: definition.getDescription(tier, threshold),
+          emoji: definition.emoji,
+          rarity: TIER_RARITY[tier],
+          tier,
+          category: definition.category,
+        };
+      }
+    }
+  }
+  return null;
+}
 
 export const BADGE_INFO: Record<
   BadgeType,
@@ -428,6 +660,182 @@ export const BADGE_INFO: Record<
     rarity: "common" | "rare" | "epic" | "legendary";
   }
 > = {
+  // Tiered Posts Badges
+  "posts-bronze": {
+    name: "Storyteller (Bronze)",
+    description: "Shared 10 posts",
+    emoji: "📝",
+    rarity: "common",
+  },
+  "posts-silver": {
+    name: "Storyteller (Silver)",
+    description: "Shared 30 posts",
+    emoji: "📝",
+    rarity: "rare",
+  },
+  "posts-gold": {
+    name: "Storyteller (Gold)",
+    description: "Shared 100 posts",
+    emoji: "📝",
+    rarity: "epic",
+  },
+  "posts-platinum": {
+    name: "Storyteller (Platinum)",
+    description: "Shared 500 posts",
+    emoji: "📝",
+    rarity: "legendary",
+  },
+  // Tiered Habits Badges
+  "habits-bronze": {
+    name: "Architect (Bronze)",
+    description: "Created 3 habits",
+    emoji: "🏗️",
+    rarity: "common",
+  },
+  "habits-silver": {
+    name: "Architect (Silver)",
+    description: "Created 10 habits",
+    emoji: "🏗️",
+    rarity: "rare",
+  },
+  "habits-gold": {
+    name: "Architect (Gold)",
+    description: "Created 30 habits",
+    emoji: "🏗️",
+    rarity: "epic",
+  },
+  "habits-platinum": {
+    name: "Architect (Platinum)",
+    description: "Created 100 habits",
+    emoji: "🏗️",
+    rarity: "legendary",
+  },
+  // Tiered Goals Badges
+  "goals-bronze": {
+    name: "Achiever (Bronze)",
+    description: "Completed first goal",
+    emoji: "🎯",
+    rarity: "common",
+  },
+  "goals-silver": {
+    name: "Achiever (Silver)",
+    description: "Completed 5 goals",
+    emoji: "🎯",
+    rarity: "rare",
+  },
+  "goals-gold": {
+    name: "Achiever (Gold)",
+    description: "Completed 15 goals",
+    emoji: "🎯",
+    rarity: "epic",
+  },
+  "goals-platinum": {
+    name: "Achiever (Platinum)",
+    description: "Completed 50 goals",
+    emoji: "🎯",
+    rarity: "legendary",
+  },
+  // Tiered Check-ins Badges
+  "checkins-bronze": {
+    name: "Consistent (Bronze)",
+    description: "Logged 10 check-ins",
+    emoji: "✅",
+    rarity: "common",
+  },
+  "checkins-silver": {
+    name: "Consistent (Silver)",
+    description: "Logged 50 check-ins",
+    emoji: "✅",
+    rarity: "rare",
+  },
+  "checkins-gold": {
+    name: "Consistent (Gold)",
+    description: "Logged 200 check-ins",
+    emoji: "✅",
+    rarity: "epic",
+  },
+  "checkins-platinum": {
+    name: "Consistent (Platinum)",
+    description: "Logged 1000 check-ins",
+    emoji: "✅",
+    rarity: "legendary",
+  },
+  // Tiered Reactions Badges
+  "reactions-bronze": {
+    name: "Supporter (Bronze)",
+    description: "Gave 10 reactions",
+    emoji: "👏",
+    rarity: "common",
+  },
+  "reactions-silver": {
+    name: "Supporter (Silver)",
+    description: "Gave 50 reactions",
+    emoji: "👏",
+    rarity: "rare",
+  },
+  "reactions-gold": {
+    name: "Supporter (Gold)",
+    description: "Gave 200 reactions",
+    emoji: "👏",
+    rarity: "epic",
+  },
+  "reactions-platinum": {
+    name: "Supporter (Platinum)",
+    description: "Gave 1000 reactions",
+    emoji: "👏",
+    rarity: "legendary",
+  },
+  // Tiered Nudges Badges
+  "nudges-bronze": {
+    name: "Cheerleader (Bronze)",
+    description: "Sent 5 nudges",
+    emoji: "📣",
+    rarity: "common",
+  },
+  "nudges-silver": {
+    name: "Cheerleader (Silver)",
+    description: "Sent 20 nudges",
+    emoji: "📣",
+    rarity: "rare",
+  },
+  "nudges-gold": {
+    name: "Cheerleader (Gold)",
+    description: "Sent 75 nudges",
+    emoji: "📣",
+    rarity: "epic",
+  },
+  "nudges-platinum": {
+    name: "Cheerleader (Platinum)",
+    description: "Sent 300 nudges",
+    emoji: "📣",
+    rarity: "legendary",
+  },
+  // Tiered Comments Badges
+  "comments-bronze": {
+    name: "Conversationalist (Bronze)",
+    description: "Made 10 comments",
+    emoji: "💬",
+    rarity: "common",
+  },
+  "comments-silver": {
+    name: "Conversationalist (Silver)",
+    description: "Made 30 comments",
+    emoji: "💬",
+    rarity: "rare",
+  },
+  "comments-gold": {
+    name: "Conversationalist (Gold)",
+    description: "Made 100 comments",
+    emoji: "💬",
+    rarity: "epic",
+  },
+  "comments-platinum": {
+    name: "Conversationalist (Platinum)",
+    description: "Made 500 comments",
+    emoji: "💬",
+    rarity: "legendary",
+  },
+  // Streak badges
   "streak-7": { name: "Week Warrior", description: "7-day streak", emoji: "🔥", rarity: "common" },
   "streak-30": {
     name: "Monthly Master",
@@ -517,10 +925,17 @@ export type NotificationType =
   | "BADGE_EARNED"
   | "FRIEND_POSTED"
   | "HABIT_REMINDER"
+  | "HABIT_JOIN_REQUEST"
+  | "HABIT_JOIN_ACCEPTED"
+  | "HABIT_MEMBER_JOINED"
+  | "GOAL_JOIN_REQUEST"
+  | "GOAL_JOIN_ACCEPTED"
+  | "GOAL_MEMBER_JOINED"
   | "CIRCLE_POST"
   | "CIRCLE_MESSAGE"
   | "CIRCLE_INVITE"
-  | "CIRCLE_MEMBER_JOINED";
+  | "CIRCLE_MEMBER_JOINED"
+  | "FRIEND_REQUEST";
 
 export type AppNotification = {
   id: string;

@@ -18,7 +18,16 @@ import {
   getTodayCheckIns,
   deleteCheckIn,
 } from "../../src/storage/checkIns";
-import type { Habit, HabitCheckIn, Privacy, HabitFrequency } from "../../src/types";
+import {
+  joinHabit,
+  leaveHabit,
+  isParticipant,
+  getParticipantCount,
+  getParticipant,
+  updateParticipantPerformancePrivacy,
+} from "../../src/storage/habitParticipants";
+import { getUserById } from "../../src/storage/user";
+import type { Habit, HabitCheckIn, Privacy, HabitFrequency, User } from "../../src/types";
 import {
   calculateStreak,
   getCurrentPeriodCount,
@@ -39,6 +48,8 @@ import {
   CheckInList,
   CheckInModal,
   EditHabitModal,
+  EditJoinedHabitModal,
+  Avatar,
 } from "../../src/components";
 
 export default function HabitDetailScreen() {
@@ -51,7 +62,17 @@ export default function HabitDetailScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showJoinedEditModal, setShowJoinedEditModal] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("");
+
+  // Owner/viewer mode state
+  const [habitOwner, setHabitOwner] = useState<User | null>(null);
+  const [hasJoined, setHasJoined] = useState(false);
+  const [participantCount, setParticipantCount] = useState(0);
+  const [isJoining, setIsJoining] = useState(false);
+  const [participantPerformancePrivacy, setParticipantPerformancePrivacy] =
+    useState<Privacy>("FRIENDS");
 
   // Check-in form state
   const [checkInNote, setCheckInNote] = useState("");
@@ -60,11 +81,12 @@ export default function HabitDetailScreen() {
   // Edit form state
   const [editTitle, setEditTitle] = useState("");
   const [editPrivacy, setEditPrivacy] = useState<Privacy>("SELF");
+  const [editPerformancePrivacy, setEditPerformancePrivacy] = useState<Privacy>("FRIENDS");
   const [editFrequency, setEditFrequency] = useState<HabitFrequency>("daily");
   const [editTargetCount, setEditTargetCount] = useState("1");
 
   const loadData = useCallback(async () => {
-    if (!id) return;
+    if (!id || !userId) return;
     try {
       const [habitData, checkInsData, todayData] = await Promise.all([
         getHabitById(id),
@@ -74,24 +96,50 @@ export default function HabitDetailScreen() {
       setHabit(habitData);
       setCheckIns(checkInsData);
       setTodayCheckIns(todayData);
+
+      // Load owner info and participation status if viewing someone else's habit
+      if (habitData && habitData.userId !== userId) {
+        const [owner, joined, count, participant] = await Promise.all([
+          getUserById(habitData.userId),
+          isParticipant(id, userId),
+          getParticipantCount(id),
+          getParticipant(id, userId),
+        ]);
+        setHabitOwner(owner);
+        setHasJoined(joined);
+        setParticipantCount(count);
+        if (participant) {
+          setParticipantPerformancePrivacy(participant.performancePrivacy);
+        }
+      } else {
+        // Own habit - get participant count
+        const count = await getParticipantCount(id);
+        setParticipantCount(count);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load habit";
       console.error("Error loading habit:", error);
       Alert.alert("Error", message);
     }
-  }, [id]);
+  }, [id, userId]);
 
   useEffect(() => {
     async function initialize() {
       const user = await auth.getUser();
       if (user) {
         setUserId(user.id);
-        await loadData();
+        setUserName(user.displayName);
       }
       setIsLoading(false);
     }
     initialize();
-  }, [loadData]);
+  }, []);
+
+  useEffect(() => {
+    if (userId) {
+      loadData();
+    }
+  }, [userId, loadData]);
 
   const onRefresh = useCallback(async () => {
     if (!userId) return;
@@ -176,10 +224,68 @@ export default function HabitDetailScreen() {
     ]);
   }
 
+  async function handleJoinHabit() {
+    if (!habit || !userId || !userName) return;
+
+    setIsJoining(true);
+    try {
+      await joinHabit(habit.id, userId, userName);
+      setHasJoined(true);
+      setParticipantCount((prev) => prev + 1);
+      Alert.alert("Joined!", `You've joined "${habit.title}". The owner has been notified.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to join habit";
+      Alert.alert("Error", message);
+    } finally {
+      setIsJoining(false);
+    }
+  }
+
+  async function handleLeaveHabit() {
+    if (!habit || !userId) return;
+
+    Alert.alert("Leave Habit", `Stop following "${habit.title}"?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Leave",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await leaveHabit(habit.id, userId);
+            setHasJoined(false);
+            setParticipantCount((prev) => Math.max(0, prev - 1));
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Failed to leave habit";
+            Alert.alert("Error", message);
+          }
+        },
+      },
+    ]);
+  }
+
+  function openJoinedEditModal() {
+    setShowJoinedEditModal(true);
+  }
+
+  async function handleSaveJoinedEdit() {
+    if (!habit || !userId) return;
+    setIsSubmitting(true);
+    try {
+      await updateParticipantPerformancePrivacy(habit.id, userId, participantPerformancePrivacy);
+      setShowJoinedEditModal(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update settings";
+      Alert.alert("Error", message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   function openEditModal() {
     if (!habit) return;
     setEditTitle(habit.title);
     setEditPrivacy(habit.privacy);
+    setEditPerformancePrivacy(habit.performancePrivacy || "FRIENDS");
     setEditFrequency(habit.schedule.frequency);
     setEditTargetCount(habit.schedule.targetCount.toString());
     setShowEditModal(true);
@@ -203,6 +309,7 @@ export default function HabitDetailScreen() {
       await updateHabit(habit.id, {
         title: editTitle.trim(),
         privacy: editPrivacy,
+        performancePrivacy: editPerformancePrivacy,
         schedule: {
           ...habit.schedule,
           frequency: editFrequency,
@@ -300,6 +407,7 @@ export default function HabitDetailScreen() {
     );
   }
 
+  const isOwner = habit.userId === userId;
   const todayCount = todayCheckIns.length;
   const targetMet = todayCount >= habit.schedule.targetCount;
   const progressTitle = `${habit.schedule.frequency === "weekly" ? "This Week" : "Today"}'s Progress`;
@@ -309,14 +417,33 @@ export default function HabitDetailScreen() {
       <ScreenHeader
         title=""
         rightAction={
-          <View style={styles.headerActions}>
-            <Pressable onPress={openEditModal} style={styles.actionButton}>
-              <Text style={[styles.editText, { color: theme.semantic.primary }]}>Edit</Text>
+          isOwner ? (
+            <View style={styles.headerActions}>
+              <Pressable onPress={openEditModal} style={styles.actionButton}>
+                <Text style={[styles.editText, { color: theme.semantic.primary }]}>Edit</Text>
+              </Pressable>
+              <Pressable onPress={handleArchive} style={styles.actionButton}>
+                <Text style={[styles.archiveText, { color: theme.text.error }]}>Archive</Text>
+              </Pressable>
+            </View>
+          ) : hasJoined ? (
+            <View style={styles.headerActions}>
+              <Pressable onPress={openJoinedEditModal} style={styles.actionButton}>
+                <Text style={[styles.editText, { color: theme.semantic.primary }]}>Edit</Text>
+              </Pressable>
+              <Pressable onPress={handleLeaveHabit} style={styles.actionButton}>
+                <Text style={[styles.archiveText, { color: theme.text.error }]}>Leave</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              onPress={handleJoinHabit}
+              disabled={isJoining}
+              style={[styles.joinButton, { backgroundColor: theme.semantic.primary }]}
+            >
+              <Text style={styles.joinButtonText}>{isJoining ? "Joining..." : "Join"}</Text>
             </Pressable>
-            <Pressable onPress={handleArchive} style={styles.actionButton}>
-              <Text style={[styles.archiveText, { color: theme.text.error }]}>Archive</Text>
-            </Pressable>
-          </View>
+          )
         }
       />
 
@@ -324,6 +451,43 @@ export default function HabitDetailScreen() {
         style={styles.content}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
       >
+        {/* Owner info when viewing someone else's habit */}
+        {!isOwner && habitOwner && (
+          <Pressable
+            style={[styles.ownerCard, { backgroundColor: theme.card.background }]}
+            onPress={() => router.push(`/profile/${habitOwner.id}`)}
+          >
+            <Avatar imageUrl={habitOwner.photoUrl} name={habitOwner.displayName} size="sm" />
+            <View style={styles.ownerInfo}>
+              <Text style={[styles.ownerName, { color: theme.text.primary }]}>
+                {habitOwner.displayName}&apos;s habit
+              </Text>
+              {participantCount > 0 && (
+                <Text style={[styles.participantCount, { color: theme.text.secondary }]}>
+                  {participantCount} {participantCount === 1 ? "person" : "people"} joined
+                </Text>
+              )}
+            </View>
+            {hasJoined && (
+              <View style={[styles.joinedBadge, { backgroundColor: theme.text.success + "20" }]}>
+                <Text style={[styles.joinedBadgeText, { color: theme.text.success }]}>Joined</Text>
+              </View>
+            )}
+          </Pressable>
+        )}
+
+        {/* Performance privacy control for joined users - now in EditJoinedHabitModal */}
+
+        {/* Participant count for owner */}
+        {isOwner && participantCount > 0 && (
+          <View style={[styles.participantBanner, { backgroundColor: theme.card.background }]}>
+            <Text style={[styles.participantBannerText, { color: theme.text.primary }]}>
+              👥 {participantCount} {participantCount === 1 ? "person has" : "people have"} joined
+              this habit
+            </Text>
+          </View>
+        )}
+
         <HabitDetailCard habit={habit} />
 
         <StatusBanner status={habitStatus} message={statusMessage} />
@@ -335,19 +499,23 @@ export default function HabitDetailScreen() {
           isInRecovery={recoveryStatus.isInRecovery}
         />
 
-        <TodayProgress
-          title={progressTitle}
-          count={periodProgress.count}
-          target={periodProgress.target}
-          remaining={periodProgress.remaining}
-          targetMet={targetMet}
-          onQuickCheckIn={handleQuickCheckIn}
-          onCheckInWithNote={() => setShowCheckInModal(true)}
-        />
+        {/* Only show check-in controls for habit owner */}
+        {isOwner && (
+          <TodayProgress
+            title={progressTitle}
+            count={periodProgress.count}
+            target={periodProgress.target}
+            remaining={periodProgress.remaining}
+            targetMet={targetMet}
+            onQuickCheckIn={handleQuickCheckIn}
+            onCheckInWithNote={() => setShowCheckInModal(true)}
+          />
+        )}
 
+        {/* Show check-in history (read-only for non-owners) */}
         <CheckInList
           checkIns={checkIns}
-          onDeleteCheckIn={handleDeleteCheckIn}
+          onDeleteCheckIn={isOwner ? handleDeleteCheckIn : undefined}
           formatDate={formatDate}
         />
       </ScrollView>
@@ -374,7 +542,23 @@ export default function HabitDetailScreen() {
         onTargetCountChange={setEditTargetCount}
         privacy={editPrivacy}
         onPrivacyChange={setEditPrivacy}
+        performancePrivacy={editPerformancePrivacy}
+        onPerformancePrivacyChange={setEditPerformancePrivacy}
       />
+
+      {/* Edit modal for joined habits - only shows performance privacy */}
+      {!isOwner && habitOwner && (
+        <EditJoinedHabitModal
+          visible={showJoinedEditModal}
+          onClose={() => setShowJoinedEditModal(false)}
+          onSubmit={handleSaveJoinedEdit}
+          isSubmitting={isSubmitting}
+          habitTitle={habit.title}
+          ownerName={habitOwner.displayName}
+          performancePrivacy={participantPerformancePrivacy}
+          onPerformancePrivacyChange={setParticipantPerformancePrivacy}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -403,5 +587,54 @@ const styles = StyleSheet.create({
   },
   archiveText: {
     fontSize: typography.fontSize.base,
+  },
+  joinButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 20,
+  },
+  joinButtonText: {
+    color: "#FFFFFF",
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  ownerCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: 12,
+  },
+  ownerInfo: {
+    flex: 1,
+    marginLeft: spacing.sm,
+  },
+  ownerName: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+  },
+  participantCount: {
+    fontSize: typography.fontSize.sm,
+    marginTop: 2,
+  },
+  joinedBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 12,
+  },
+  joinedBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+  },
+  participantBanner: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  participantBannerText: {
+    fontSize: typography.fontSize.sm,
   },
 });

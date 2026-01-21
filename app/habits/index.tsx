@@ -9,10 +9,10 @@ import { FlatList, RefreshControl, Alert, StyleSheet, Text } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { auth } from "../../src/services/auth";
-import { createHabit, getHabits } from "../../src/storage/habits";
+import { createHabit, getHabitsWithMeta } from "../../src/storage/habits";
 import { getGoals } from "../../src/storage/goals";
 import { ALL_PILLARS } from "../../src/types/goals";
-import type { Habit, Goal, Pillar } from "../../src/types";
+import type { HabitWithMeta, Goal, Pillar } from "../../src/types";
 import { useTheme } from "../../src/theme";
 import { spacing } from "../../src/theme/spacing";
 import { typography } from "../../src/theme/typography";
@@ -28,7 +28,7 @@ import {
 export default function HabitsScreen() {
   const { theme } = useTheme();
   const params = useLocalSearchParams<{ goalId?: string }>();
-  const [habits, setHabits] = useState<Habit[]>([]);
+  const [habits, setHabits] = useState<HabitWithMeta[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -38,7 +38,7 @@ export default function HabitsScreen() {
   const loadHabits = useCallback(
     async (uid: string) => {
       try {
-        const userHabits = await getHabits(uid, { goalId: params.goalId });
+        const userHabits = await getHabitsWithMeta(uid, { goalId: params.goalId });
         setHabits(userHabits);
       } catch {
         Alert.alert("Error", "Failed to load habits");
@@ -108,7 +108,7 @@ export default function HabitsScreen() {
       acc[habit.pillar].push(habit);
       return acc;
     },
-    {} as Record<Pillar, Habit[]>
+    {} as Record<Pillar, HabitWithMeta[]>
   );
 
   if (isLoading) {

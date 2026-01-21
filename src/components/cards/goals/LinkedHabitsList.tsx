@@ -1,18 +1,19 @@
 /**
  * LinkedHabitsList - Displays habits linked to a goal
  * Shows habit cards with streak badges and navigation
+ * For joined goals, hides the "Add Habit" button (onAddHabit is optional)
  */
 
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { router } from "expo-router";
-import type { Habit } from "../../../types";
+import type { Habit, HabitWithMeta } from "../../../types";
 import { useTheme, spacing, borderRadius, typography } from "../../../theme";
 
 interface LinkedHabitsListProps {
   /** Array of habits linked to the goal */
-  habits: Habit[];
-  /** Handler for adding a new habit */
-  onAddHabit: () => void;
+  habits: Habit[] | HabitWithMeta[];
+  /** Handler for adding a new habit (optional - hidden for non-owners) */
+  onAddHabit?: () => void;
 }
 
 export function LinkedHabitsList({ habits, onAddHabit }: LinkedHabitsListProps) {
@@ -22,14 +23,16 @@ export function LinkedHabitsList({ habits, onAddHabit }: LinkedHabitsListProps) 
     <View style={[styles.container, { backgroundColor: theme.card.background }]}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.text.primary }]}>Linked Habits</Text>
-        <Pressable
-          onPress={onAddHabit}
-          style={[styles.addButton, { backgroundColor: theme.button.primary.background }]}
-        >
-          <Text style={[styles.addButtonText, { color: theme.button.primary.text }]}>
-            + Add Habit
-          </Text>
-        </Pressable>
+        {onAddHabit && (
+          <Pressable
+            onPress={onAddHabit}
+            style={[styles.addButton, { backgroundColor: theme.button.primary.background }]}
+          >
+            <Text style={[styles.addButtonText, { color: theme.button.primary.text }]}>
+              + Add Habit
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       {habits.length === 0 ? (
@@ -37,11 +40,13 @@ export function LinkedHabitsList({ habits, onAddHabit }: LinkedHabitsListProps) 
           <Text style={[styles.emptyText, { color: theme.text.tertiary }]}>
             No habits linked to this goal yet.
           </Text>
-          <Pressable onPress={onAddHabit} style={styles.linkButton}>
-            <Text style={[styles.linkButtonText, { color: theme.semantic.primary }]}>
-              Create a habit
-            </Text>
-          </Pressable>
+          {onAddHabit && (
+            <Pressable onPress={onAddHabit} style={styles.linkButton}>
+              <Text style={[styles.linkButtonText, { color: theme.semantic.primary }]}>
+                Create a habit
+              </Text>
+            </Pressable>
+          )}
         </View>
       ) : (
         habits.map((habit) => (
