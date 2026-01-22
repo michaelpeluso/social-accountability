@@ -87,11 +87,8 @@ export default {
       "expo-router",
       "expo-secure-store",
       "expo-sqlite",
+      "expo-video",
       "@react-native-community/datetimepicker",
     ],
-
-    metro: {
-      config: "./config/metro.config.js",
-    },
   },
 };
