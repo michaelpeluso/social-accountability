@@ -7,6 +7,11 @@ jest.mock("expo-constants", () => ({
       apiUrl: "https://test.example.com/api",
       supabaseUrl: "https://test.supabase.co",
       supabaseAnonKey: "test-anon-key",
+      // Feature flags - ensure Apple auth is disabled in tests (uses mock)
+      enableAppleAuth: false,
+      enableHealthkit: false,
+      enableCloudSync: false,
+      logLevel: "error",
     },
   },
 }));
@@ -44,15 +49,20 @@ jest.mock("expo-sqlite", () => ({
 
 // Mock expo-secure-store with in-memory storage
 jest.mock("expo-secure-store", () => {
-  const store = new Map();
+  let mockStore = new Map();
+  
   return {
     setItemAsync: jest.fn(async (key, value) => {
-      store.set(key, value);
+      mockStore.set(key, value);
     }),
-    getItemAsync: jest.fn(async (key) => store.get(key) ?? null),
+    getItemAsync: jest.fn(async (key) => mockStore.get(key) ?? null),
     deleteItemAsync: jest.fn(async (key) => {
-      store.delete(key);
+      mockStore.delete(key);
     }),
+    // Expose a way to clear the store for testing
+    __clearStore: () => {
+      mockStore = new Map();
+    },
   };
 });
 
