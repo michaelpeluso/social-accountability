@@ -9,7 +9,7 @@
 #   APPSTORE_API_KEY_ID      - App Store Connect > Keys (10 chars)
 #   APPSTORE_API_PRIVATE_KEY - Full contents of .p8 file
 
-name: 🚀 Deploy to TestFlight
+name: Deploy to TestFlight
 
 on:
   workflow_dispatch:
