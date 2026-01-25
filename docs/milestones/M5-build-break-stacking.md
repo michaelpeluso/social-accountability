@@ -409,7 +409,7 @@ User taps "Disable Steps Tracking"
     {
       date: "2026-01-01",
       source: "INTEGRATION",
-      evidenceRef: "healthkit:steps:10543",
+      evidenceUrl: "healthkit:steps:10543",
       automated: true
     }
   ]
@@ -477,7 +477,7 @@ async function enableStepsTracking() {
     if (steps >= 10000) {
       await createCheckIn(stepsHabitId, {
         source: "INTEGRATION",
-        evidenceRef: `healthkit:steps:${steps}`,
+        evidenceUrl: `healthkit:steps:${steps}`,
       });
     }
   }

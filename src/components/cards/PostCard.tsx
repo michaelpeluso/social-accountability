@@ -19,19 +19,27 @@ import { typography } from "../../theme/typography";
 
 type PostCardProps = {
   post: FeedPost;
-  onPress: () => void;
+  onPress?: () => void;
   onAuthorPress?: () => void;
   currentUserId: string;
+  /** When true, comments are expanded by default and card is not pressable */
+  isDetailView?: boolean;
 };
 
-export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCardProps) {
+export function PostCard({
+  post,
+  onPress,
+  onAuthorPress,
+  currentUserId,
+  isDetailView = false,
+}: PostCardProps) {
   const { theme } = useTheme();
   const [reactions, setReactions] = useState(post.reactions);
   const [userReaction, setUserReaction] = useState<ReactionEmoji | null>(
     // Find the user's current reaction (should be only one)
     post.reactions.find((r) => r.userReacted)?.emoji ?? null
   );
-  const [showCommentInput, setShowCommentInput] = useState(false);
+  const [showCommentInput, setShowCommentInput] = useState(isDetailView);
   const [commentText, setCommentText] = useState("");
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentsLoaded, setCommentsLoaded] = useState(false);
@@ -55,7 +63,7 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
     setIsSubmittingComment(true);
     const result = await createComment(currentUserId, {
       postId: post.id,
-      bodyText: commentText.trim(),
+      text: commentText.trim(),
     });
     setIsSubmittingComment(false);
 
@@ -70,7 +78,11 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
   };
 
   const handleReaction = async (emoji: ReactionEmoji) => {
-    const result = await toggleReaction(currentUserId, { postId: post.id, emoji });
+    const result = await toggleReaction(currentUserId, {
+      targetId: post.id,
+      targetType: "POST",
+      emoji,
+    });
 
     if ("error" in result) {
       console.error("Failed to toggle reaction:", result.error);
@@ -127,8 +139,10 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
     ? theme.pillars[post.pillar as keyof typeof theme.pillars]
     : undefined;
 
+  const CardWrapper = isDetailView ? View : Pressable;
+
   return (
-    <Pressable
+    <CardWrapper
       style={[
         styles.container,
         {
@@ -137,8 +151,9 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
           padding: theme.space.cardPadding,
           borderColor: theme.border.light,
         },
+        isDetailView && styles.detailContainer,
       ]}
-      onPress={onPress}
+      {...(!isDetailView && { onPress })}
     >
       {/* Author Header */}
       <View style={styles.header}>
@@ -150,11 +165,11 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
           }}
         >
           <View style={[styles.avatar, { backgroundColor: pillarColor || theme.semantic.primary }]}>
-            {post.authorAvatarUrl ? (
-              <Image source={{ uri: post.authorAvatarUrl }} style={styles.avatarImage} />
+            {post.userPhotoUrl ? (
+              <Image source={{ uri: post.userPhotoUrl }} style={styles.avatarImage} />
             ) : (
               <Text style={[styles.avatarText, { color: theme.button.primary.text }]}>
-                {post.authorName?.charAt(0) ?? "?"}
+                {post.userName?.charAt(0) ?? "?"}
               </Text>
             )}
           </View>
@@ -167,7 +182,7 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
           }}
         >
           <Text style={[styles.authorName, { color: theme.text.primary }]}>
-            {post.authorName ?? "Unknown"}
+            {post.userName ?? "Unknown"}
           </Text>
           <Text style={[styles.timestamp, { color: theme.text.tertiary }]}>
             {formatRelativeTime(post.createdAt)}
@@ -222,24 +237,38 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
       )}
 
       {/* Location Context (only location, not time - time is shown in header) */}
-      {post.contextLocation && (
+      {post.contextLocationId && (
         <View style={styles.contextChips}>
           <View style={[styles.contextChip, { backgroundColor: `${theme.semantic.secondary}15` }]}>
             <Text style={[styles.contextChipText, { color: theme.semantic.secondary }]}>
-              📍 {post.contextLocation}
+              📍 {post.contextLocationId}
             </Text>
           </View>
         </View>
       )}
 
       {/* Post Body */}
-      {post.bodyText && (
-        <Text style={[styles.bodyText, { color: theme.text.primary }]}>{post.bodyText}</Text>
-      )}
+      {post.text && <Text style={[styles.text, { color: theme.text.primary }]}>{post.text}</Text>}
 
       {/* Media */}
       {post.mediaUrl && (
-        <Image source={{ uri: post.mediaUrl }} style={styles.media} resizeMode="cover" />
+        <Image
+          source={{ uri: post.mediaUrl }}
+          style={[
+            styles.media,
+            {
+              aspectRatio:
+                post.mediaAspectRatio === "3:2"
+                  ? 3 / 2
+                  : post.mediaAspectRatio === "2:3"
+                    ? 2 / 3
+                    : post.mediaAspectRatio === "1:1"
+                      ? 1
+                      : 16 / 9, // default fallback
+            },
+          ]}
+          resizeMode="cover"
+        />
       )}
 
       {/* Reactions Bar - Always visible */}
@@ -286,7 +315,7 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
           onPress={handleToggleComments}
         >
           <Text style={[styles.commentButtonText, { color: theme.text.secondary }]}>
-            💬 {comments.length > 0 ? comments.length : "Comment"}
+            💬{comments.length > 0 ? ` ${comments.length}` : ""}
           </Text>
         </Pressable>
       </View>
@@ -305,10 +334,10 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
                   style={[styles.commentItem, { borderBottomColor: theme.border.light }]}
                 >
                   <Text style={[styles.commentAuthor, { color: theme.text.primary }]}>
-                    {comment.authorName ?? "User"}
+                    {comment.userName ?? "User"}
                   </Text>
                   <Text style={[styles.commentBody, { color: theme.text.secondary }]}>
-                    {comment.bodyText}
+                    {comment.text}
                   </Text>
                   <Text style={[styles.commentTime, { color: theme.text.tertiary }]}>
                     {formatRelativeTime(comment.createdAt)}
@@ -362,7 +391,7 @@ export function PostCard({ post, onPress, onAuthorPress, currentUserId }: PostCa
       {post.editedAt && (
         <Text style={[styles.editedText, { color: theme.text.tertiary }]}>Edited</Text>
       )}
-    </Pressable>
+    </CardWrapper>
   );
 }
 
@@ -376,14 +405,16 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
+  detailContainer: {
+    marginBottom: 0,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: spacing.sm,
+    gap: spacing.sm,
   },
-  avatarPressable: {
-    marginRight: spacing.sm,
-  },
+  avatarPressable: {},
   avatar: {
     width: 40,
     height: 40,
@@ -467,14 +498,13 @@ const styles = StyleSheet.create({
   contextChipText: {
     fontSize: 12,
   },
-  bodyText: {
+  text: {
     fontSize: 15,
     lineHeight: 22,
     marginBottom: spacing.md,
   },
   media: {
     width: "100%",
-    height: 200,
     borderRadius: borderRadius.md,
     marginBottom: spacing.md,
   },

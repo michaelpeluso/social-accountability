@@ -2,30 +2,23 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   Pressable,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Image,
-  Alert,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { auth } from "../../src/services/auth";
 import { api } from "../../src/services/api";
 import { logger } from "../../src/lib/logger";
-import { validateDisplayName, validateBio, limits, isNearLimit } from "../../src/lib/validation";
-import { useTheme } from "../../src/theme";
-import { spacing, borderRadius } from "../../src/theme/spacing";
-import { typography } from "../../src/theme/typography";
+import { validateDisplayName, validateBio, limits } from "../../src/lib/validation";
+import { useTheme, spacing, borderRadius, typography } from "../../src/theme";
+import { PhotoPicker, FormField } from "../../src/components";
 
 const MAX_BIO_LENGTH = limits.bio.max;
 const MAX_DISPLAY_NAME_LENGTH = limits.displayName.max;
-const MAX_PHOTO_SIZE_MB = limits.photo.maxSizeBytes / (1024 * 1024);
-const MAX_PHOTO_SIZE_BYTES = limits.photo.maxSizeBytes;
 
 export default function ProfileSetup() {
   const { theme } = useTheme();
@@ -43,10 +36,6 @@ export default function ProfileSetup() {
 
   // Check if form is valid
   const isFormValid = displayNameValidation.valid && bioValidation.valid;
-
-  // Character count styles
-  const displayNameNearLimit = isNearLimit(displayName, MAX_DISPLAY_NAME_LENGTH, 10);
-  const bioNearLimit = isNearLimit(bio, MAX_BIO_LENGTH, 30);
 
   useEffect(() => {
     loadProfile();
@@ -68,50 +57,9 @@ export default function ProfileSetup() {
     }
   }
 
-  async function handlePickPhoto() {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permissionResult.granted) {
-      Alert.alert(
-        "Permission Required",
-        "Please allow access to your photo library to upload a profile photo."
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "images",
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (result.canceled) {
-      return;
-    }
-
-    const asset = result.assets[0];
-
-    if (asset.fileSize && asset.fileSize > MAX_PHOTO_SIZE_BYTES) {
-      Alert.alert("Photo Too Large", `Please select a photo smaller than ${MAX_PHOTO_SIZE_MB}MB.`);
-      return;
-    }
-
-    const extension = asset.uri.split(".").pop()?.toLowerCase();
-    if (extension && !["jpg", "jpeg", "png"].includes(extension)) {
-      Alert.alert("Invalid Format", "Please select a JPG or PNG image.");
-      return;
-    }
-
-    setPhotoUri(asset.uri);
-    logger.info("ProfileSetup: photo selected", { uri: asset.uri.slice(0, 50) });
-  }
-
   const handleSave = useCallback(async () => {
-    // Mark all fields as touched
     setTouched({ displayName: true, bio: true });
 
-    // Validate using the utility functions
     if (!displayNameValidation.valid) {
       setError(displayNameValidation.error || "Invalid display name");
       return;
@@ -170,119 +118,36 @@ export default function ProfileSetup() {
         </View>
 
         <View style={styles.form}>
-          <View style={styles.photoSection}>
-            <Pressable style={styles.photoContainer} onPress={handlePickPhoto}>
-              {photoUri ? (
-                <Image source={{ uri: photoUri }} style={styles.photo} />
-              ) : (
-                <View
-                  style={[
-                    styles.photoPlaceholder,
-                    {
-                      backgroundColor: theme.background.secondary,
-                      borderColor: theme.border.medium,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.photoPlaceholderText, { color: theme.text.tertiary }]}>
-                    +
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-            <Pressable onPress={handlePickPhoto}>
-              <Text style={[styles.photoLabel, { color: theme.semantic.primary }]}>
-                {photoUri ? "Change Photo" : "Add Photo"}
-              </Text>
-            </Pressable>
-            <Text style={[styles.photoHint, { color: theme.text.tertiary }]}>
-              Max {MAX_PHOTO_SIZE_MB}MB, JPG or PNG
-            </Text>
-          </View>
+          <PhotoPicker value={photoUri} onChange={setPhotoUri} />
 
-          <View style={styles.field}>
-            <Text style={[styles.label, { color: theme.text.primary }]}>Display Name *</Text>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  borderColor: theme.input.border,
-                  backgroundColor: theme.input.background,
-                  color: theme.text.primary,
-                },
-                touched.displayName && !displayNameValidation.valid && styles.inputError,
-              ]}
-              value={displayName}
-              onChangeText={setDisplayName}
-              onBlur={() => setTouched((t) => ({ ...t, displayName: true }))}
-              placeholder="Your name"
-              placeholderTextColor={theme.text.tertiary}
-              maxLength={MAX_DISPLAY_NAME_LENGTH}
-              autoCapitalize="words"
-              autoCorrect={false}
-            />
-            <View style={styles.fieldFooter}>
-              {touched.displayName && !displayNameValidation.valid ? (
-                <Text style={[styles.fieldError, { color: theme.semantic.danger }]}>
-                  {displayNameValidation.error}
-                </Text>
-              ) : (
-                <View />
-              )}
-              <Text
-                style={[
-                  styles.counter,
-                  { color: theme.text.tertiary },
-                  displayNameNearLimit && { color: theme.semantic.warning },
-                ]}
-              >
-                {displayName.length}/{MAX_DISPLAY_NAME_LENGTH}
-              </Text>
-            </View>
-          </View>
+          <FormField
+            label="Display Name"
+            required
+            value={displayName}
+            onChangeText={setDisplayName}
+            onBlur={() => setTouched((t) => ({ ...t, displayName: true }))}
+            placeholder="Your name"
+            maxLength={MAX_DISPLAY_NAME_LENGTH}
+            error={displayNameValidation.error}
+            touched={touched.displayName}
+            autoCapitalize="words"
+            autoCorrect={false}
+            warnThreshold={10}
+          />
 
-          <View style={styles.field}>
-            <Text style={[styles.label, { color: theme.text.primary }]}>Bio (optional)</Text>
-            <TextInput
-              style={[
-                styles.input,
-                styles.bioInput,
-                {
-                  borderColor: theme.input.border,
-                  backgroundColor: theme.input.background,
-                  color: theme.text.primary,
-                },
-                touched.bio && !bioValidation.valid && styles.inputError,
-              ]}
-              value={bio}
-              onChangeText={setBio}
-              onBlur={() => setTouched((t) => ({ ...t, bio: true }))}
-              placeholder="A few words about yourself..."
-              placeholderTextColor={theme.text.tertiary}
-              maxLength={MAX_BIO_LENGTH}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-            <View style={styles.fieldFooter}>
-              {touched.bio && !bioValidation.valid ? (
-                <Text style={[styles.fieldError, { color: theme.semantic.danger }]}>
-                  {bioValidation.error}
-                </Text>
-              ) : (
-                <View />
-              )}
-              <Text
-                style={[
-                  styles.counter,
-                  { color: theme.text.tertiary },
-                  bioNearLimit && { color: theme.semantic.warning },
-                ]}
-              >
-                {bio.length}/{MAX_BIO_LENGTH}
-              </Text>
-            </View>
-          </View>
+          <FormField
+            label="Bio (optional)"
+            value={bio}
+            onChangeText={setBio}
+            onBlur={() => setTouched((t) => ({ ...t, bio: true }))}
+            placeholder="A few words about yourself..."
+            maxLength={MAX_BIO_LENGTH}
+            error={bioValidation.error}
+            touched={touched.bio}
+            multiline
+            height={100}
+            warnThreshold={30}
+          />
 
           {error && <Text style={[styles.error, { color: theme.semantic.danger }]}>{error}</Text>}
 
@@ -336,76 +201,6 @@ const styles = StyleSheet.create({
   },
   form: {
     flex: 1,
-  },
-  photoSection: {
-    alignItems: "center",
-    marginBottom: spacing.xl,
-  },
-  photoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: borderRadius.full,
-    overflow: "hidden",
-    marginBottom: spacing.sm,
-  },
-  photo: {
-    width: "100%",
-    height: "100%",
-  },
-  photoPlaceholder: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderStyle: "dashed",
-    borderRadius: borderRadius.full,
-  },
-  photoPlaceholderText: {
-    fontSize: typography.fontSize.xxxl,
-  },
-  photoLabel: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-  },
-  photoHint: {
-    fontSize: typography.fontSize.xs,
-    marginTop: spacing.xs,
-  },
-  field: {
-    marginBottom: spacing.lg,
-  },
-  label: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    marginBottom: spacing.sm,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: borderRadius.md,
-    padding: spacing.sm,
-    fontSize: typography.fontSize.base,
-  },
-  inputError: {
-    borderColor: "#ff3b30",
-  },
-  bioInput: {
-    height: 100,
-  },
-  fieldFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: spacing.xs,
-  },
-  fieldError: {
-    fontSize: typography.fontSize.xs,
-    flex: 1,
-    marginRight: spacing.sm,
-  },
-  counter: {
-    fontSize: typography.fontSize.xs,
-    textAlign: "right",
   },
   error: {
     marginBottom: spacing.md,

@@ -9,6 +9,8 @@ export * from "./goals";
 export * from "./habits";
 export * from "./checkIns";
 export * from "./dbDebug";
+export * from "./habitParticipants";
+export * from "./goalParticipants";
 
 // M3 Social modules
 export * from "./posts";

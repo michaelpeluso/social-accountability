@@ -3,3 +3,6 @@
  */
 
 export * from "./GoalCard";
+export * from "./GoalDetailCard";
+export * from "./LinkedHabitsList";
+export * from "./ProgressSummary";

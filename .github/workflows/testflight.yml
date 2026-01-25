@@ -1,0 +1,68 @@
+# TestFlight Deployment - Solo Developer
+#
+# Manual trigger → Build on EAS Cloud → Submit to TestFlight
+# No Mac required.
+#
+# GitHub Secrets needed:
+#   EXPO_TOKEN               - expo.dev > Account > Access Tokens
+#   APPSTORE_ISSUER_ID       - App Store Connect > Keys (UUID)
+#   APPSTORE_API_KEY_ID      - App Store Connect > Keys (10 chars)
+#   APPSTORE_API_PRIVATE_KEY - Full contents of .p8 file
+
+name: 🚀 Deploy to TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: 'Release notes (optional)'
+        required: false
+        type: string
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & Submit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Quality checks
+        run: |
+          npm run type-check
+          npm run lint
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build iOS
+        run: eas build --platform ios --profile production --non-interactive --wait
+        env:
+          EXPO_APPLE_APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          EXPO_APPLE_APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          EXPO_APPLE_APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+
+      - name: Submit to TestFlight
+        run: eas submit --platform ios --profile production --non-interactive --latest
+        env:
+          EXPO_APPLE_APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          EXPO_APPLE_APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          EXPO_APPLE_APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+
+      - name: Done
+        run: |
+          echo "## ✅ Deployed to TestFlight" >> $GITHUB_STEP_SUMMARY
+          echo "Build will appear in ~15 min." >> $GITHUB_STEP_SUMMARY

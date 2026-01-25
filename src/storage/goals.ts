@@ -6,7 +6,7 @@
 import { query, queryFirst, execute } from "./database";
 import { logger } from "../lib/logger";
 import { enqueue } from "../services/sync";
-import type { Goal, Pillar, Privacy, GoalDataSource } from "../types";
+import type { Goal, GoalWithMeta, Pillar, Privacy, GoalDataSource } from "../types";
 
 /**
  * Generate a UUID for new goals (device-side for offline support)
@@ -53,6 +53,7 @@ export async function createGoal(userId: string, data: CreateGoalData): Promise<
     identityId: data.identityId,
     // Values
     isIndefinite: data.isIndefinite,
+    metricType: "COUNT", // Default metric type
     startValue: data.startValue,
     targetValue: data.targetValue,
     currentValue: data.startValue, // Initialize to start value
@@ -71,11 +72,11 @@ export async function createGoal(userId: string, data: CreateGoalData): Promise<
   await execute(
     `INSERT INTO goals (
       id, userId, title, pillar, privacy, description, identityId,
-      isIndefinite, startValue, targetValue, currentValue,
+      isIndefinite, metricType, startValue, targetValue, currentValue,
       startDate, deadline,
       dataSource, linkedHabitIds,
       isArchived, createdAt, updatedAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       goal.id,
       goal.userId,
@@ -85,6 +86,7 @@ export async function createGoal(userId: string, data: CreateGoalData): Promise<
       goal.description || null,
       goal.identityId || null,
       goal.isIndefinite ? 1 : 0,
+      goal.metricType,
       goal.startValue ?? null,
       goal.targetValue ?? null,
       goal.currentValue ?? null,
@@ -129,6 +131,74 @@ export async function getGoals(
 }
 
 /**
+ * Get all goals for a user with metadata (owned + joined)
+ * Returns owned goals first, then joined goals from friends
+ */
+export async function getGoalsWithMeta(
+  userId: string,
+  options: { includeArchived?: boolean } = {}
+): Promise<GoalWithMeta[]> {
+  const { includeArchived = false } = options;
+
+  // Get owned goals with participant count
+  let ownedSql = `
+    SELECT g.*, 
+           (SELECT COUNT(*) FROM goal_participants WHERE goalId = g.id) as participantCount
+    FROM goals g
+    WHERE g.userId = ?
+  `;
+  const ownedParams: (string | number)[] = [userId];
+
+  if (!includeArchived) {
+    ownedSql += " AND g.isArchived = 0";
+  }
+
+  ownedSql += " ORDER BY g.createdAt DESC";
+
+  const ownedRows = await query<GoalRow & { participantCount: number }>(ownedSql, ownedParams);
+  const ownedGoals: GoalWithMeta[] = ownedRows.map((row) => ({
+    ...rowToGoal(row),
+    isJoined: false,
+    participantCount: row.participantCount,
+  }));
+
+  // Get joined goals with owner info
+  const joinedSql = `
+    SELECT g.*, 
+           u.displayName as ownerName, 
+           u.photoUrl as ownerPhotoUrl,
+           gp.performancePrivacy as participantPerformancePrivacy,
+           (SELECT COUNT(*) FROM goal_participants WHERE goalId = g.id) as participantCount
+    FROM goal_participants gp
+    JOIN goals g ON gp.goalId = g.id
+    JOIN users u ON g.userId = u.id
+    WHERE gp.userId = ? AND g.isArchived = 0
+    ORDER BY gp.joinedAt DESC
+  `;
+
+  const joinedRows = await query<
+    GoalRow & {
+      ownerName: string;
+      ownerPhotoUrl: string | null;
+      participantPerformancePrivacy: string;
+      participantCount: number;
+    }
+  >(joinedSql, [userId]);
+
+  const joinedGoals: GoalWithMeta[] = joinedRows.map((row) => ({
+    ...rowToGoal(row),
+    isJoined: true,
+    ownerName: row.ownerName,
+    ownerPhotoUrl: row.ownerPhotoUrl ?? undefined,
+    participantPerformancePrivacy: row.participantPerformancePrivacy as Privacy,
+    participantCount: row.participantCount,
+  }));
+
+  // Combine and return owned first, then joined
+  return [...ownedGoals, ...joinedGoals];
+}
+
+/**
  * Get goals filtered by pillar
  */
 export async function getGoalsByPillar(userId: string, pillar: Pillar): Promise<Goal[]> {
@@ -166,7 +236,7 @@ export async function updateGoal(
     deadline?: string;
     dataSource?: GoalDataSource;
     linkedHabitIds?: string[];
-    vacationMode?: boolean;
+    isVacationMode?: boolean;
     vacationEndsAt?: string;
     isArchived?: boolean;
   }
@@ -227,9 +297,9 @@ export async function updateGoal(
     setClauses.push("linkedHabitIds = ?");
     params.push(updates.linkedHabitIds ? JSON.stringify(updates.linkedHabitIds) : null);
   }
-  if (updates.vacationMode !== undefined) {
-    setClauses.push("vacationMode = ?");
-    params.push(updates.vacationMode ? 1 : 0);
+  if (updates.isVacationMode !== undefined) {
+    setClauses.push("isVacationMode = ?");
+    params.push(updates.isVacationMode ? 1 : 0);
   }
   if (updates.vacationEndsAt !== undefined) {
     setClauses.push("vacationEndsAt = ?");
@@ -307,6 +377,8 @@ interface GoalRow {
   identityId: string | null;
   // Values
   isIndefinite: number;
+  metricType: string;
+  metricUnit: string | null;
   startValue: number | null;
   targetValue: number | null;
   currentValue: number | null;
@@ -317,7 +389,7 @@ interface GoalRow {
   dataSource: string;
   linkedHabitIds: string | null; // JSON array
   // Vacation mode
-  vacationMode: number;
+  isVacationMode: number;
   vacationEndsAt: string | null;
   // System fields
   isArchived: number;
@@ -338,6 +410,8 @@ function rowToGoal(row: GoalRow): Goal {
     identityId: row.identityId ?? undefined,
     // Values
     isIndefinite: row.isIndefinite === 1,
+    metricType: (row.metricType || "COUNT") as Goal["metricType"],
+    metricUnit: row.metricUnit ?? undefined,
     startValue: row.startValue ?? undefined,
     targetValue: row.targetValue ?? undefined,
     currentValue: row.currentValue ?? undefined,
@@ -348,7 +422,7 @@ function rowToGoal(row: GoalRow): Goal {
     dataSource: (row.dataSource || "MANUAL") as GoalDataSource,
     linkedHabitIds: row.linkedHabitIds ? JSON.parse(row.linkedHabitIds) : undefined,
     // Vacation mode
-    vacationMode: row.vacationMode === 1,
+    isVacationMode: row.isVacationMode === 1,
     vacationEndsAt: row.vacationEndsAt ?? undefined,
     // System fields
     isArchived: row.isArchived === 1,
@@ -357,4 +431,26 @@ function rowToGoal(row: GoalRow): Goal {
     updatedAt: row.updatedAt,
     syncedAt: row.syncedAt ?? undefined,
   };
+}
+
+/**
+ * Count total goals for a user (for badge tracking)
+ */
+export async function countUserGoals(userId: string): Promise<number> {
+  const result = await queryFirst<{ count: number }>(
+    "SELECT COUNT(*) as count FROM goals WHERE userId = ?",
+    [userId]
+  );
+  return result?.count ?? 0;
+}
+
+/**
+ * Count completed goals for a user (for badge tracking)
+ */
+export async function countCompletedGoals(userId: string): Promise<number> {
+  const result = await queryFirst<{ count: number }>(
+    "SELECT COUNT(*) as count FROM goals WHERE userId = ? AND completedAt IS NOT NULL",
+    [userId]
+  );
+  return result?.count ?? 0;
 }

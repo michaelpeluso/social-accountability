@@ -26,15 +26,18 @@
 # Install dependencies
 npm install
 
-# Copy environment variables
-cp .env.local .env
-# Edit .env with your values
+# Create your local secrets file (copy from template)
+cp .env.example .env
+# Edit .env and add your secrets (JWT_SECRET, SUPABASE keys, etc.)
+# Non-sensitive defaults are already in .env.local (committed)
 
 # Start Expo dev server
 npm start
 
 # On iPhone: scan QR with Expo Go app
 ```
+
+See [docs/ENV_SETUP.md](docs/ENV_SETUP.md) for full environment configuration details.
 
 ## development workflow
 

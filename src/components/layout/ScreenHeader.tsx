@@ -14,6 +14,7 @@ interface ScreenHeaderProps {
   onBack?: () => void;
   showBack?: boolean;
   backLabel?: string;
+  leftAction?: React.ReactNode;
   rightAction?: React.ReactNode;
   rightButton?: {
     label: string;
@@ -28,6 +29,7 @@ export function ScreenHeader({
   onBack,
   showBack = true,
   backLabel = "←",
+  leftAction,
   rightAction,
   rightButton,
 }: ScreenHeaderProps) {
@@ -51,7 +53,9 @@ export function ScreenHeader({
         },
       ]}
     >
-      {showBack ? (
+      {leftAction ? (
+        leftAction
+      ) : showBack ? (
         <Pressable onPress={handleBack} style={styles.backButton}>
           <Text style={[styles.backButtonText, { color: theme.semantic.primary }]}>
             {backLabel}

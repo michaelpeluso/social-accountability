@@ -8,8 +8,8 @@ export * from "./pickers";
 // Error Boundary
 export { ErrorBoundary } from "./ErrorBoundary";
 
-// Forms (future)
-// export * from "./forms";
+// Forms
+export * from "./forms";
 
 // Cards
 export * from "./cards";

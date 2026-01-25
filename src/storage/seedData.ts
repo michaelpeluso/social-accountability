@@ -53,9 +53,18 @@ export async function clearDemoData(): Promise<void> {
     demoIds
   );
   await execute(
-    `DELETE FROM posts WHERE authorUserId IN (${demoIds.map(() => "?").join(",")})`,
+    `DELETE FROM badges WHERE userId IN (${demoIds.map(() => "?").join(",")})`,
     demoIds
   );
+  await execute(
+    `DELETE FROM goal_participants WHERE userId IN (${demoIds.map(() => "?").join(",")})`,
+    demoIds
+  );
+  await execute(
+    `DELETE FROM habit_participants WHERE userId IN (${demoIds.map(() => "?").join(",")})`,
+    demoIds
+  );
+  await execute(`DELETE FROM posts WHERE userId IN (${demoIds.map(() => "?").join(",")})`, demoIds);
   await execute(
     `DELETE FROM habit_check_ins WHERE userId IN (${demoIds.map(() => "?").join(",")})`,
     demoIds
@@ -145,6 +154,7 @@ export async function seedDemoData(
         pillar: "BODY",
         description: "Complete my first 5K race",
         targetValue: 5,
+        performancePrivacy: "FRIENDS",
       },
       {
         id: genId("goal"),
@@ -153,6 +163,7 @@ export async function seedDemoData(
         pillar: "MIND",
         description: "Expand my knowledge through reading",
         targetValue: 12,
+        performancePrivacy: "FRIENDS",
       },
       {
         id: genId("goal"),
@@ -161,12 +172,22 @@ export async function seedDemoData(
         pillar: "BODY",
         description: "Train for and finish a full marathon",
         targetValue: 42.2,
+        performancePrivacy: "PUBLIC",
+      },
+      {
+        id: genId("goal"),
+        userId: DEMO_USERS.FRIEND_BOB,
+        title: "Build a meditation practice",
+        pillar: "SOUL",
+        description: "Meditate daily for 30 days",
+        targetValue: 30,
+        performancePrivacy: "FRIENDS",
       },
     ];
 
     for (const goal of goals) {
       await execute(
-        `INSERT OR REPLACE INTO goals (id, userId, title, pillar, description, targetValue, currentValue, dataSource, privacy, isArchived, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO goals (id, userId, title, pillar, description, targetValue, currentValue, dataSource, privacy, performancePrivacy, isArchived, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           goal.id,
           goal.userId,
@@ -177,6 +198,7 @@ export async function seedDemoData(
           0,
           "MANUAL",
           "FRIENDS",
+          goal.performancePrivacy,
           0,
           daysAgo(25),
           now,
@@ -195,6 +217,7 @@ export async function seedDemoData(
         description: "10 minutes of mindfulness",
         icon: "🧘",
         habitType: "BUILD",
+        performancePrivacy: "FRIENDS",
       },
       {
         id: genId("habit"),
@@ -205,6 +228,7 @@ export async function seedDemoData(
         description: "Daily reading habit",
         icon: "📚",
         habitType: "BUILD",
+        performancePrivacy: "FRIENDS",
       },
       {
         id: genId("habit"),
@@ -215,6 +239,7 @@ export async function seedDemoData(
         description: "Strength training",
         icon: "💪",
         habitType: "BUILD",
+        performancePrivacy: "PUBLIC",
       },
       {
         id: genId("habit"),
@@ -224,6 +249,7 @@ export async function seedDemoData(
         description: "Better sleep hygiene",
         icon: "📱",
         habitType: "BREAK",
+        performancePrivacy: "SELF",
       },
       {
         id: genId("habit"),
@@ -234,26 +260,29 @@ export async function seedDemoData(
         description: "5K training runs",
         icon: "🏃‍♀️",
         habitType: "BUILD",
+        performancePrivacy: "PUBLIC",
       },
       {
         id: genId("habit"),
         userId: DEMO_USERS.FRIEND_BOB,
+        goalId: goals[3].id,
         title: "Gratitude Journal",
         pillar: "SOUL",
         description: "Write 3 things I'm grateful for",
         icon: "📝",
         habitType: "BUILD",
+        performancePrivacy: "FRIENDS",
       },
     ];
 
     for (const habit of habits) {
-      const schedule = JSON.stringify({ frequency: "DAILY", targetCount: 1 });
+      const schedule = JSON.stringify({ frequency: "daily", targetCount: 1 });
       await execute(
         `INSERT OR REPLACE INTO habits (
           id, userId, goalId, title, pillar, description, icon, habitType, completionType,
-          schedule, privacy, isArchived, currentStreak, longestStreak, recoveryStreak, graceDays,
+          schedule, privacy, performancePrivacy, isArchived, currentStreak, longestStreak, recoveryStreak, graceDays,
           createdAt, updatedAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           habit.id,
           habit.userId,
@@ -266,6 +295,7 @@ export async function seedDemoData(
           "BINARY",
           schedule,
           "PUBLIC",
+          habit.performancePrivacy,
           0,
           0,
           0,
@@ -275,6 +305,23 @@ export async function seedDemoData(
           now,
         ]
       );
+    }
+
+    // 4b. Update goals with linkedHabitIds (reverse mapping from habits)
+    const goalToHabits: Record<string, string[]> = {};
+    for (const habit of habits) {
+      if (habit.goalId) {
+        if (!goalToHabits[habit.goalId]) {
+          goalToHabits[habit.goalId] = [];
+        }
+        goalToHabits[habit.goalId].push(habit.id);
+      }
+    }
+    for (const [goalId, habitIds] of Object.entries(goalToHabits)) {
+      await execute(`UPDATE goals SET linkedHabitIds = ? WHERE id = ?`, [
+        JSON.stringify(habitIds),
+        goalId,
+      ]);
     }
 
     // 5. Check-ins (create realistic patterns)
@@ -377,7 +424,7 @@ export async function seedDemoData(
 
     for (const post of posts) {
       await execute(
-        `INSERT OR REPLACE INTO posts (id, authorUserId, bodyText, pillar, privacy, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO posts (id, userId, text, pillar, privacy, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           post.id,
           post.userId,
@@ -410,7 +457,7 @@ export async function seedDemoData(
 
     // 8. Comments (on posts)
     await execute(
-      `INSERT OR REPLACE INTO comments (id, postId, authorUserId, bodyText, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO comments (id, postId, userId, text, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
       [
         genId("comment"),
         posts[0].id,
@@ -421,7 +468,7 @@ export async function seedDemoData(
       ]
     );
     await execute(
-      `INSERT OR REPLACE INTO comments (id, postId, authorUserId, bodyText, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO comments (id, postId, userId, text, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
       [genId("comment"), posts[2].id, mainUserId, "Amazing progress Alice! 🏃‍♀️", daysAgo(1), now]
     );
 
@@ -437,7 +484,7 @@ export async function seedDemoData(
 
     // 10. Notifications (using new emoji set, for main user)
     await execute(
-      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, data, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, text, data, isRead, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         genId("notif"),
         mainUserId,
@@ -450,7 +497,7 @@ export async function seedDemoData(
       ]
     );
     await execute(
-      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, data, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, text, data, isRead, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         genId("notif"),
         mainUserId,
@@ -463,19 +510,20 @@ export async function seedDemoData(
       ]
     );
     await execute(
-      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, text, data, isRead, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         genId("notif"),
         mainUserId,
         "FRIEND_REQUEST",
         "New friend request",
         "Carol wants to be friends",
+        null,
         0,
         daysAgo(1),
       ]
     );
     await execute(
-      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, data, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, text, data, isRead, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         genId("notif"),
         mainUserId,
@@ -488,7 +536,7 @@ export async function seedDemoData(
       ]
     );
     await execute(
-      `INSERT OR REPLACE INTO notifications (id, userId, type, title, body, data, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO notifications (id, userId, type, title, text, data, isRead, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         genId("notif"),
         mainUserId,
@@ -501,12 +549,160 @@ export async function seedDemoData(
       ]
     );
 
+    // 11. Badges (for main user and friends)
+    const badges = [
+      // Main user badges - tiered streak badges
+      {
+        id: genId("badge"),
+        userId: mainUserId,
+        badgeName: "streak-bronze",
+        habitId: meditationHabit.id,
+        pillar: "SOUL",
+        tier: "bronze",
+        earnedAt: daysAgo(3),
+      },
+      {
+        id: genId("badge"),
+        userId: mainUserId,
+        badgeName: "habits-bronze",
+        pillar: null,
+        tier: "bronze",
+        earnedAt: daysAgo(10),
+      },
+      {
+        id: genId("badge"),
+        userId: mainUserId,
+        badgeName: "check-ins-bronze",
+        pillar: null,
+        tier: "bronze",
+        earnedAt: daysAgo(5),
+      },
+      // Alice has more badges
+      {
+        id: genId("badge"),
+        userId: DEMO_USERS.FRIEND_ALICE,
+        badgeName: "streak-bronze",
+        habitId: aliceRunHabit.id,
+        pillar: "BODY",
+        tier: "bronze",
+        earnedAt: daysAgo(7),
+      },
+      {
+        id: genId("badge"),
+        userId: DEMO_USERS.FRIEND_ALICE,
+        badgeName: "streak-silver",
+        habitId: aliceRunHabit.id,
+        pillar: "BODY",
+        tier: "silver",
+        earnedAt: daysAgo(1),
+      },
+      {
+        id: genId("badge"),
+        userId: DEMO_USERS.FRIEND_ALICE,
+        badgeName: "posts-bronze",
+        pillar: null,
+        tier: "bronze",
+        earnedAt: daysAgo(5),
+      },
+      // Bob has a badge
+      {
+        id: genId("badge"),
+        userId: DEMO_USERS.FRIEND_BOB,
+        badgeName: "social-bronze",
+        pillar: null,
+        tier: "bronze",
+        earnedAt: daysAgo(4),
+      },
+    ];
+
+    for (const badge of badges) {
+      await execute(
+        `INSERT OR REPLACE INTO badges (id, userId, badgeName, habitId, pillar, tier, earnedAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          badge.id,
+          badge.userId,
+          badge.badgeName,
+          badge.habitId || null,
+          badge.pillar,
+          badge.tier,
+          badge.earnedAt,
+        ]
+      );
+    }
+
+    // 12. Posts with habits (showing habit progress)
+    const postsWithHabits = [
+      {
+        id: genId("post"),
+        userId: mainUserId,
+        habitId: meditationHabit.id,
+        text: "🧘 Just completed my morning meditation. 10 days in a row! This habit is changing my life.",
+        privacy: "FRIENDS",
+        pillar: "SOUL",
+      },
+      {
+        id: genId("post"),
+        userId: DEMO_USERS.FRIEND_ALICE,
+        habitId: aliceRunHabit.id,
+        text: "🏃‍♀️ 5K done! Getting faster every week. Marathon here I come!",
+        privacy: "PUBLIC",
+        pillar: "BODY",
+      },
+    ];
+
+    for (const post of postsWithHabits) {
+      await execute(
+        `INSERT OR REPLACE INTO posts (id, userId, habitId, text, pillar, privacy, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          post.id,
+          post.userId,
+          post.habitId,
+          post.text,
+          post.pillar,
+          post.privacy,
+          daysAgo(Math.floor(Math.random() * 2)),
+          now,
+        ]
+      );
+    }
+
+    // Add reactions to habit-linked posts
+    await execute(
+      `INSERT OR REPLACE INTO reactions (id, postId, userId, emoji, createdAt) VALUES (?, ?, ?, ?, ?)`,
+      [genId("react"), postsWithHabits[0].id, DEMO_USERS.FRIEND_ALICE, "🔥", now]
+    );
+    await execute(
+      `INSERT OR REPLACE INTO reactions (id, postId, userId, emoji, createdAt) VALUES (?, ?, ?, ?, ?)`,
+      [genId("react"), postsWithHabits[1].id, mainUserId, "👏", now]
+    );
+
+    // 13. Habit participants (Alice joins Bob's habit, Bob joins main user's meditation)
+    await execute(
+      `INSERT OR REPLACE INTO habit_participants (id, habitId, userId, role, performancePrivacy, joinedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+      [genId("hp"), habits[5].id, DEMO_USERS.FRIEND_ALICE, "MEMBER", "FRIENDS", daysAgo(5)]
+    );
+    await execute(
+      `INSERT OR REPLACE INTO habit_participants (id, habitId, userId, role, performancePrivacy, joinedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+      [genId("hp"), habits[0].id, DEMO_USERS.FRIEND_BOB, "MEMBER", "PUBLIC", daysAgo(7)]
+    );
+
+    // 14. Goal participants (Bob joins main user's 5K goal, main user joins Alice's marathon goal)
+    // When joining a goal, linked habits are automatically joined
+    await execute(
+      `INSERT OR REPLACE INTO goal_participants (id, goalId, userId, role, performancePrivacy, joinedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+      [genId("gp"), goals[0].id, DEMO_USERS.FRIEND_BOB, "MEMBER", "FRIENDS", daysAgo(8)]
+    );
+    await execute(
+      `INSERT OR REPLACE INTO goal_participants (id, goalId, userId, role, performancePrivacy, joinedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+      [genId("gp"), goals[2].id, mainUserId, "MEMBER", "PUBLIC", daysAgo(6)]
+    );
+
     logger.info("Demo data seeded successfully", { mainUserId, isCurrentUser });
     return {
       success: true,
       message: isCurrentUser
-        ? `Demo data created for your account: 2 goals, 4 habits, 40+ check-ins, 2 posts, 2 friends, 2 nudges, 2 comments`
-        : "Demo data created: 4 users, 3 goals, 6 habits, 40+ check-ins, 4 posts, 4 reactions, 2 nudges, 2 comments",
+        ? `Demo data created for your account: 2 goals, 4 habits, 40+ check-ins, 4 posts, 2 friends, 2 nudges, 2 comments, 3 badges, 2 joined habits, 1 joined goal`
+        : "Demo data created: 4 users, 4 goals, 6 habits, 40+ check-ins, 6 posts, 6 reactions, 2 nudges, 2 comments, 7 badges, 2 habit participants, 2 goal participants",
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

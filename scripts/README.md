@@ -164,6 +164,46 @@ npm run dev
 
 ---
 
+## EAS Build Scripts (2 total)
+
+### `eas-setup-secrets.sh`
+
+**Command:** `bash scripts/eas-setup-secrets.sh`
+
+One-time setup to configure EAS environment secrets:
+
+- Reads from local `.env` file
+- Creates secrets in all EAS environments (development, preview, production)
+- Sets visibility levels (plaintext, sensitive, secret)
+
+Run this once before your first build.
+
+### `eas-build.sh [profile] [platform]`
+
+**Command:** `bash scripts/eas-build.sh development ios`
+
+Triggers cloud builds on EAS (no Mac required!):
+
+- `profile`: development | preview | production
+- `platform`: ios | android | all
+
+Examples:
+
+```bash
+# Development build for testing
+./scripts/eas-build.sh development ios
+
+# Preview build for beta testers
+./scripts/eas-build.sh preview ios
+
+# Production build for App Store
+./scripts/eas-build.sh production ios
+```
+
+See [docs/MAC_VISIT_CHECKLIST.md](../docs/MAC_VISIT_CHECKLIST.md) for iOS build setup guide.
+
+---
+
 ## Design Philosophy
 
 **Principles:**

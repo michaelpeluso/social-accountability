@@ -1,6 +1,25 @@
 /**
  * SQLite Database - Local Source of Truth
  * Device-first architecture: all writes go here first, then sync to cloud
+ *
+ * NAMING CONVENTIONS (enforced across all tables):
+ * - Boolean fields: `is` prefix (isPreset, isArchived, isRead, isCloseFriend)
+ * - Timestamps: `At` suffix (createdAt, updatedAt, syncedAt, deletedAt, earnedAt)
+ * - User references: `userId` only (JOIN with users table for name/photo)
+ * - Foreign keys: simple `{table}Id` pattern (habitId, goalId, postId)
+ * - Text content: `text` (short), `description` (long), `note` (annotations)
+ * - JSON arrays: stored as TEXT, parsed in application layer
+ * - Enums: stored as TEXT, validated in application layer
+ *
+ * NORMALIZATION: 3NF (Third Normal Form)
+ * - No repeating groups (1NF)
+ * - No partial dependencies (2NF)
+ * - No transitive dependencies (3NF)
+ * - User data not denormalized on content tables (JOIN for name/photo)
+ *
+ * SCHEMA VERSION HISTORY:
+ * - v1: Initial consolidated schema supporting M0-M8+ milestones
+ * - v2: Normalized user references, consolidated tags, updated reactions
  */
 
 import * as SQLite from "expo-sqlite";
@@ -8,7 +27,7 @@ import type { SQLiteBindValue, SQLiteRunResult } from "expo-sqlite";
 import { logger } from "../lib/logger";
 
 const DB_NAME = "social_accountability.db";
-const CURRENT_VERSION = 9;
+const SCHEMA_VERSION = 6;
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -20,12 +39,26 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 
   try {
     db = await SQLite.openDatabaseAsync(DB_NAME);
-    await runMigrations(db);
 
-    // Validate schema after migrations
-    await validateCriticalColumns(db);
+    // Check current version and run migrations if needed
+    const currentVersion = await getCurrentSchemaVersion(db);
 
-    logger.info("Database initialized", { name: DB_NAME, version: CURRENT_VERSION });
+    if (currentVersion === 0) {
+      // Fresh install - initialize schema
+      await initializeSchema(db);
+      await setSchemaVersion(db, SCHEMA_VERSION);
+    } else if (currentVersion < SCHEMA_VERSION) {
+      // Existing database - run migrations
+      await migrateSchema(db, currentVersion);
+      await setSchemaVersion(db, SCHEMA_VERSION);
+    }
+    // If currentVersion === SCHEMA_VERSION, schema is up to date
+
+    logger.info("Database initialized", {
+      name: DB_NAME,
+      version: SCHEMA_VERSION,
+      previousVersion: currentVersion,
+    });
     return db;
   } catch (error) {
     logger.error("Database initialization failed", { error });
@@ -45,141 +78,121 @@ export async function closeDatabase(): Promise<void> {
 }
 
 /**
- * Run database migrations
+ * Get database info (for dev tools)
  */
-async function runMigrations(database: SQLite.SQLiteDatabase): Promise<void> {
-  // Create migrations table if it doesn't exist
-  await database.execAsync(`
-    CREATE TABLE IF NOT EXISTS migrations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      version INTEGER NOT NULL UNIQUE,
-      appliedAt TEXT NOT NULL
-    );
-  `);
+export async function getDatabaseInfo(): Promise<{
+  version: number;
+  tables: string[];
+  size: number;
+  tableCounts: Record<string, number>;
+  totalRows: number;
+}> {
+  const database = await getDatabase();
 
-  // Get current version
-  const result = await database.getFirstAsync<{ version: number }>(
-    "SELECT MAX(version) as version FROM migrations"
+  const version = await getCurrentSchemaVersion(database);
+
+  const tablesResult = await database.getAllAsync<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
   );
-  const currentVersion = result?.version || 0;
+  const tables = tablesResult.map((row) => row.name);
 
-  // Run pending migrations
-  for (let version = currentVersion + 1; version <= CURRENT_VERSION; version++) {
-    await applyMigration(database, version);
-  }
-}
+  // Get size using correct PRAGMA syntax
+  const pageCountResult = await database.getFirstAsync<{ page_count: number }>("PRAGMA page_count");
+  const pageSizeResult = await database.getFirstAsync<{ page_size: number }>("PRAGMA page_size");
+  const size = (pageCountResult?.page_count ?? 0) * (pageSizeResult?.page_size ?? 0);
 
-/**
- * Apply a specific migration version
- */
-async function applyMigration(database: SQLite.SQLiteDatabase, version: number): Promise<void> {
-  logger.info("Applying migration", { version });
+  // Get row counts for each table
+  const tableCounts: Record<string, number> = {};
+  let totalRows = 0;
 
-  try {
-    switch (version) {
-      case 1:
-        await migrationV1(database);
-        break;
-      case 2:
-        await migrationV2(database);
-        break;
-      case 3:
-        await migrationV3(database);
-        break;
-      case 4:
-        await migrationV4(database);
-        break;
-      case 5:
-        await migrationV5(database);
-        break;
-      case 6:
-        await migrationV6(database);
-        break;
-      case 7:
-        await migrationV7(database);
-        break;
-      case 8:
-        await migrationV8(database);
-        break;
-      case 9:
-        await migrationV9(database);
-        break;
-      default:
-        throw new Error(`Unknown migration version: ${version}`);
-    }
-
-    // Record migration
-    await database.runAsync("INSERT INTO migrations (version, appliedAt) VALUES (?, ?)", [
-      version,
-      new Date().toISOString(),
-    ]);
-
-    logger.info("Migration applied", { version });
-  } catch (error) {
-    logger.error("Migration failed", { version, error });
-    throw error;
-  }
-}
-
-/**
- * Validate critical columns exist after migrations
- * If validation fails, log detailed error to help debug
- */
-async function validateCriticalColumns(database: SQLite.SQLiteDatabase): Promise<void> {
-  try {
-    // Check habit_check_ins table (only if it exists)
-    const checkInsInfo = await database.getAllAsync<{ name: string }>(
-      "PRAGMA table_info(habit_check_ins)"
-    );
-
-    // If table doesn't exist yet, skip validation (migrations will create it)
-    if (checkInsInfo.length === 0) {
-      logger.info("habit_check_ins table not yet created, skipping validation");
-      return;
-    }
-
-    const checkInsColumns = checkInsInfo.map((col) => col.name);
-
-    const missingColumns: string[] = [];
-
-    if (!checkInsColumns.includes("habitId")) {
-      missingColumns.push("habit_check_ins.habitId");
-    }
-    if (!checkInsColumns.includes("userId")) {
-      missingColumns.push("habit_check_ins.userId");
-    }
-
-    if (missingColumns.length > 0) {
-      logger.error("Database schema validation failed - missing columns", {
-        missingColumns,
-        actualColumns: checkInsColumns,
-        table: "habit_check_ins",
-      });
-
-      throw new Error(
-        `Database schema corrupted. Missing columns: ${missingColumns.join(", ")}. ` +
-          `Please delete and reinstall the app to fix.`
+  for (const table of tables) {
+    try {
+      const countResult = await database.getFirstAsync<{ count: number }>(
+        `SELECT COUNT(*) as count FROM ${table}`
       );
+      const count = countResult?.count ?? 0;
+      tableCounts[table] = count;
+      totalRows += count;
+    } catch (error) {
+      tableCounts[table] = 0;
     }
+  }
 
-    logger.info("Database schema validation passed", {
-      checkInsColumns,
-    });
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("Missing columns")) {
-      throw error; // Re-throw our validation error
-    }
-    logger.error("Schema validation check failed", { error });
-    // Don't throw on validation errors - let app continue
+  return { version, tables, size, tableCounts, totalRows };
+}
+
+/**
+ * Reset database (for dev tools - DESTRUCTIVE)
+ * Drops all tables and reinitializes schema
+ */
+export async function resetDatabase(): Promise<void> {
+  logger.warn("Resetting database - all data will be lost");
+
+  const database = await getDatabase();
+
+  // Get all tables
+  const tables = await database.getAllAsync<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+  );
+
+  // Drop all tables
+  for (const table of tables) {
+    await database.execAsync(`DROP TABLE IF EXISTS ${table.name}`);
+  }
+
+  // Reset version to 0
+  await database.execAsync("PRAGMA user_version = 0");
+
+  logger.info("All tables dropped, reinitializing schema");
+
+  // Reinitialize schema
+  await initializeSchema(database);
+  await setSchemaVersion(database, SCHEMA_VERSION);
+
+  logger.info("Database reset complete", { version: SCHEMA_VERSION });
+}
+
+/**
+ * Get current schema version from database
+ */
+async function getCurrentSchemaVersion(database: SQLite.SQLiteDatabase): Promise<number> {
+  try {
+    const result = await database.getFirstAsync<{ user_version: number }>("PRAGMA user_version");
+    return result?.user_version ?? 0;
+  } catch {
+    return 0;
   }
 }
 
 /**
- * Migration V1: Initial schema for M1
- * Users, friendships, sync queue, and settings
+ * Set schema version in database
  */
-async function migrationV1(database: SQLite.SQLiteDatabase): Promise<void> {
+async function setSchemaVersion(database: SQLite.SQLiteDatabase, version: number): Promise<void> {
+  await database.execAsync(`PRAGMA user_version = ${version}`);
+}
+
+/**
+ * Run schema migrations from old version to current
+ * NOTE: Pre-alpha - use Reset Database button instead of migrations
+ */
+async function migrateSchema(_database: SQLite.SQLiteDatabase, fromVersion: number): Promise<void> {
+  logger.warn("Schema migration skipped - pre-alpha mode", {
+    fromVersion,
+    toVersion: SCHEMA_VERSION,
+    message: "Use Reset Database button in dev tools to apply schema changes",
+  });
+}
+
+/**
+ * Initialize database schema - Complete M0-M8+ schema
+ * Single clean schema - no incremental migrations
+ */
+async function initializeSchema(database: SQLite.SQLiteDatabase): Promise<void> {
   await database.execAsync(`
+    -- ============================================
+    -- USERS & AUTHENTICATION (M0-M1)
+    -- ============================================
+    
     -- Users table (local cache of user data)
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -189,6 +202,8 @@ async function migrationV1(database: SQLite.SQLiteDatabase): Promise<void> {
       photoUrl TEXT,
       bio TEXT,
       defaultPrivacy TEXT NOT NULL DEFAULT 'SELF',
+      isVacationMode INTEGER NOT NULL DEFAULT 0,
+      vacationEndsAt TEXT,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
       deletedAt TEXT,
@@ -200,9 +215,14 @@ async function migrationV1(database: SQLite.SQLiteDatabase): Promise<void> {
       id INTEGER PRIMARY KEY CHECK (id = 1),
       userId TEXT NOT NULL,
       token TEXT NOT NULL,
-      expiresAt INTEGER NOT NULL,
-      createdAt TEXT NOT NULL
+      expiresAt TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY (userId) REFERENCES users(id)
     );
+
+    -- ============================================
+    -- SOCIAL RELATIONSHIPS (M1, M4, M8)
+    -- ============================================
 
     -- Friendships table
     CREATE TABLE IF NOT EXISTS friendships (
@@ -210,20 +230,14 @@ async function migrationV1(database: SQLite.SQLiteDatabase): Promise<void> {
       userId TEXT NOT NULL,
       friendId TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'PENDING',
+      isCloseFriend INTEGER NOT NULL DEFAULT 0,
+      acceptedAt TEXT,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
       syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id),
+      FOREIGN KEY (friendId) REFERENCES users(id),
       UNIQUE(userId, friendId)
-    );
-
-    -- Friend requests (pending)
-    CREATE TABLE IF NOT EXISTS friend_requests (
-      id TEXT PRIMARY KEY,
-      fromUserId TEXT NOT NULL,
-      toUserId TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'PENDING',
-      createdAt TEXT NOT NULL,
-      syncedAt TEXT
     );
 
     -- Blocked users
@@ -233,7 +247,549 @@ async function migrationV1(database: SQLite.SQLiteDatabase): Promise<void> {
       blockedUserId TEXT NOT NULL,
       createdAt TEXT NOT NULL,
       syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id),
+      FOREIGN KEY (blockedUserId) REFERENCES users(id),
       UNIQUE(userId, blockedUserId)
+    );
+
+    -- Circles (M8: Private groups)
+    CREATE TABLE IF NOT EXISTS circles (
+      id TEXT PRIMARY KEY,
+      ownerUserId TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      privacy TEXT NOT NULL DEFAULT 'INVITE_ONLY',
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      archivedAt TEXT,
+      syncedAt TEXT,
+      FOREIGN KEY (ownerUserId) REFERENCES users(id)
+    );
+
+    -- Circle members
+    CREATE TABLE IF NOT EXISTS circle_members (
+      id TEXT PRIMARY KEY,
+      circleId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'MEMBER',
+      joinedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (circleId) REFERENCES circles(id),
+      FOREIGN KEY (userId) REFERENCES users(id),
+      UNIQUE(circleId, userId)
+    );
+
+    -- Circle messages
+    CREATE TABLE IF NOT EXISTS circle_messages (
+      id TEXT PRIMARY KEY,
+      circleId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      text TEXT NOT NULL,
+      mediaUrl TEXT,
+      mediaType TEXT,
+      createdAt TEXT NOT NULL,
+      deletedAt TEXT,
+      syncedAt TEXT,
+      FOREIGN KEY (circleId) REFERENCES circles(id),
+      FOREIGN KEY (userId) REFERENCES users(id)
+    );
+
+    -- ============================================
+    -- IDENTITIES & GOALS (M2, M4)
+    -- ============================================
+
+    -- Identities table (M4)
+    CREATE TABLE IF NOT EXISTS identities (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      name TEXT NOT NULL,
+      pillar TEXT NOT NULL,
+      icon TEXT NOT NULL,
+      isPreset INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id)
+    );
+
+    -- Goals table
+    CREATE TABLE IF NOT EXISTS goals (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      identityId TEXT,
+      title TEXT NOT NULL,
+      description TEXT,
+      pillar TEXT NOT NULL,
+      privacy TEXT NOT NULL DEFAULT 'SELF',
+      performancePrivacy TEXT DEFAULT 'FRIENDS',
+      isIndefinite INTEGER NOT NULL DEFAULT 0,
+      metricType TEXT NOT NULL DEFAULT 'COUNT',
+      metricUnit TEXT,
+      startValue REAL,
+      targetValue REAL,
+      currentValue REAL,
+      startDate TEXT,
+      deadline TEXT,
+      dataSource TEXT NOT NULL DEFAULT 'MANUAL',
+      linkedHabitIds TEXT,
+      isVacationMode INTEGER NOT NULL DEFAULT 0,
+      vacationEndsAt TEXT,
+      completedAt TEXT,
+      isArchived INTEGER NOT NULL DEFAULT 0,
+      archivedAt TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id),
+      FOREIGN KEY (identityId) REFERENCES identities(id)
+    );
+
+    -- Goal participants (for goal joining feature, M5)
+    CREATE TABLE IF NOT EXISTS goal_participants (
+      id TEXT PRIMARY KEY,
+      goalId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'MEMBER',
+      performancePrivacy TEXT NOT NULL DEFAULT 'FRIENDS',
+      joinedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (goalId) REFERENCES goals(id),
+      FOREIGN KEY (userId) REFERENCES users(id),
+      UNIQUE(goalId, userId)
+    );
+
+    -- ============================================
+    -- HABITS & CHECK-INS (M2, M4, M5)
+    -- ============================================
+
+    -- Habits table
+    CREATE TABLE IF NOT EXISTS habits (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      goalId TEXT,
+      identityId TEXT,
+      parentHabitId TEXT,
+      stackAfterHabitId TEXT,
+      title TEXT NOT NULL,
+      description TEXT,
+      pillar TEXT NOT NULL,
+      habitType TEXT NOT NULL DEFAULT 'BUILD',
+      completionType TEXT NOT NULL DEFAULT 'BINARY',
+      targetValue REAL,
+      unit TEXT,
+      icon TEXT,
+      tags TEXT,
+      schedule TEXT NOT NULL,
+      timezone TEXT,
+      difficulty INTEGER,
+      miniVersion TEXT,
+      graceDays INTEGER NOT NULL DEFAULT 0,
+      privacy TEXT NOT NULL DEFAULT 'SELF',
+      performancePrivacy TEXT DEFAULT 'FRIENDS',
+      isArchived INTEGER NOT NULL DEFAULT 0,
+      archivedAt TEXT,
+      currentStreak INTEGER NOT NULL DEFAULT 0,
+      longestStreak INTEGER NOT NULL DEFAULT 0,
+      lastCheckInAt TEXT,
+      lastMissedAt TEXT,
+      recoveryStreak INTEGER NOT NULL DEFAULT 0,
+      bestTimeHour INTEGER,
+      bestTimeConfidence REAL,
+      environmentalCue TEXT,
+      progressiveOverload TEXT,
+      progressiveOverloadStart REAL,
+      progressiveOverloadPrevious REAL,
+      progressiveOverloadLastAppliedAt TEXT,
+      isReminderEnabled INTEGER NOT NULL DEFAULT 0,
+      reminderTimes TEXT,
+      reminderText TEXT,
+      reflectionPrompt TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id),
+      FOREIGN KEY (goalId) REFERENCES goals(id),
+      FOREIGN KEY (identityId) REFERENCES identities(id),
+      FOREIGN KEY (parentHabitId) REFERENCES habits(id),
+      FOREIGN KEY (stackAfterHabitId) REFERENCES habits(id)
+    );
+
+    -- Habit check-ins table
+    CREATE TABLE IF NOT EXISTS habit_check_ins (
+      id TEXT PRIMARY KEY,
+      habitId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      occurredAt TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'MANUAL',
+      success INTEGER NOT NULL DEFAULT 1,
+      value REAL,
+      evidenceUrl TEXT,
+      note TEXT,
+      intensity INTEGER,
+      outcome TEXT,
+      moodBefore INTEGER,
+      moodAfter INTEGER,
+      createdAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (habitId) REFERENCES habits(id),
+      FOREIGN KEY (userId) REFERENCES users(id)
+    );
+
+    -- Habit participants (for habit joining feature, M5)
+    CREATE TABLE IF NOT EXISTS habit_participants (
+      id TEXT PRIMARY KEY,
+      habitId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'MEMBER',
+      performancePrivacy TEXT NOT NULL DEFAULT 'FRIENDS',
+      joinedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (habitId) REFERENCES habits(id),
+      FOREIGN KEY (userId) REFERENCES users(id),
+      UNIQUE(habitId, userId)
+    );
+
+    -- Habit stacks (M5: habit chaining)
+    CREATE TABLE IF NOT EXISTS habit_stacks (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      name TEXT NOT NULL,
+      habitIds TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id)
+    );
+
+    -- Habit triggers (M5: contextual triggers)
+    CREATE TABLE IF NOT EXISTS habit_triggers (
+      id TEXT PRIMARY KEY,
+      habitId TEXT NOT NULL,
+      triggerType TEXT NOT NULL,
+      locationId TEXT,
+      timeRange TEXT,
+      eventType TEXT,
+      createdAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (habitId) REFERENCES habits(id)
+    );
+
+    -- Saved locations (M5: location-based triggers)
+    CREATE TABLE IF NOT EXISTS saved_locations (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      latitude REAL NOT NULL,
+      longitude REAL NOT NULL,
+      radiusMeters REAL NOT NULL DEFAULT 100,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id)
+    );
+
+    -- ============================================
+    -- JOURNAL & MOOD (M4)
+    -- ============================================
+
+    -- Journal entries
+    CREATE TABLE IF NOT EXISTS journal_entries (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      text TEXT NOT NULL,
+      pillar TEXT,
+      privacy TEXT NOT NULL DEFAULT 'SELF',
+      tags TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id)
+    );
+
+    -- Mood entries (quick mood logging with optional micro-emotion)
+    CREATE TABLE IF NOT EXISTS mood_entries (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      mood INTEGER NOT NULL,
+      emotion TEXT,
+      note TEXT,
+      createdAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id)
+    );
+
+    -- ============================================
+    -- INTEGRATIONS & AUTO-LOGGING (M5+)
+    -- ============================================
+
+    -- Connected integrations
+    CREATE TABLE IF NOT EXISTS integrations (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      accessToken TEXT,
+      refreshToken TEXT,
+      expiresAt TEXT,
+      scopes TEXT,
+      isEnabled INTEGER NOT NULL DEFAULT 1,
+      lastSyncAt TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id),
+      UNIQUE(userId, provider)
+    );
+
+    -- Auto-logged data from integrations (supports multiple value types)
+    CREATE TABLE IF NOT EXISTS auto_logs (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      integrationId TEXT NOT NULL,
+      metricType TEXT NOT NULL,
+      valueType TEXT NOT NULL DEFAULT 'NUMBER',
+      valueNumber REAL,
+      valueBoolean INTEGER,
+      valueTimestamp TEXT,
+      unit TEXT,
+      occurredAt TEXT NOT NULL,
+      rawData TEXT,
+      createdAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id),
+      FOREIGN KEY (integrationId) REFERENCES integrations(id)
+    );
+
+    -- ============================================
+    -- BEHAVIORAL DRIFT & ANALYTICS (M6)
+    -- ============================================
+
+    -- Behavioral drift detection
+    CREATE TABLE IF NOT EXISTS behavioral_drift (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      habitId TEXT,
+      pillar TEXT,
+      driftType TEXT NOT NULL,
+      severity TEXT NOT NULL DEFAULT 'LOW',
+      detectedAt TEXT NOT NULL,
+      resolvedAt TEXT,
+      supportRequestedAt TEXT,
+      metadata TEXT,
+      createdAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id),
+      FOREIGN KEY (habitId) REFERENCES habits(id)
+    );
+
+    -- ============================================
+    -- CHALLENGES (M4+)
+    -- ============================================
+
+    -- User challenges (supports multiple habits/goals)
+    CREATE TABLE IF NOT EXISTS challenges (
+      id TEXT PRIMARY KEY,
+      creatorUserId TEXT,
+      title TEXT NOT NULL,
+      description TEXT,
+      pillar TEXT,
+      habitIds TEXT,
+      goalIds TEXT,
+      startDate TEXT NOT NULL,
+      endDate TEXT NOT NULL,
+      privacy TEXT NOT NULL DEFAULT 'FRIENDS',
+      isArchived INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (creatorUserId) REFERENCES users(id)
+    );
+
+    -- Challenge participants
+    CREATE TABLE IF NOT EXISTS challenge_participants (
+      id TEXT PRIMARY KEY,
+      challengeId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'ACTIVE',
+      score REAL NOT NULL DEFAULT 0,
+      progress REAL NOT NULL DEFAULT 0,
+      joinedAt TEXT NOT NULL,
+      completedAt TEXT,
+      syncedAt TEXT,
+      FOREIGN KEY (challengeId) REFERENCES challenges(id),
+      FOREIGN KEY (userId) REFERENCES users(id),
+      UNIQUE(challengeId, userId)
+    );
+
+    -- ============================================
+    -- SOCIAL CONTENT (M3)
+    -- ============================================
+
+    -- Posts table (JOIN with users for userName/userPhotoUrl)
+    CREATE TABLE IF NOT EXISTS posts (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      circleId TEXT,
+      pillar TEXT NOT NULL,
+      privacy TEXT NOT NULL DEFAULT 'FRIENDS',
+      text TEXT,
+      mediaUrl TEXT,
+      mediaType TEXT,
+      mediaAspectRatio TEXT,
+      postTypeTags TEXT,
+      customTags TEXT,
+      checkInId TEXT,
+      habitId TEXT,
+      goalId TEXT,
+      linkedObjectId TEXT,
+      linkedObjectType TEXT,
+      contextTimeOfDay TEXT,
+      contextLocationId TEXT,
+      editedAt TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id),
+      FOREIGN KEY (circleId) REFERENCES circles(id),
+      FOREIGN KEY (checkInId) REFERENCES habit_check_ins(id),
+      FOREIGN KEY (habitId) REFERENCES habits(id),
+      FOREIGN KEY (goalId) REFERENCES goals(id),
+      FOREIGN KEY (contextLocationId) REFERENCES saved_locations(id)
+    );
+
+    -- Stories table (24h TTL ephemeral posts, M3)
+    -- JOIN with users for userName/userPhotoUrl
+    -- Badges generate their own auto-posts, not stored here
+    CREATE TABLE IF NOT EXISTS stories (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      pillar TEXT NOT NULL,
+      privacy TEXT NOT NULL DEFAULT 'FRIENDS',
+      mediaUrl TEXT NOT NULL,
+      mediaType TEXT NOT NULL,
+      caption TEXT,
+      tags TEXT,
+      checkInId TEXT,
+      habitId TEXT,
+      expiresAt TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id),
+      FOREIGN KEY (checkInId) REFERENCES habit_check_ins(id),
+      FOREIGN KEY (habitId) REFERENCES habits(id)
+    );
+
+    -- Reactions table (either postId OR storyId must be set)
+    CREATE TABLE IF NOT EXISTS reactions (
+      id TEXT PRIMARY KEY,
+      postId TEXT,
+      storyId TEXT,
+      userId TEXT NOT NULL,
+      emoji TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (postId) REFERENCES posts(id) ON DELETE CASCADE,
+      FOREIGN KEY (storyId) REFERENCES stories(id) ON DELETE CASCADE,
+      FOREIGN KEY (userId) REFERENCES users(id),
+      CHECK (postId IS NOT NULL OR storyId IS NOT NULL),
+      CHECK (NOT (postId IS NOT NULL AND storyId IS NOT NULL))
+    );
+
+    -- Comments table (posts only, 50 words max)
+    CREATE TABLE IF NOT EXISTS comments (
+      id TEXT PRIMARY KEY,
+      postId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      text TEXT NOT NULL,
+      isArchived INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (postId) REFERENCES posts(id) ON DELETE CASCADE,
+      FOREIGN KEY (userId) REFERENCES users(id)
+    );
+
+    -- Nudges table
+    CREATE TABLE IF NOT EXISTS nudges (
+      id TEXT PRIMARY KEY,
+      fromUserId TEXT NOT NULL,
+      toUserId TEXT NOT NULL,
+      habitId TEXT,
+      templateId TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (fromUserId) REFERENCES users(id),
+      FOREIGN KEY (toUserId) REFERENCES users(id),
+      FOREIGN KEY (habitId) REFERENCES habits(id)
+    );
+
+    -- ============================================
+    -- GAMIFICATION & ENGAGEMENT (M3)
+    -- ============================================
+
+    -- Badges table
+    CREATE TABLE IF NOT EXISTS badges (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      badgeName TEXT NOT NULL,
+      pillar TEXT,
+      habitId TEXT,
+      tier INTEGER,
+      metadata TEXT,
+      earnedAt TEXT NOT NULL,
+      sharedAt TEXT,
+      syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id),
+      FOREIGN KEY (habitId) REFERENCES habits(id),
+      UNIQUE(userId, badgeName, pillar, habitId)
+    );
+
+    -- Notifications table
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      text TEXT NOT NULL,
+      data TEXT,
+      isRead INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY (userId) REFERENCES users(id)
+    );
+
+    -- ============================================
+    -- TAGS (M4+)
+    -- ============================================
+
+    -- Tags table (user-defined tags, M4+)
+    CREATE TABLE IF NOT EXISTS tags (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      color TEXT,
+      icon TEXT,
+      pillar TEXT,
+      useCount INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id),
+      UNIQUE(userId, slug)
+    );
+
+    -- ============================================
+    -- SYSTEM TABLES
+    -- ============================================
+
+    -- Rate limit tracking
+    CREATE TABLE IF NOT EXISTS rate_limits (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      actionType TEXT NOT NULL,
+      targetId TEXT,
+      date TEXT NOT NULL,
+      count INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (userId) REFERENCES users(id),
+      UNIQUE(userId, actionType, targetId, date)
     );
 
     -- Sync queue for offline-first operations
@@ -247,7 +803,8 @@ async function migrationV1(database: SQLite.SQLiteDatabase): Promise<void> {
       attempts INTEGER NOT NULL DEFAULT 0,
       lastAttemptAt TEXT,
       createdAt TEXT NOT NULL,
-      completedAt TEXT
+      completedAt TEXT,
+      syncedAt TEXT
     );
 
     -- App settings (key-value store)
@@ -257,458 +814,324 @@ async function migrationV1(database: SQLite.SQLiteDatabase): Promise<void> {
       updatedAt TEXT NOT NULL
     );
 
-    -- Indexes for common queries
+    -- ============================================
+    -- INDEXES FOR QUERY PERFORMANCE
+    -- ============================================
+
+    -- Users
+    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+    CREATE INDEX IF NOT EXISTS idx_users_appleId ON users(appleId);
+
+    -- Session
+    CREATE INDEX IF NOT EXISTS idx_session_userId ON session(userId);
+
+    -- Friendships
     CREATE INDEX IF NOT EXISTS idx_friendships_userId ON friendships(userId);
     CREATE INDEX IF NOT EXISTS idx_friendships_friendId ON friendships(friendId);
-    CREATE INDEX IF NOT EXISTS idx_friend_requests_toUserId ON friend_requests(toUserId);
-    CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status);
-  `);
-}
+    CREATE INDEX IF NOT EXISTS idx_friendships_status ON friendships(status);
+    CREATE INDEX IF NOT EXISTS idx_friendships_isCloseFriend ON friendships(userId, isCloseFriend);
 
-/**
- * Migration V2: Goals and Habits tables for M2
- */
-async function migrationV2(database: SQLite.SQLiteDatabase): Promise<void> {
-  await database.execAsync(`
-    -- Goals table
-    CREATE TABLE IF NOT EXISTS goals (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      title TEXT NOT NULL,
-      pillar TEXT NOT NULL,
-      privacy TEXT NOT NULL DEFAULT 'SELF',
-      isArchived INTEGER NOT NULL DEFAULT 0,
-      archivedAt TEXT,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL,
-      syncedAt TEXT
-    );
+    -- Blocked users
+    CREATE INDEX IF NOT EXISTS idx_blocked_users_userId ON blocked_users(userId);
 
-    -- Habits table
-    CREATE TABLE IF NOT EXISTS habits (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      goalId TEXT,
-      parentHabitId TEXT,
-      title TEXT NOT NULL,
-      pillar TEXT NOT NULL,
-      schedule TEXT NOT NULL,
-      privacy TEXT NOT NULL DEFAULT 'SELF',
-      isArchived INTEGER NOT NULL DEFAULT 0,
-      archivedAt TEXT,
-      currentStreak INTEGER NOT NULL DEFAULT 0,
-      longestStreak INTEGER NOT NULL DEFAULT 0,
-      lastCheckInAt TEXT,
-      lastMissedAt TEXT,
-      recoveryStreak INTEGER NOT NULL DEFAULT 0,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL,
-      syncedAt TEXT,
-      FOREIGN KEY (goalId) REFERENCES goals(id),
-      FOREIGN KEY (parentHabitId) REFERENCES habits(id)
-    );
+    -- Circles
+    CREATE INDEX IF NOT EXISTS idx_circles_ownerUserId ON circles(ownerUserId);
+    CREATE INDEX IF NOT EXISTS idx_circle_members_circleId ON circle_members(circleId);
+    CREATE INDEX IF NOT EXISTS idx_circle_members_userId ON circle_members(userId);
+    CREATE INDEX IF NOT EXISTS idx_circle_messages_circleId ON circle_messages(circleId);
+    CREATE INDEX IF NOT EXISTS idx_circle_messages_userId ON circle_messages(userId);
+    CREATE INDEX IF NOT EXISTS idx_circle_messages_createdAt ON circle_messages(createdAt DESC);
 
-    -- Habit check-ins table
-    CREATE TABLE IF NOT EXISTS habit_check_ins (
-      id TEXT PRIMARY KEY,
-      habitId TEXT NOT NULL,
-      userId TEXT NOT NULL,
-      occurredAt TEXT NOT NULL,
-      source TEXT NOT NULL DEFAULT 'MANUAL',
-      evidenceRef TEXT,
-      note TEXT,
-      createdAt TEXT NOT NULL,
-      syncedAt TEXT,
-      FOREIGN KEY (habitId) REFERENCES habits(id)
-    );
+    -- Identities
+    CREATE INDEX IF NOT EXISTS idx_identities_userId ON identities(userId);
+    CREATE INDEX IF NOT EXISTS idx_identities_pillar ON identities(pillar);
 
-    -- Indexes for goals/habits queries
+    -- Goals
     CREATE INDEX IF NOT EXISTS idx_goals_userId ON goals(userId);
+    CREATE INDEX IF NOT EXISTS idx_goals_identityId ON goals(identityId);
     CREATE INDEX IF NOT EXISTS idx_goals_pillar ON goals(pillar);
+    CREATE INDEX IF NOT EXISTS idx_goals_completedAt ON goals(userId, completedAt);
+    CREATE INDEX IF NOT EXISTS idx_goals_deadline ON goals(deadline);
+    CREATE INDEX IF NOT EXISTS idx_goals_isArchived ON goals(isArchived);
+
+    -- Goal participants
+    CREATE INDEX IF NOT EXISTS idx_goal_participants_goalId ON goal_participants(goalId);
+    CREATE INDEX IF NOT EXISTS idx_goal_participants_userId ON goal_participants(userId);
+
+    -- Habits
     CREATE INDEX IF NOT EXISTS idx_habits_userId ON habits(userId);
     CREATE INDEX IF NOT EXISTS idx_habits_goalId ON habits(goalId);
+    CREATE INDEX IF NOT EXISTS idx_habits_identityId ON habits(identityId);
     CREATE INDEX IF NOT EXISTS idx_habits_pillar ON habits(pillar);
+    CREATE INDEX IF NOT EXISTS idx_habits_habitType ON habits(habitType);
+    CREATE INDEX IF NOT EXISTS idx_habits_isArchived ON habits(isArchived);
+    CREATE INDEX IF NOT EXISTS idx_habits_stackAfterHabitId ON habits(stackAfterHabitId);
+
+    -- Check-ins
     CREATE INDEX IF NOT EXISTS idx_check_ins_habitId ON habit_check_ins(habitId);
-    CREATE INDEX IF NOT EXISTS idx_check_ins_occurredAt ON habit_check_ins(occurredAt);
-  `);
-}
+    CREATE INDEX IF NOT EXISTS idx_check_ins_userId ON habit_check_ins(userId);
+    CREATE INDEX IF NOT EXISTS idx_check_ins_occurredAt ON habit_check_ins(occurredAt DESC);
+    CREATE INDEX IF NOT EXISTS idx_check_ins_userId_occurredAt ON habit_check_ins(userId, occurredAt DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_check_ins_unique ON habit_check_ins(habitId, occurredAt, source);
 
-/**
- * Migration V3: Add description and deadline fields
- */
-async function migrationV3(database: SQLite.SQLiteDatabase): Promise<void> {
-  // Check if columns already exist to avoid errors
-  const goalsInfo = await database.getAllAsync<{ name: string }>("PRAGMA table_info(goals)");
-  const habitsInfo = await database.getAllAsync<{ name: string }>("PRAGMA table_info(habits)");
+    -- Habit participants
+    CREATE INDEX IF NOT EXISTS idx_habit_participants_habitId ON habit_participants(habitId);
+    CREATE INDEX IF NOT EXISTS idx_habit_participants_userId ON habit_participants(userId);
 
-  const goalsColumns = goalsInfo.map((col) => col.name);
-  const habitsColumns = habitsInfo.map((col) => col.name);
+    -- Habit stacks
+    CREATE INDEX IF NOT EXISTS idx_habit_stacks_userId ON habit_stacks(userId);
 
-  // Add goals columns if they don't exist
-  if (!goalsColumns.includes("description")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN description TEXT;`);
-  }
-  if (!goalsColumns.includes("deadline")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN deadline TEXT;`);
-  }
+    -- Habit triggers
+    CREATE INDEX IF NOT EXISTS idx_habit_triggers_habitId ON habit_triggers(habitId);
 
-  // Add habits description if it doesn't exist
-  if (!habitsColumns.includes("description")) {
-    await database.execAsync(`ALTER TABLE habits ADD COLUMN description TEXT;`);
-  }
-}
+    -- Saved locations
+    CREATE INDEX IF NOT EXISTS idx_saved_locations_userId ON saved_locations(userId);
 
-/**
- * Migration V4: Add habit type, measurement, visual, and flexibility fields
- */
-async function migrationV4(database: SQLite.SQLiteDatabase): Promise<void> {
-  // Check existing columns
-  const goalsInfo = await database.getAllAsync<{ name: string }>("PRAGMA table_info(goals)");
-  const habitsInfo = await database.getAllAsync<{ name: string }>("PRAGMA table_info(habits)");
-  const checkInsInfo = await database.getAllAsync<{ name: string }>(
-    "PRAGMA table_info(habit_check_ins)"
-  );
+    -- Journal entries
+    CREATE INDEX IF NOT EXISTS idx_journal_entries_userId ON journal_entries(userId);
+    CREATE INDEX IF NOT EXISTS idx_journal_entries_createdAt ON journal_entries(createdAt DESC);
+    CREATE INDEX IF NOT EXISTS idx_journal_entries_pillar ON journal_entries(pillar);
 
-  const goalsColumns = goalsInfo.map((col) => col.name);
-  const habitsColumns = habitsInfo.map((col) => col.name);
-  const checkInsColumns = checkInsInfo.map((col) => col.name);
+    -- Mood entries
+    CREATE INDEX IF NOT EXISTS idx_mood_entries_userId ON mood_entries(userId);
+    CREATE INDEX IF NOT EXISTS idx_mood_entries_createdAt ON mood_entries(createdAt DESC);
 
-  // Goals: vacation mode
-  if (!goalsColumns.includes("vacationMode")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN vacationMode INTEGER DEFAULT 0;`);
-  }
-  if (!goalsColumns.includes("vacationEndsAt")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN vacationEndsAt TEXT;`);
-  }
+    -- Integrations
+    CREATE INDEX IF NOT EXISTS idx_integrations_userId ON integrations(userId);
+    CREATE INDEX IF NOT EXISTS idx_integrations_provider ON integrations(provider);
 
-  // Habits: type & measurement
-  if (!habitsColumns.includes("habitType")) {
-    await database.execAsync(`ALTER TABLE habits ADD COLUMN habitType TEXT DEFAULT 'BUILD';`);
-  }
-  if (!habitsColumns.includes("completionType")) {
-    await database.execAsync(`ALTER TABLE habits ADD COLUMN completionType TEXT DEFAULT 'BINARY';`);
-  }
-  if (!habitsColumns.includes("targetValue")) {
-    await database.execAsync(`ALTER TABLE habits ADD COLUMN targetValue REAL;`);
-  }
-  if (!habitsColumns.includes("unit")) {
-    await database.execAsync(`ALTER TABLE habits ADD COLUMN unit TEXT;`);
-  }
+    -- Auto logs
+    CREATE INDEX IF NOT EXISTS idx_auto_logs_userId ON auto_logs(userId);
+    CREATE INDEX IF NOT EXISTS idx_auto_logs_integrationId ON auto_logs(integrationId);
+    CREATE INDEX IF NOT EXISTS idx_auto_logs_occurredAt ON auto_logs(occurredAt DESC);
+    CREATE INDEX IF NOT EXISTS idx_auto_logs_metricType ON auto_logs(metricType);
 
-  // Habits: visual
-  if (!habitsColumns.includes("icon")) {
-    await database.execAsync(`ALTER TABLE habits ADD COLUMN icon TEXT;`);
-  }
-  if (!habitsColumns.includes("tags")) {
-    await database.execAsync(`ALTER TABLE habits ADD COLUMN tags TEXT;`); // JSON array
-  }
+    -- Behavioral drift
+    CREATE INDEX IF NOT EXISTS idx_behavioral_drift_userId ON behavioral_drift(userId);
+    CREATE INDEX IF NOT EXISTS idx_behavioral_drift_habitId ON behavioral_drift(habitId);
+    CREATE INDEX IF NOT EXISTS idx_behavioral_drift_detectedAt ON behavioral_drift(detectedAt DESC);
 
-  // Habits: scheduling & flexibility
-  if (!habitsColumns.includes("timezone")) {
-    await database.execAsync(`ALTER TABLE habits ADD COLUMN timezone TEXT;`);
-  }
-  if (!habitsColumns.includes("difficulty")) {
-    await database.execAsync(`ALTER TABLE habits ADD COLUMN difficulty INTEGER;`);
-  }
-  if (!habitsColumns.includes("miniVersion")) {
-    await database.execAsync(`ALTER TABLE habits ADD COLUMN miniVersion TEXT;`);
-  }
-  if (!habitsColumns.includes("graceDays")) {
-    await database.execAsync(`ALTER TABLE habits ADD COLUMN graceDays INTEGER DEFAULT 0;`);
-  }
+    -- Challenges
+    CREATE INDEX IF NOT EXISTS idx_challenges_creatorUserId ON challenges(creatorUserId);
+    CREATE INDEX IF NOT EXISTS idx_challenges_pillar ON challenges(pillar);
+    CREATE INDEX IF NOT EXISTS idx_challenge_participants_challengeId ON challenge_participants(challengeId);
+    CREATE INDEX IF NOT EXISTS idx_challenge_participants_userId ON challenge_participants(userId);
 
-  // Check-ins: value for count/duration
-  if (!checkInsColumns.includes("value")) {
-    await database.execAsync(`ALTER TABLE habit_check_ins ADD COLUMN value REAL;`);
-  }
-}
+    -- Posts
+    CREATE INDEX IF NOT EXISTS idx_posts_userId ON posts(userId);
+    CREATE INDEX IF NOT EXISTS idx_posts_createdAt ON posts(createdAt DESC);
+    CREATE INDEX IF NOT EXISTS idx_posts_privacy ON posts(privacy);
+    CREATE INDEX IF NOT EXISTS idx_posts_pillar ON posts(pillar);
+    CREATE INDEX IF NOT EXISTS idx_posts_checkInId ON posts(checkInId);
+    CREATE INDEX IF NOT EXISTS idx_posts_habitId ON posts(habitId);
+    CREATE INDEX IF NOT EXISTS idx_posts_circleId ON posts(circleId);
 
-/**
- * Migration V5: Add enhanced goal fields (type, measurement, timeframe, linking)
- */
-async function migrationV5(database: SQLite.SQLiteDatabase): Promise<void> {
-  const goalsInfo = await database.getAllAsync<{ name: string }>("PRAGMA table_info(goals)");
-  const goalsColumns = goalsInfo.map((col) => col.name);
+    -- Stories
+    CREATE INDEX IF NOT EXISTS idx_stories_userId ON stories(userId);
+    CREATE INDEX IF NOT EXISTS idx_stories_expiresAt ON stories(expiresAt);
+    CREATE INDEX IF NOT EXISTS idx_stories_privacy ON stories(privacy);
+    CREATE INDEX IF NOT EXISTS idx_stories_createdAt ON stories(createdAt DESC);
+    CREATE INDEX IF NOT EXISTS idx_stories_checkInId ON stories(checkInId);
 
-  // Goal type & measurement
-  if (!goalsColumns.includes("goalType")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN goalType TEXT DEFAULT 'CUSTOM';`);
-  }
-  if (!goalsColumns.includes("metric")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN metric TEXT;`);
-  }
-  if (!goalsColumns.includes("customMetric")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN customMetric TEXT;`);
-  }
+    -- Reactions
+    CREATE INDEX IF NOT EXISTS idx_reactions_postId ON reactions(postId);
+    CREATE INDEX IF NOT EXISTS idx_reactions_storyId ON reactions(storyId);
+    CREATE INDEX IF NOT EXISTS idx_reactions_userId ON reactions(userId);
+    CREATE INDEX IF NOT EXISTS idx_reactions_createdAt ON reactions(createdAt DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_reactions_post_user ON reactions(postId, userId) WHERE postId IS NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_reactions_story_user ON reactions(storyId, userId) WHERE storyId IS NOT NULL;
 
-  // Goal values
-  if (!goalsColumns.includes("isIndefinite")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN isIndefinite INTEGER DEFAULT 0;`);
-  }
-  if (!goalsColumns.includes("startValue")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN startValue REAL;`);
-  }
-  if (!goalsColumns.includes("targetValue")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN targetValue REAL;`);
-  }
-  if (!goalsColumns.includes("currentValue")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN currentValue REAL;`);
-  }
+    -- Comments
+    CREATE INDEX IF NOT EXISTS idx_comments_postId ON comments(postId);
+    CREATE INDEX IF NOT EXISTS idx_comments_userId ON comments(userId);
+    CREATE INDEX IF NOT EXISTS idx_comments_createdAt ON comments(createdAt DESC);
+    CREATE INDEX IF NOT EXISTS idx_comments_isArchived ON comments(isArchived);
 
-  // Timeframe
-  if (!goalsColumns.includes("startDate")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN startDate TEXT;`);
-  }
-  if (!goalsColumns.includes("endDate")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN endDate TEXT;`);
-  }
-  if (!goalsColumns.includes("timeframeType")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN timeframeType TEXT DEFAULT 'FIXED';`);
-  }
-  if (!goalsColumns.includes("isRepeating")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN isRepeating INTEGER DEFAULT 0;`);
-  }
-  if (!goalsColumns.includes("repeatInterval")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN repeatInterval TEXT;`);
-  }
+    -- Nudges
+    CREATE INDEX IF NOT EXISTS idx_nudges_fromUserId ON nudges(fromUserId);
+    CREATE INDEX IF NOT EXISTS idx_nudges_toUserId ON nudges(toUserId);
+    CREATE INDEX IF NOT EXISTS idx_nudges_habitId ON nudges(habitId);
+    CREATE INDEX IF NOT EXISTS idx_nudges_createdAt ON nudges(createdAt DESC);
+    CREATE INDEX IF NOT EXISTS idx_nudges_rate_limit ON nudges(fromUserId, toUserId, createdAt);
 
-  // Data source & linking
-  if (!goalsColumns.includes("dataSource")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN dataSource TEXT DEFAULT 'MANUAL';`);
-  }
-  if (!goalsColumns.includes("linkedHabitIds")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN linkedHabitIds TEXT;`); // JSON array
-  }
-}
+    -- Badges
+    CREATE INDEX IF NOT EXISTS idx_badges_userId ON badges(userId);
+    CREATE INDEX IF NOT EXISTS idx_badges_badgeName ON badges(badgeName);
+    CREATE INDEX IF NOT EXISTS idx_badges_earnedAt ON badges(earnedAt DESC);
+    CREATE INDEX IF NOT EXISTS idx_badges_pillar ON badges(pillar);
+    CREATE INDEX IF NOT EXISTS idx_badges_habitId ON badges(habitId);
 
-/**
- * Migration V6: Simplify goals - remove goalType/metric/timeframe/repeating, add identityId, merge deadline
- */
-async function migrationV6(database: SQLite.SQLiteDatabase): Promise<void> {
-  const goalsInfo = await database.getAllAsync<{ name: string }>("PRAGMA table_info(goals)");
-  const goalsColumns = goalsInfo.map((col) => col.name);
+    -- Notifications
+    CREATE INDEX IF NOT EXISTS idx_notifications_userId ON notifications(userId);
+    CREATE INDEX IF NOT EXISTS idx_notifications_isRead ON notifications(isRead);
+    CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
+    CREATE INDEX IF NOT EXISTS idx_notifications_createdAt ON notifications(createdAt DESC);
 
-  // Add identityId for linking to identities (M4)
-  if (!goalsColumns.includes("identityId")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN identityId TEXT;`);
-  }
+    -- Tags
+    CREATE INDEX IF NOT EXISTS idx_tags_userId ON tags(userId);
+    CREATE INDEX IF NOT EXISTS idx_tags_useCount ON tags(userId, useCount DESC);
 
-  // Remove endDate column (deadline is now the only date field besides startDate)
-  // Note: SQLite doesn't support DROP COLUMN easily, so we'll just ignore endDate in queries
-  // Migration preserves existing data but new code won't use goalType, metric, customMetric,
-  // endDate, timeframeType, isRepeating, repeatInterval
+    -- ============================================
+    -- FUTURE TABLES (M5+) - In Progress
+    -- These tables are drafted but implementation may change
+    -- ============================================
 
-  // Add deadline if missing (merged from endDate for backwards compatibility)
-  if (!goalsColumns.includes("deadline")) {
-    await database.execAsync(`ALTER TABLE goals ADD COLUMN deadline TEXT;`);
-    // Copy endDate to deadline for existing goals
-    await database.execAsync(
-      `UPDATE goals SET deadline = endDate WHERE deadline IS NULL AND endDate IS NOT NULL;`
-    );
-  }
-
-  // Create identities table (M4 will populate presets)
-  await database.execAsync(`
-    CREATE TABLE IF NOT EXISTS identities (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      name TEXT NOT NULL,
-      pillar TEXT NOT NULL,
-      icon TEXT NOT NULL,
-      preset INTEGER NOT NULL DEFAULT 0,
-      createdAt TEXT NOT NULL
-    );
-    
-    CREATE INDEX IF NOT EXISTS idx_identities_userId ON identities(userId);
-  `);
-}
-
-/**
- * Migration V7: Social tables for M3 (posts, reactions, nudges, badges, notifications)
- */
-async function migrationV7(database: SQLite.SQLiteDatabase): Promise<void> {
-  await database.execAsync(`
-    -- Posts table
-    CREATE TABLE IF NOT EXISTS posts (
-      id TEXT PRIMARY KEY,
-      authorUserId TEXT NOT NULL,
-      circleId TEXT,
-      pillar TEXT NOT NULL,
-      privacy TEXT NOT NULL DEFAULT 'FRIENDS',
-      bodyText TEXT,
-      mediaUrl TEXT,
-      linkedCheckInId TEXT,
-      linkedHabitId TEXT,
-      editedAt TEXT,
-      createdAt TEXT NOT NULL,
-      syncedAt TEXT,
-      FOREIGN KEY (linkedCheckInId) REFERENCES habit_check_ins(id),
-      FOREIGN KEY (linkedHabitId) REFERENCES habits(id)
-    );
-
-    -- Reactions table
-    CREATE TABLE IF NOT EXISTS reactions (
-      id TEXT PRIMARY KEY,
-      postId TEXT NOT NULL,
-      userId TEXT NOT NULL,
-      emoji TEXT NOT NULL,
-      createdAt TEXT NOT NULL,
-      syncedAt TEXT,
-      FOREIGN KEY (postId) REFERENCES posts(id) ON DELETE CASCADE,
-      UNIQUE(postId, userId)
-    );
-
-    -- Comments table (50 char max)
-    CREATE TABLE IF NOT EXISTS comments (
-      id TEXT PRIMARY KEY,
-      postId TEXT NOT NULL,
-      userId TEXT NOT NULL,
-      bodyText TEXT NOT NULL,
-      isArchived INTEGER NOT NULL DEFAULT 0,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL,
-      syncedAt TEXT,
-      FOREIGN KEY (postId) REFERENCES posts(id) ON DELETE CASCADE
-    );
-
-    -- Nudges table
-    CREATE TABLE IF NOT EXISTS nudges (
-      id TEXT PRIMARY KEY,
-      fromUserId TEXT NOT NULL,
-      toUserId TEXT NOT NULL,
-      templateId TEXT NOT NULL,
-      createdAt TEXT NOT NULL,
-      syncedAt TEXT
-    );
-
-    -- Badges table
-    CREATE TABLE IF NOT EXISTS badges (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      badgeType TEXT NOT NULL,
-      earnedAt TEXT NOT NULL,
-      sharedAt TEXT,
-      syncedAt TEXT,
-      UNIQUE(userId, badgeType)
-    );
-
-    -- Notifications table
-    CREATE TABLE IF NOT EXISTS notifications (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      type TEXT NOT NULL,
-      title TEXT NOT NULL,
-      body TEXT NOT NULL,
-      data TEXT,
-      read INTEGER NOT NULL DEFAULT 0,
-      createdAt TEXT NOT NULL
-    );
-
-    -- Habit participants (for habit joining feature)
-    CREATE TABLE IF NOT EXISTS habit_participants (
+    -- Habit followers (allow friends to join/follow habits)
+    CREATE TABLE IF NOT EXISTS habit_followers (
       id TEXT PRIMARY KEY,
       habitId TEXT NOT NULL,
       userId TEXT NOT NULL,
-      role TEXT NOT NULL DEFAULT 'MEMBER',
+      ownerId TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'FOLLOWER',
+      notifyOnCheckIn INTEGER NOT NULL DEFAULT 1,
+      notifyOnMiss INTEGER NOT NULL DEFAULT 0,
       joinedAt TEXT NOT NULL,
+      leftAt TEXT,
       syncedAt TEXT,
       FOREIGN KEY (habitId) REFERENCES habits(id),
+      FOREIGN KEY (userId) REFERENCES users(id),
+      FOREIGN KEY (ownerId) REFERENCES users(id),
       UNIQUE(habitId, userId)
     );
 
-    -- Rate limit tracking
-    CREATE TABLE IF NOT EXISTS rate_limits (
+    -- Accountability partners (dedicated partner relationships)
+    CREATE TABLE IF NOT EXISTS accountability_partners (
       id TEXT PRIMARY KEY,
       userId TEXT NOT NULL,
-      actionType TEXT NOT NULL,
-      targetId TEXT,
-      date TEXT NOT NULL,
-      count INTEGER NOT NULL DEFAULT 0,
-      UNIQUE(userId, actionType, targetId, date)
-    );
-
-    -- Indexes for social queries
-    CREATE INDEX IF NOT EXISTS idx_posts_authorUserId ON posts(authorUserId);
-    CREATE INDEX IF NOT EXISTS idx_posts_createdAt ON posts(createdAt);
-    CREATE INDEX IF NOT EXISTS idx_posts_privacy ON posts(privacy);
-    CREATE INDEX IF NOT EXISTS idx_reactions_postId ON reactions(postId);
-    CREATE INDEX IF NOT EXISTS idx_reactions_userId ON reactions(userId);
-    CREATE INDEX IF NOT EXISTS idx_nudges_fromUserId ON nudges(fromUserId);
-    CREATE INDEX IF NOT EXISTS idx_nudges_toUserId ON nudges(toUserId);
-    CREATE INDEX IF NOT EXISTS idx_nudges_createdAt ON nudges(createdAt);
-    CREATE INDEX IF NOT EXISTS idx_badges_userId ON badges(userId);
-    CREATE INDEX IF NOT EXISTS idx_notifications_userId ON notifications(userId);
-    CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
-    CREATE INDEX IF NOT EXISTS idx_habit_participants_habitId ON habit_participants(habitId);
-    CREATE INDEX IF NOT EXISTS idx_habit_participants_userId ON habit_participants(userId);
-    CREATE INDEX IF NOT EXISTS idx_rate_limits_userId_date ON rate_limits(userId, date);
-  `);
-}
-
-/**
- * Migration V8: Add advanced post fields for M3 (media type, post tags, linked objects, context)
- */
-async function migrationV8(database: SQLite.SQLiteDatabase): Promise<void> {
-  const postsInfo = await database.getAllAsync<{ name: string }>("PRAGMA table_info(posts)");
-  const postsColumns = postsInfo.map((col) => col.name);
-
-  // Add advanced post fields if they don't exist
-  if (!postsColumns.includes("mediaType")) {
-    await database.execAsync(`ALTER TABLE posts ADD COLUMN mediaType TEXT;`);
-  }
-  if (!postsColumns.includes("postTypeTags")) {
-    await database.execAsync(`ALTER TABLE posts ADD COLUMN postTypeTags TEXT;`); // JSON array
-  }
-  if (!postsColumns.includes("customTags")) {
-    await database.execAsync(`ALTER TABLE posts ADD COLUMN customTags TEXT;`); // JSON array
-  }
-  if (!postsColumns.includes("linkedObjectId")) {
-    await database.execAsync(`ALTER TABLE posts ADD COLUMN linkedObjectId TEXT;`);
-  }
-  if (!postsColumns.includes("linkedObjectType")) {
-    await database.execAsync(`ALTER TABLE posts ADD COLUMN linkedObjectType TEXT;`);
-  }
-  if (!postsColumns.includes("contextTimeOfDay")) {
-    await database.execAsync(`ALTER TABLE posts ADD COLUMN contextTimeOfDay TEXT;`);
-  }
-  if (!postsColumns.includes("contextLocation")) {
-    await database.execAsync(`ALTER TABLE posts ADD COLUMN contextLocation TEXT;`);
-  }
-
-  logger.info("Migration V8 applied: Advanced post fields added");
-}
-
-/**
- * Migration V9: Fix missing columns from v7 (posts.updatedAt) and ensure comments table exists
- */
-async function migrationV9(database: SQLite.SQLiteDatabase): Promise<void> {
-  // Check if posts table has updatedAt column
-  const postsInfo = await database.getAllAsync<{ name: string }>("PRAGMA table_info(posts)");
-  const postsColumns = postsInfo.map((col) => col.name);
-
-  if (!postsColumns.includes("updatedAt")) {
-    await database.execAsync(`ALTER TABLE posts ADD COLUMN updatedAt TEXT;`);
-    // Set updatedAt = createdAt for existing posts
-    await database.execAsync(`UPDATE posts SET updatedAt = createdAt WHERE updatedAt IS NULL;`);
-    logger.info("Added updatedAt column to posts table");
-  }
-
-  // Ensure comments table exists (may have been skipped in v7 if posts already existed)
-  await database.execAsync(`
-    CREATE TABLE IF NOT EXISTS comments (
-      id TEXT PRIMARY KEY,
-      postId TEXT NOT NULL,
-      userId TEXT NOT NULL,
-      bodyText TEXT NOT NULL,
-      isArchived INTEGER NOT NULL DEFAULT 0,
+      partnerId TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      focusPillar TEXT,
+      checkInFrequency TEXT NOT NULL DEFAULT 'WEEKLY',
+      lastCheckInAt TEXT,
+      nextCheckInAt TEXT,
+      sharedHabitIds TEXT,
+      sharedGoalIds TEXT,
+      notes TEXT,
+      startedAt TEXT NOT NULL,
+      endedAt TEXT,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
       syncedAt TEXT,
-      FOREIGN KEY (postId) REFERENCES posts(id) ON DELETE CASCADE
+      FOREIGN KEY (userId) REFERENCES users(id),
+      FOREIGN KEY (partnerId) REFERENCES users(id),
+      UNIQUE(userId, partnerId)
     );
+
+    -- User statistics (aggregated stats for dashboard)
+    CREATE TABLE IF NOT EXISTS user_stats (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      periodType TEXT NOT NULL,
+      periodStart TEXT,
+      totalCheckIns INTEGER NOT NULL DEFAULT 0,
+      successfulCheckIns INTEGER NOT NULL DEFAULT 0,
+      completionRate REAL NOT NULL DEFAULT 0,
+      currentStreakMax INTEGER NOT NULL DEFAULT 0,
+      longestStreakEver INTEGER NOT NULL DEFAULT 0,
+      pillarCheckIns TEXT,
+      pillarCompletionRates TEXT,
+      goalsCompleted INTEGER NOT NULL DEFAULT 0,
+      goalsInProgress INTEGER NOT NULL DEFAULT 0,
+      reactionsGiven INTEGER NOT NULL DEFAULT 0,
+      reactionsReceived INTEGER NOT NULL DEFAULT 0,
+      nudgesSent INTEGER NOT NULL DEFAULT 0,
+      nudgesReceived INTEGER NOT NULL DEFAULT 0,
+      postsCreated INTEGER NOT NULL DEFAULT 0,
+      commentsGiven INTEGER NOT NULL DEFAULT 0,
+      activeDays INTEGER NOT NULL DEFAULT 0,
+      bestDayOfWeek INTEGER,
+      bestTimeOfDay INTEGER,
+      calculatedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (userId) REFERENCES users(id),
+      UNIQUE(userId, periodType, periodStart)
+    );
+
+    -- Habit statistics (per-habit aggregated stats)
+    CREATE TABLE IF NOT EXISTS habit_stats (
+      id TEXT PRIMARY KEY,
+      habitId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      periodType TEXT NOT NULL,
+      periodStart TEXT,
+      totalCheckIns INTEGER NOT NULL DEFAULT 0,
+      successfulCheckIns INTEGER NOT NULL DEFAULT 0,
+      completionRate REAL NOT NULL DEFAULT 0,
+      currentStreak INTEGER NOT NULL DEFAULT 0,
+      longestStreak INTEGER NOT NULL DEFAULT 0,
+      avgCheckInHour REAL,
+      mostFrequentDay INTEGER,
+      avgTimeBetweenCheckIns REAL,
+      avgValue REAL,
+      maxValue REAL,
+      totalValue REAL,
+      avgMoodBefore REAL,
+      avgMoodAfter REAL,
+      moodImpact REAL,
+      calculatedAt TEXT NOT NULL,
+      syncedAt TEXT,
+      FOREIGN KEY (habitId) REFERENCES habits(id),
+      FOREIGN KEY (userId) REFERENCES users(id),
+      UNIQUE(habitId, periodType, periodStart)
+    );
+
+    -- Habit signals (computed warnings and ribbons)
+    CREATE TABLE IF NOT EXISTS habit_signals (
+      id TEXT PRIMARY KEY,
+      habitId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      signalType TEXT NOT NULL,
+      severity TEXT NOT NULL DEFAULT 'INFO',
+      message TEXT,
+      metadata TEXT,
+      isActive INTEGER NOT NULL DEFAULT 1,
+      triggeredAt TEXT NOT NULL,
+      resolvedAt TEXT,
+      acknowledgedAt TEXT,
+      syncedAt TEXT,
+      FOREIGN KEY (habitId) REFERENCES habits(id),
+      FOREIGN KEY (userId) REFERENCES users(id)
+    );
+
+    -- ============================================
+    -- INDEXES FOR FUTURE TABLES
+    -- ============================================
+
+    -- Habit followers
+    CREATE INDEX IF NOT EXISTS idx_habit_followers_habitId ON habit_followers(habitId);
+    CREATE INDEX IF NOT EXISTS idx_habit_followers_userId ON habit_followers(userId);
+    CREATE INDEX IF NOT EXISTS idx_habit_followers_ownerId ON habit_followers(ownerId);
+
+    -- Accountability partners
+    CREATE INDEX IF NOT EXISTS idx_accountability_partners_userId ON accountability_partners(userId);
+    CREATE INDEX IF NOT EXISTS idx_accountability_partners_partnerId ON accountability_partners(partnerId);
+    CREATE INDEX IF NOT EXISTS idx_accountability_partners_status ON accountability_partners(status);
+    CREATE INDEX IF NOT EXISTS idx_accountability_partners_nextCheckIn ON accountability_partners(nextCheckInAt);
+
+    -- User stats
+    CREATE INDEX IF NOT EXISTS idx_user_stats_userId ON user_stats(userId);
+    CREATE INDEX IF NOT EXISTS idx_user_stats_periodType ON user_stats(userId, periodType);
+
+    -- Habit stats
+    CREATE INDEX IF NOT EXISTS idx_habit_stats_habitId ON habit_stats(habitId);
+    CREATE INDEX IF NOT EXISTS idx_habit_stats_userId ON habit_stats(userId);
+
+    -- Habit signals
+    CREATE INDEX IF NOT EXISTS idx_habit_signals_habitId ON habit_signals(habitId);
+    CREATE INDEX IF NOT EXISTS idx_habit_signals_userId ON habit_signals(userId);
+    CREATE INDEX IF NOT EXISTS idx_habit_signals_active ON habit_signals(habitId, isActive);
+
+    -- Rate limits
+    CREATE INDEX IF NOT EXISTS idx_rate_limits_userId_date ON rate_limits(userId, date);
+    CREATE INDEX IF NOT EXISTS idx_rate_limits_actionType ON rate_limits(actionType);
+
+    -- Sync queue
+    CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status);
+    CREATE INDEX IF NOT EXISTS idx_sync_queue_tableName ON sync_queue(tableName);
+    CREATE INDEX IF NOT EXISTS idx_sync_queue_createdAt ON sync_queue(createdAt DESC);
   `);
 
-  logger.info("Migration V9 applied: Fixed posts.updatedAt and ensured comments table exists");
+  logger.info("Database schema initialized", { version: SCHEMA_VERSION });
 }
 
 /**

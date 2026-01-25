@@ -4,11 +4,17 @@
  * Remove or hide behind ENABLE_DEV_TOOLS flag in production
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, Pressable, Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { seedDemoData, clearDemoData, hasDemoData } from "@/storage";
+import {
+  seedDemoData,
+  clearDemoData,
+  hasDemoData,
+  getDatabaseInfo,
+  resetDatabase,
+} from "@/storage";
 import { auth } from "@/services/auth";
 import { useTheme } from "@/theme";
 import { spacing, borderRadius } from "@/theme/spacing";
@@ -18,6 +24,63 @@ export default function DevToolsScreen() {
   const { theme } = useTheme();
   const [status, setStatus] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [dbInfo, setDbInfo] = useState<{
+    version: number;
+    tables: string[];
+    size: number;
+    tableCounts: Record<string, number>;
+    totalRows: number;
+  } | null>(null);
+
+  useEffect(() => {
+    loadDatabaseInfo();
+  }, []);
+
+  const loadDatabaseInfo = async () => {
+    setLoading(true);
+    try {
+      const info = await getDatabaseInfo();
+      setDbInfo(info);
+      setStatus("Database info refreshed");
+    } catch (error) {
+      console.error("Failed to load database info:", error);
+      setStatus(
+        `Error loading DB info: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetDatabase = async () => {
+    Alert.alert(
+      "⚠️ Reset Database?",
+      "This will DELETE ALL TABLES and rebuild the schema from scratch. ALL DATA WILL BE LOST.\n\nThis action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset Database",
+          style: "destructive",
+          onPress: async () => {
+            setLoading(true);
+            setStatus("Resetting database...");
+            try {
+              await resetDatabase();
+              await loadDatabaseInfo();
+              setStatus("Database reset successfully - schema rebuilt");
+              Alert.alert("Success", "Database has been reset with fresh schema");
+            } catch (error) {
+              const message = error instanceof Error ? error.message : "Unknown error";
+              setStatus(`Error: ${message}`);
+              Alert.alert("Error", message);
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleSeedData = async () => {
     setLoading(true);
@@ -48,6 +111,7 @@ export default function DevToolsScreen() {
           setStatus("Clearing data...");
           try {
             await clearDemoData();
+            await loadDatabaseInfo();
             setStatus("Demo data cleared successfully");
             Alert.alert("Success", "Demo data cleared");
           } catch (error) {
@@ -98,6 +162,107 @@ export default function DevToolsScreen() {
       </View>
 
       <ScrollView style={styles.scrollContent}>
+        {/* Database Info */}
+        {dbInfo && (
+          <View
+            style={[
+              styles.infoBox,
+              {
+                backgroundColor: theme.semantic.primary + "20",
+                borderLeftColor: theme.semantic.primary,
+                marginHorizontal: spacing.md,
+                marginTop: spacing.md,
+              },
+            ]}
+          >
+            <Text style={[styles.infoTitle, { color: theme.semantic.primary }]}>Database Info</Text>
+            <Text style={[styles.infoText, { color: theme.text.secondary }]}>
+              Schema Version: {dbInfo.version}
+            </Text>
+            <Text style={[styles.infoText, { color: theme.text.secondary }]}>
+              Tables: {dbInfo.tables.length}
+            </Text>
+            <Text style={[styles.infoText, { color: theme.text.secondary }]}>
+              Total Rows: {dbInfo.totalRows.toLocaleString()}
+            </Text>
+            <Text style={[styles.infoText, { color: theme.text.secondary }]}>
+              Size: {(dbInfo.size / 1024).toFixed(1)} KB
+            </Text>
+
+            {/* Table breakdown */}
+            {dbInfo.totalRows > 0 && (
+              <>
+                <Text
+                  style={[
+                    styles.infoSubtitle,
+                    { color: theme.semantic.primary, marginTop: spacing.sm },
+                  ]}
+                >
+                  Tables with Data:
+                </Text>
+                {Object.entries(dbInfo.tableCounts)
+                  .filter(([_, count]) => count > 0)
+                  .sort(([_, a], [__, b]) => b - a)
+                  .map(([table, count]) => (
+                    <Text
+                      key={table}
+                      style={[styles.infoTextSmall, { color: theme.text.tertiary }]}
+                    >
+                      • {table}: {count.toLocaleString()}
+                    </Text>
+                  ))}
+              </>
+            )}
+          </View>
+        )}
+
+        {/* Database Management */}
+        <View style={[styles.section, { gap: theme.space.componentGap }]}>
+          <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>Database</Text>
+
+          <Pressable
+            style={[
+              styles.button,
+              styles.buttonSecondary,
+              {
+                backgroundColor: theme.button.secondary.background,
+                borderColor: theme.semantic.primary,
+              },
+              loading && styles.buttonDisabled,
+            ]}
+            onPress={loadDatabaseInfo}
+            disabled={loading}
+          >
+            <Text
+              style={[
+                styles.buttonText,
+                styles.buttonTextSecondary,
+                { color: theme.semantic.primary },
+              ]}
+            >
+              Refresh Database Info
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={[
+              styles.button,
+              styles.buttonDanger,
+              { backgroundColor: theme.button.danger.background },
+              loading && styles.buttonDisabled,
+            ]}
+            onPress={handleResetDatabase}
+            disabled={loading}
+          >
+            <Text style={[styles.buttonText, { color: theme.button.danger.text }]}>
+              ⚠️ Reset Database
+            </Text>
+            <Text style={[styles.buttonDescription, { color: theme.button.danger.text }]}>
+              Drops all tables and rebuilds schema from scratch
+            </Text>
+          </Pressable>
+        </View>
+
         <View style={[styles.section, { gap: theme.space.componentGap }]}>
           <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>Demo Data</Text>
 
@@ -282,8 +447,18 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     marginBottom: spacing.sm,
   },
+  infoSubtitle: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.xs,
+  },
   infoText: {
     fontSize: typography.fontSize.xs,
     marginBottom: 2,
+  },
+  infoTextSmall: {
+    fontSize: typography.fontSize.xs,
+    marginBottom: 1,
+    marginLeft: spacing.xs,
   },
 });

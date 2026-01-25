@@ -13,17 +13,18 @@
 ### 1. Device-First, Offline-First
 
 - **SQLite = Source of Truth** - All writes go to local DB first for instant UX
-- Server is sync replica, not primary database
+- Cloud (Supabase) is sync replica, not primary database
 - User actions never block on network calls
 - Background sync queue handles eventual consistency
 - Pattern: `[User Action] → [SQLite Write] → [UI Update] → [Sync Queue]`
+- **Cloud Status**: Not yet deployed - coming in M1 with Supabase
 
 ### 2. Privacy Model (Enforced Server-Side)
 
 - Every object has privacy: `SELF` | `FRIENDS` | `PUBLIC`
 - **Never trust client filters** - server must re-validate every query
 - Check viewer's relationship to owner (friend status, privacy level)
-- See [spec/architecture.md](../spec/architecture.md#privacy-enforcement) for query patterns
+- Server-side enforcement critical when cloud API is deployed (M1)
 
 ### 3. Identity → Goal → Habit Hierarchy
 
@@ -31,7 +32,7 @@
 - **Goal** (M2/M3): "Proof I'm that person" - quantitative targets (Run 5K under 30min)
 - **Habit** (M2): "What I do daily" - recurring actions (Run 4x/month)
 - Goals CAN complete, Habits NEVER complete (recurring forever)
-- See [spec/data-model.md](../docs/data-model.md#relationships-diagram)
+- Database tables defined in `src/storage/database.ts`
 
 ### 4. Post vs Story Decoupling
 
@@ -48,18 +49,16 @@
 - Auto-posts describe user state qualitatively: "I slowed down this week", "Working through a rough patch"
 - Social features prioritize **supportive presence** over performance metrics
 - Visual analytics show patterns to user AND optionally to close friends (transparency builds accountability)
-- See [spec/architecture.md](../spec/architecture.md#social-accountability-model) for sharing patterns
 
 ### 6. Data Model & Cloud Sync: Ephemeral 3rd Party, Persistent App Data
 
 - **3rd party data (ScreenTime, Location, Calendar) is EPHEMERAL**: Query → Process → Delete immediately
-- **App data (habits, metrics, patterns) is PERSISTENT**: All synced to Postgres cloud replica
+- **App data (habits, metrics, patterns) is PERSISTENT**: All synced to cloud replica (when deployed)
 - Pattern: `[Query iOS API] → [Calculate Aggregate] → [Delete Raw Data] → [Sync Processed Metric]`
 - Example: ScreenTime returns app usage → Calculate "social media: 90 min" → Delete app-specific logs → Sync aggregate
 - **Never store raw sensor data** - only user-meaningful aggregates (steps count, usage minutes, visit boolean)
 - **Zero additional personal data** - cloud only receives what user explicitly created or app calculated
 - Coordinates encrypted at rest if stored, never in posts/stories (M7 feature)
-- See [spec/architecture.md](../spec/architecture.md#data-sync-model) for detailed flow
 
 ### 7. Component Modularity & Reusability (CRITICAL)
 
@@ -100,11 +99,11 @@ npm run test:watch     # Jest watch mode
 
 ### Milestone Status
 
-- ✅ **M0** (Foundation) - In progress: types, routing, auth stubs
-- 📋 **M1** (Account & Privacy) - Next: Apple Sign-In, friends
-- 🔜 **M2** (Goals & Habits) - Manual tracking, streaks
-- 🔜 **M3** (Social) - Posts, stories, reactions, nudges
-- 🔜 **M4** (Identity & Analytics) - Identities, journal, HealthKit proof-of-concept
+- **M0** (Foundation) - In progress: types, routing, auth stubs
+- **M1** (Account & Privacy) - Next: Apple Sign-In, friends
+- **M2** (Goals & Habits) - Manual tracking, streaks
+- **M3** (Social) - Posts, stories, reactions, nudges
+- **M4** (Identity & Analytics) - Identities, journal, HealthKit proof-of-concept
 - 💡 **M5+** (Future) - Full automation, ML, location triggers
 
 ### Key Files for Each Milestone
@@ -199,28 +198,29 @@ const { theme } = useTheme();
 
 ---
 
-## Spec Navigation (Source of Truth)
+## Documentation Structure
 
-### Read First
+### Primary Sources of Truth
 
-1. [spec/INDEX.md](../spec/INDEX.md) - Master navigation
-2. [spec/vision.md](../spec/vision.md) - Product goals
-3. [spec/architecture.md](../spec/architecture.md) - Technical patterns
-4. [spec/data-model.md](../spec/data-model.md) - Complete schema
+1. **Database Schema**: `src/storage/database.ts` - Current schema v3 with 38 tables
+2. **Milestone Specs**: `docs/milestones/M*.md` - Feature specifications and acceptance criteria
+3. **API Contracts**: `docs/api-contracts.md` - REST endpoint definitions for cloud sync
+4. **Component Docs**: `src/components/README.md` - Component architecture and usage
 
-## Docs & Milestones location
+### Milestone Documents Location
 
 - Milestones and milestone docs: `docs/milestones/` (files like `M0-foundation.md`, `M1-account-privacy.md`)
-- Core docs: `docs/architecture.md`, `docs/api-contracts.md`, `docs/data-model.md`, `docs/WORKFLOW.md`, `docs/access-request-checklist.md`, `user-interface.md`
+- Core docs: `docs/README.md`, `docs/api-contracts.md`, `docs/WORKFLOW.md`, `docs/user-interface.md`
 - Implementation notes and specs live under `docs/` — prefer these paths when opening issues or drafting PR descriptions.
 
 ### When Implementing Features
 
-- **Authentication?** → [spec/M1-account-privacy.md](../spec/M1-account-privacy.md)
-- **Habits/Goals?** → [spec/M2-habits-tracking.md](../spec/M2-habits-tracking.md)
-- **Social/Feed?** → [spec/M3-social.md](../spec/M3-social.md)
-- **Analytics?** → [spec/M4-identity-analytics.md](../spec/M4-identity-analytics.md)
-- **API endpoints?** → [spec/api-contracts.md](../spec/api-contracts.md)
+- **Authentication?** → [docs/milestones/M1-account-privacy.md](../docs/milestones/M1-account-privacy.md)
+- **Habits/Goals?** → [docs/milestones/M2-habits-tracking.md](../docs/milestones/M2-habits-tracking.md)
+- **Social/Feed?** → [docs/milestones/M3-social.md](../docs/milestones/M3-social.md)
+- **Analytics?** → [docs/milestones/M4-identity-analytics.md](../docs/milestones/M4-identity-analytics.md)
+- **API endpoints?** → [docs/api-contracts.md](../docs/api-contracts.md)
+- **Database schema?** → [src/storage/database.ts](../src/storage/database.ts)
 
 ### Each Milestone File Contains
 
@@ -234,13 +234,13 @@ const { theme } = useTheme();
 
 ## Critical Rules
 
-1. **Treat `/spec` as source of truth** - Never invent new features, endpoints, or fields
-2. **Privacy first** - All queries must validate viewer permissions server-side
+1. **Treat milestone docs as source of truth** - Never invent new features, endpoints, or fields
+2. **Privacy first** - All queries must validate viewer permissions server-side (when cloud deployed)
 3. **Device-first** - Write to SQLite first, sync to cloud in background
 4. **Small diffs** - Prefer reviewable changes over large refactors
 5. **Test coverage** - Add/update tests for changed behavior
 6. **No bypassing auth/privacy** - Never skip security checks for convenience
-7. **M1-M3 only** - Don't implement M4/M5 features yet (see [spec/M5-future.md](../spec/M5-future.md))
+7. **M0 complete, M1-M3 in progress** - Don't implement M4/M5 features yet
 
 ---
 
@@ -248,7 +248,8 @@ const { theme } = useTheme();
 
 - Leave `// TODO:` comment explaining the question
 - Write a failing test describing expected behavior
-- Reference specific spec files in questions: "According to M2-habits-tracking.md line 45..."
+- Reference specific milestone files in questions: "According to M2-habits-tracking.md line 45..."
+- Check [docs/README.md](../docs/README.md) for AI-specific guidance
 - Check [rules/ai-agent-guide.md](../rules/ai-agent-guide.md) for AI-specific guidance
 
 ---
@@ -265,10 +266,11 @@ These rules are for any autonomous or assistant agent (including CI bots or LLM-
 - **Run checks before commits/PRs:** Run `npm run type-check`, `npm test`, `npm run lint` and fix failures. Include test results or CI links in the PR description.
 - **Small, reviewable diffs:** Keep changes focused and limited in scope; prefer multiple small PRs to one large change. Add or update tests for behaviour changes.
 - **Add tests for new implementations:** When adding a new feature or changing behavior, add unit and/or integration tests that cover expected behavior and edge cases before opening a PR.
-- **Secrets handling:** Never write secrets or `.p8` keys into the repo. Use CI secret stores (GitHub Actions secrets, EAS secrets) and document required secret names in `docs/`.
-- **Note for AI agents:** The project's `.env` file is intentionally ignored and hidden from Copilot and repository scans; assume it exists locally for development and do not attempt to read, expose, or commit it. For development the repo uses two files:
-- ` .env.local`: non-sensitive configuration safe to reference in suggestions (feature flags, API_URL, timeouts, local paths). This file may be committed when it contains only non-secret values.
-- ` .env`: sensitive secrets only (JWT_SECRET, Apple `.p8` private keys, SENTRY_DSN, third-party API keys). Never read, expose, or commit its contents. Keep `.env` and any `.p8` files in `.gitignore` and in your secret manager. When proposing changes to environment variables or configuration, reference and modify `.env.local` in your suggestions — do not modify `.env` directly. For secret values, recommend using a secret manager (GitHub Actions secrets, EAS secrets, or similar) and document required secret names in `docs/`. The user will forward and apply any `.env` edits manually.
+- **Secrets handling:** Never write secrets or `.p8` keys into the repo. Use CI secret stores (GitHub Actions secrets, EAS env vars) and document required secret names in `docs/`.
+- **Environment configuration:** This project uses **cloud-only environment variables** via EAS. There are NO `.env` files. All configuration is managed through:
+  - **EAS env vars** (`npx eas-cli env:create`) for build-time config
+  - **GitHub Secrets** for CI/CD workflows
+  - When proposing changes to environment variables, reference `docs/env-troubleshooting.md` for the current approach. Never suggest creating `.env` files.
 - **Progress updates & cadence:** After significant work (3–5 tool calls or editing/creating >3 files), post a concise progress update summarizing completed steps, remaining tasks, and the next action.
 - **Ask clarifying questions:** If a requirement is ambiguous, leave a `// TODO:` and ask the owner rather than guessing. Create a failing test that codifies the assumption when helpful.
 - **PR policy:** Open feature branches and create PRs against `main` (or the repo's default). Do not merge to `main` without owner approval and passing CI.

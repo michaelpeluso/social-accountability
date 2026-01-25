@@ -3,20 +3,11 @@
  * M2-2.3: Log Check-In feature
  * M2-2.4: Streak Calculation
  * M2-2.5: Streak Recovery & Misses
+ * Refactored to use reusable components for maintainability
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  RefreshControl,
-  Modal,
-  TextInput,
-  Alert,
-  ScrollView,
-} from "react-native";
+import { View, Text, Pressable, StyleSheet, RefreshControl, Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { auth } from "../../src/services/auth";
@@ -27,8 +18,16 @@ import {
   getTodayCheckIns,
   deleteCheckIn,
 } from "../../src/storage/checkIns";
-import { PILLAR_INFO, PRIVACY_INFO } from "../../src/types/goals";
-import type { Habit, HabitCheckIn, Privacy, HabitFrequency } from "../../src/types";
+import {
+  joinHabit,
+  leaveHabit,
+  isParticipant,
+  getParticipantCount,
+  getParticipant,
+  updateParticipantPerformancePrivacy,
+} from "../../src/storage/habitParticipants";
+import { getUserById } from "../../src/storage/user";
+import type { Habit, HabitCheckIn, Privacy, HabitFrequency, User } from "../../src/types";
 import {
   calculateStreak,
   getCurrentPeriodCount,
@@ -37,11 +36,21 @@ import {
   calculateRecoveryStatus,
 } from "../../src/logic";
 import { useTheme } from "../../src/theme";
-import { spacing, borderRadius } from "../../src/theme/spacing";
+import { spacing } from "../../src/theme/spacing";
 import { typography } from "../../src/theme/typography";
-
-// Privacy options for editing
-const PRIVACY_OPTIONS: Privacy[] = ["SELF", "FRIENDS", "PUBLIC"];
+import {
+  ScreenHeader,
+  EmptyState,
+  HabitDetailCard,
+  StatusBanner,
+  StreakDisplay,
+  TodayProgress,
+  CheckInList,
+  CheckInModal,
+  EditHabitModal,
+  EditJoinedHabitModal,
+  Avatar,
+} from "../../src/components";
 
 export default function HabitDetailScreen() {
   const { theme } = useTheme();
@@ -53,7 +62,17 @@ export default function HabitDetailScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showJoinedEditModal, setShowJoinedEditModal] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("");
+
+  // Owner/viewer mode state
+  const [habitOwner, setHabitOwner] = useState<User | null>(null);
+  const [hasJoined, setHasJoined] = useState(false);
+  const [participantCount, setParticipantCount] = useState(0);
+  const [isJoining, setIsJoining] = useState(false);
+  const [participantPerformancePrivacy, setParticipantPerformancePrivacy] =
+    useState<Privacy>("FRIENDS");
 
   // Check-in form state
   const [checkInNote, setCheckInNote] = useState("");
@@ -62,11 +81,12 @@ export default function HabitDetailScreen() {
   // Edit form state
   const [editTitle, setEditTitle] = useState("");
   const [editPrivacy, setEditPrivacy] = useState<Privacy>("SELF");
+  const [editPerformancePrivacy, setEditPerformancePrivacy] = useState<Privacy>("FRIENDS");
   const [editFrequency, setEditFrequency] = useState<HabitFrequency>("daily");
   const [editTargetCount, setEditTargetCount] = useState("1");
 
   const loadData = useCallback(async () => {
-    if (!id) return;
+    if (!id || !userId) return;
     try {
       const [habitData, checkInsData, todayData] = await Promise.all([
         getHabitById(id),
@@ -76,24 +96,50 @@ export default function HabitDetailScreen() {
       setHabit(habitData);
       setCheckIns(checkInsData);
       setTodayCheckIns(todayData);
+
+      // Load owner info and participation status if viewing someone else's habit
+      if (habitData && habitData.userId !== userId) {
+        const [owner, joined, count, participant] = await Promise.all([
+          getUserById(habitData.userId),
+          isParticipant(id, userId),
+          getParticipantCount(id),
+          getParticipant(id, userId),
+        ]);
+        setHabitOwner(owner);
+        setHasJoined(joined);
+        setParticipantCount(count);
+        if (participant) {
+          setParticipantPerformancePrivacy(participant.performancePrivacy);
+        }
+      } else {
+        // Own habit - get participant count
+        const count = await getParticipantCount(id);
+        setParticipantCount(count);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load habit";
       console.error("Error loading habit:", error);
       Alert.alert("Error", message);
     }
-  }, [id]);
+  }, [id, userId]);
 
   useEffect(() => {
     async function initialize() {
       const user = await auth.getUser();
       if (user) {
         setUserId(user.id);
-        await loadData();
+        setUserName(user.displayName);
       }
       setIsLoading(false);
     }
     initialize();
-  }, [loadData]);
+  }, []);
+
+  useEffect(() => {
+    if (userId) {
+      loadData();
+    }
+  }, [userId, loadData]);
 
   const onRefresh = useCallback(async () => {
     if (!userId) return;
@@ -178,10 +224,68 @@ export default function HabitDetailScreen() {
     ]);
   }
 
+  async function handleJoinHabit() {
+    if (!habit || !userId || !userName) return;
+
+    setIsJoining(true);
+    try {
+      await joinHabit(habit.id, userId, userName);
+      setHasJoined(true);
+      setParticipantCount((prev) => prev + 1);
+      Alert.alert("Joined!", `You've joined "${habit.title}". The owner has been notified.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to join habit";
+      Alert.alert("Error", message);
+    } finally {
+      setIsJoining(false);
+    }
+  }
+
+  async function handleLeaveHabit() {
+    if (!habit || !userId) return;
+
+    Alert.alert("Leave Habit", `Stop following "${habit.title}"?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Leave",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await leaveHabit(habit.id, userId);
+            setHasJoined(false);
+            setParticipantCount((prev) => Math.max(0, prev - 1));
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Failed to leave habit";
+            Alert.alert("Error", message);
+          }
+        },
+      },
+    ]);
+  }
+
+  function openJoinedEditModal() {
+    setShowJoinedEditModal(true);
+  }
+
+  async function handleSaveJoinedEdit() {
+    if (!habit || !userId) return;
+    setIsSubmitting(true);
+    try {
+      await updateParticipantPerformancePrivacy(habit.id, userId, participantPerformancePrivacy);
+      setShowJoinedEditModal(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update settings";
+      Alert.alert("Error", message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   function openEditModal() {
     if (!habit) return;
     setEditTitle(habit.title);
     setEditPrivacy(habit.privacy);
+    setEditPerformancePrivacy(habit.performancePrivacy || "FRIENDS");
     setEditFrequency(habit.schedule.frequency);
     setEditTargetCount(habit.schedule.targetCount.toString());
     setShowEditModal(true);
@@ -205,6 +309,7 @@ export default function HabitDetailScreen() {
       await updateHabit(habit.id, {
         title: editTitle.trim(),
         privacy: editPrivacy,
+        performancePrivacy: editPerformancePrivacy,
         schedule: {
           ...habit.schedule,
           frequency: editFrequency,
@@ -296,298 +401,164 @@ export default function HabitDetailScreen() {
   if (!habit) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
-        <View style={[styles.header, { borderBottomColor: theme.border.light }]}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={[styles.backButtonText, { color: theme.button.primary.background }]}>
-              Back
-            </Text>
-          </Pressable>
-        </View>
-        <View style={styles.emptyState}>
-          <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>Habit not found</Text>
-        </View>
+        <ScreenHeader title="" />
+        <EmptyState emoji="🔍" title="Habit not found" />
       </SafeAreaView>
     );
   }
 
-  const pillarInfo = PILLAR_INFO[habit.pillar];
+  const isOwner = habit.userId === userId;
   const todayCount = todayCheckIns.length;
   const targetMet = todayCount >= habit.schedule.targetCount;
+  const progressTitle = `${habit.schedule.frequency === "weekly" ? "This Week" : "Today"}'s Progress`;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.border.light }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={[styles.backButtonText, { color: theme.button.primary.background }]}>
-            Back
-          </Text>
-        </Pressable>
-        <View style={styles.headerActions}>
-          <Pressable onPress={openEditModal} style={styles.editButton}>
-            <Text style={[styles.editButtonText, { color: theme.button.primary.background }]}>
-              Edit
-            </Text>
-          </Pressable>
-          <Pressable onPress={handleArchive} style={styles.archiveButton}>
-            <Text style={[styles.archiveButtonText, { color: theme.text.error }]}>Archive</Text>
-          </Pressable>
-        </View>
-      </View>
+      <ScreenHeader
+        title=""
+        rightAction={
+          isOwner ? (
+            <View style={styles.headerActions}>
+              <Pressable onPress={openEditModal} style={styles.actionButton}>
+                <Text style={[styles.editText, { color: theme.semantic.primary }]}>Edit</Text>
+              </Pressable>
+              <Pressable onPress={handleArchive} style={styles.actionButton}>
+                <Text style={[styles.archiveText, { color: theme.text.error }]}>Archive</Text>
+              </Pressable>
+            </View>
+          ) : hasJoined ? (
+            <View style={styles.headerActions}>
+              <Pressable onPress={openJoinedEditModal} style={styles.actionButton}>
+                <Text style={[styles.editText, { color: theme.semantic.primary }]}>Edit</Text>
+              </Pressable>
+              <Pressable onPress={handleLeaveHabit} style={styles.actionButton}>
+                <Text style={[styles.archiveText, { color: theme.text.error }]}>Leave</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              onPress={handleJoinHabit}
+              disabled={isJoining}
+              style={[styles.joinButton, { backgroundColor: theme.semantic.primary }]}
+            >
+              <Text style={styles.joinButtonText}>{isJoining ? "Joining..." : "Join"}</Text>
+            </Pressable>
+          )
+        }
+      />
 
       <ScrollView
         style={styles.content}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
       >
-        {/* Habit Info Card */}
-        <View style={[styles.habitCard, { borderLeftColor: pillarInfo.color }]}>
-          <View style={styles.habitHeader}>
-            <Text style={styles.pillarEmoji}>{pillarInfo.emoji}</Text>
-            <View style={styles.habitTitleContainer}>
-              <Text style={styles.habitTitle}>{habit.title}</Text>
-              <Text style={styles.pillarLabel}>{pillarInfo.label}</Text>
-            </View>
-          </View>
-
-          <View style={styles.scheduleInfo}>
-            <Text style={styles.scheduleText}>
-              {habit.schedule.targetCount}x {habit.schedule.frequency}
-            </Text>
-          </View>
-        </View>
-
-        {/* Status Banner - Shows recovery/at-risk status */}
-        {habitStatus !== "on-track" && habitStatus !== "inactive" && (
-          <View
-            style={[
-              styles.statusBanner,
-              habitStatus === "recovering" && styles.statusRecovering,
-              habitStatus === "at-risk" && styles.statusAtRisk,
-              habitStatus === "missed-today" && styles.statusMissedToday,
-            ]}
+        {/* Owner info when viewing someone else's habit */}
+        {!isOwner && habitOwner && (
+          <Pressable
+            style={[styles.ownerCard, { backgroundColor: theme.card.background }]}
+            onPress={() => router.push(`/profile/${habitOwner.id}`)}
           >
-            <Text style={styles.statusBannerText}>{statusMessage}</Text>
+            <Avatar imageUrl={habitOwner.photoUrl} name={habitOwner.displayName} size="sm" />
+            <View style={styles.ownerInfo}>
+              <Text style={[styles.ownerName, { color: theme.text.primary }]}>
+                {habitOwner.displayName}&apos;s habit
+              </Text>
+              {participantCount > 0 && (
+                <Text style={[styles.participantCount, { color: theme.text.secondary }]}>
+                  {participantCount} {participantCount === 1 ? "person" : "people"} joined
+                </Text>
+              )}
+            </View>
+            {hasJoined && (
+              <View style={[styles.joinedBadge, { backgroundColor: theme.text.success + "20" }]}>
+                <Text style={[styles.joinedBadgeText, { color: theme.text.success }]}>Joined</Text>
+              </View>
+            )}
+          </Pressable>
+        )}
+
+        {/* Performance privacy control for joined users - now in EditJoinedHabitModal */}
+
+        {/* Participant count for owner */}
+        {isOwner && participantCount > 0 && (
+          <View style={[styles.participantBanner, { backgroundColor: theme.card.background }]}>
+            <Text style={[styles.participantBannerText, { color: theme.text.primary }]}>
+              👥 {participantCount} {participantCount === 1 ? "person has" : "people have"} joined
+              this habit
+            </Text>
           </View>
         )}
 
-        {/* Streak Display - Using real-time calculated data */}
-        <View style={styles.streakCard}>
-          <View style={styles.streakItem}>
-            <Text style={styles.streakNumber}>{streakData.currentStreak}</Text>
-            <Text style={styles.streakLabel}>Current Streak</Text>
-          </View>
-          <View style={styles.streakDivider} />
-          <View style={styles.streakItem}>
-            <Text style={styles.streakNumber}>{streakData.longestStreak}</Text>
-            <Text style={styles.streakLabel}>Best Streak</Text>
-          </View>
-          {recoveryStatus.isInRecovery && recoveryStatus.recoveryStreak > 0 && (
-            <>
-              <View style={styles.streakDivider} />
-              <View style={styles.streakItem}>
-                <Text style={[styles.streakNumber, styles.recoveryNumber]}>
-                  {recoveryStatus.recoveryStreak}
-                </Text>
-                <Text style={styles.streakLabel}>Recovery 🔥</Text>
-              </View>
-            </>
-          )}
-        </View>
+        <HabitDetailCard habit={habit} />
 
-        {/* Today's/This Week's Progress */}
-        <View style={styles.todayCard}>
-          <Text style={styles.sectionTitle}>
-            {habit.schedule.frequency === "weekly" ? "This Week" : "Today"}&apos;s Progress
-          </Text>
-          <View style={styles.todayProgress}>
-            <View style={styles.progressCircle}>
-              <Text
-                style={[
-                  styles.progressCount,
-                  periodProgress.remaining === 0 && styles.progressComplete,
-                ]}
-              >
-                {periodProgress.count}/{periodProgress.target}
-              </Text>
-            </View>
-            <Text style={styles.progressLabel}>
-              {periodProgress.remaining === 0
-                ? "Target reached!"
-                : `${periodProgress.remaining} more to go`}
-            </Text>
-          </View>
+        <StatusBanner status={habitStatus} message={statusMessage} />
 
-          {/* Quick Check-in Button */}
-          <Pressable
-            style={[styles.checkInButton, targetMet && styles.checkInButtonComplete]}
-            onPress={handleQuickCheckIn}
-          >
-            <Text style={styles.checkInButtonText}>{targetMet ? "+ Log Another" : "Check In"}</Text>
-          </Pressable>
+        <StreakDisplay
+          currentStreak={streakData.currentStreak}
+          longestStreak={streakData.longestStreak}
+          recoveryStreak={recoveryStatus.recoveryStreak}
+          isInRecovery={recoveryStatus.isInRecovery}
+        />
 
-          {/* Add note option */}
-          <Pressable style={styles.addNoteButton} onPress={() => setShowCheckInModal(true)}>
-            <Text style={styles.addNoteButtonText}>Check in with note</Text>
-          </Pressable>
-        </View>
+        {/* Only show check-in controls for habit owner */}
+        {isOwner && (
+          <TodayProgress
+            title={progressTitle}
+            count={periodProgress.count}
+            target={periodProgress.target}
+            remaining={periodProgress.remaining}
+            targetMet={targetMet}
+            onQuickCheckIn={handleQuickCheckIn}
+            onCheckInWithNote={() => setShowCheckInModal(true)}
+          />
+        )}
 
-        {/* Recent Check-ins */}
-        <View style={styles.historySection}>
-          <Text style={styles.sectionTitle}>Recent Check-ins</Text>
-          {checkIns.length === 0 ? (
-            <Text style={styles.noCheckIns}>No check-ins yet. Log your first one!</Text>
-          ) : (
-            checkIns.map((checkIn) => (
-              <Pressable
-                key={checkIn.id}
-                style={styles.checkInRow}
-                onLongPress={() => handleDeleteCheckIn(checkIn.id)}
-              >
-                <View style={styles.checkInInfo}>
-                  <Text style={styles.checkInTime}>{formatDate(checkIn.occurredAt)}</Text>
-                  {checkIn.note && <Text style={styles.checkInNote}>{checkIn.note}</Text>}
-                </View>
-                <View style={styles.checkInSource}>
-                  <Text style={styles.checkInSourceText}>
-                    {checkIn.source === "MANUAL" ? "Manual" : "Auto"}
-                  </Text>
-                </View>
-              </Pressable>
-            ))
-          )}
-        </View>
+        {/* Show check-in history (read-only for non-owners) */}
+        <CheckInList
+          checkIns={checkIns}
+          onDeleteCheckIn={isOwner ? handleDeleteCheckIn : undefined}
+          formatDate={formatDate}
+        />
       </ScrollView>
 
-      {/* Check-in with Note Modal */}
-      <Modal
+      <CheckInModal
         visible={showCheckInModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowCheckInModal(false)}
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Pressable onPress={() => setShowCheckInModal(false)}>
-              <Text style={styles.modalCancel}>Cancel</Text>
-            </Pressable>
-            <Text style={styles.modalTitle}>Log Check-in</Text>
-            <Pressable onPress={handleCheckIn} disabled={isSubmitting}>
-              <Text style={[styles.modalSave, isSubmitting && styles.disabled]}>
-                {isSubmitting ? "Saving..." : "Save"}
-              </Text>
-            </Pressable>
-          </View>
+        onClose={() => setShowCheckInModal(false)}
+        onSubmit={handleCheckIn}
+        note={checkInNote}
+        onNoteChange={setCheckInNote}
+        isSubmitting={isSubmitting}
+      />
 
-          <View style={styles.modalContent}>
-            <Text style={styles.label}>Add a note (optional)</Text>
-            <TextInput
-              style={styles.noteInput}
-              placeholder="How did it go? Any thoughts?"
-              value={checkInNote}
-              onChangeText={setCheckInNote}
-              multiline
-              maxLength={500}
-              textAlignVertical="top"
-            />
-            <Text style={styles.charCount}>{checkInNote.length}/500</Text>
-          </View>
-        </SafeAreaView>
-      </Modal>
-
-      {/* Edit Habit Modal */}
-      <Modal
+      <EditHabitModal
         visible={showEditModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowEditModal(false)}
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Pressable onPress={() => setShowEditModal(false)}>
-              <Text style={styles.modalCancel}>Cancel</Text>
-            </Pressable>
-            <Text style={styles.modalTitle}>Edit Habit</Text>
-            <Pressable onPress={handleSaveEdit} disabled={isSubmitting}>
-              <Text style={[styles.modalSave, isSubmitting && styles.disabled]}>
-                {isSubmitting ? "Saving..." : "Save"}
-              </Text>
-            </Pressable>
-          </View>
+        onClose={() => setShowEditModal(false)}
+        onSubmit={handleSaveEdit}
+        isSubmitting={isSubmitting}
+        title={editTitle}
+        onTitleChange={setEditTitle}
+        frequency={editFrequency}
+        onFrequencyChange={setEditFrequency}
+        targetCount={editTargetCount}
+        onTargetCountChange={setEditTargetCount}
+        privacy={editPrivacy}
+        onPrivacyChange={setEditPrivacy}
+        performancePrivacy={editPerformancePrivacy}
+        onPerformancePrivacyChange={setEditPerformancePrivacy}
+      />
 
-          <ScrollView style={styles.modalContent}>
-            {/* Title */}
-            <Text style={styles.label}>Title</Text>
-            <TextInput
-              style={styles.textInput}
-              value={editTitle}
-              onChangeText={setEditTitle}
-              placeholder="Enter habit title"
-              maxLength={100}
-            />
-
-            {/* Frequency */}
-            <Text style={styles.label}>Frequency</Text>
-            <View style={styles.frequencyOptions}>
-              {(["daily", "weekly"] as const).map((freq) => (
-                <Pressable
-                  key={freq}
-                  style={[
-                    styles.frequencyOption,
-                    editFrequency === freq && styles.frequencyOptionSelected,
-                  ]}
-                  onPress={() => setEditFrequency(freq)}
-                >
-                  <Text
-                    style={[
-                      styles.frequencyOptionText,
-                      editFrequency === freq && styles.frequencyOptionTextSelected,
-                    ]}
-                  >
-                    {freq.charAt(0).toUpperCase() + freq.slice(1)}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            {/* Target Count */}
-            <Text style={styles.label}>
-              Target (times per {editFrequency === "daily" ? "day" : "week"})
-            </Text>
-            <TextInput
-              style={styles.textInput}
-              value={editTargetCount}
-              onChangeText={setEditTargetCount}
-              keyboardType="number-pad"
-              placeholder="1"
-            />
-
-            {/* Privacy */}
-            <Text style={styles.label}>Privacy</Text>
-            <View style={styles.privacyOptions}>
-              {PRIVACY_OPTIONS.map((privacy) => (
-                <Pressable
-                  key={privacy}
-                  style={[
-                    styles.privacyOption,
-                    editPrivacy === privacy && styles.privacyOptionSelected,
-                  ]}
-                  onPress={() => setEditPrivacy(privacy)}
-                >
-                  <Text
-                    style={[
-                      styles.privacyOptionText,
-                      editPrivacy === privacy && styles.privacyOptionTextSelected,
-                    ]}
-                  >
-                    {PRIVACY_INFO[privacy].label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={styles.privacyDescription}>{PRIVACY_INFO[editPrivacy].description}</Text>
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+      {/* Edit modal for joined habits - only shows performance privacy */}
+      {!isOwner && habitOwner && (
+        <EditJoinedHabitModal
+          visible={showJoinedEditModal}
+          onClose={() => setShowJoinedEditModal(false)}
+          onSubmit={handleSaveJoinedEdit}
+          isSubmitting={isSubmitting}
+          habitTitle={habit.title}
+          ownerName={habitOwner.displayName}
+          performancePrivacy={participantPerformancePrivacy}
+          onPerformancePrivacyChange={setParticipantPerformancePrivacy}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -595,398 +566,75 @@ export default function HabitDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
   },
   loadingText: {
     textAlign: "center",
     marginTop: 100,
-    fontSize: 16,
-    color: "#666",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e5e5",
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  backButtonText: {
     fontSize: typography.fontSize.base,
-    color: "#007AFF",
+  },
+  content: {
+    flex: 1,
   },
   headerActions: {
     flexDirection: "row",
     gap: spacing.md,
   },
-  editButton: {
+  actionButton: {
     padding: spacing.sm,
   },
-  editButtonText: {
+  editText: {
     fontSize: typography.fontSize.base,
-    color: "#007AFF",
   },
-  archiveButton: {
-    padding: spacing.sm,
-  },
-  archiveButtonText: {
+  archiveText: {
     fontSize: typography.fontSize.base,
-    color: "#FF6B6B",
   },
-  emptyState: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: spacing.xxl - 8,
-  },
-  emptyTitle: {
-    fontSize: typography.fontSize.lg,
-    color: "#666",
-  },
-  content: {
-    flex: 1,
-  },
-  habitCard: {
-    backgroundColor: "#fff",
-    margin: spacing.md,
-    padding: spacing.lg - 4,
-    borderRadius: borderRadius.xl,
-    borderLeftWidth: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  habitHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  pillarEmoji: {
-    fontSize: typography.fontSize.xxxl,
-    marginRight: spacing.sm,
-  },
-  habitTitleContainer: {
-    flex: 1,
-  },
-  habitTitle: {
-    fontSize: 22,
-    fontWeight: typography.fontWeight.bold,
-    marginBottom: spacing.xs,
-  },
-  pillarLabel: {
-    fontSize: typography.fontSize.sm,
-    color: "#666",
-  },
-  scheduleInfo: {
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
-  },
-  scheduleText: {
-    fontSize: typography.fontSize.base,
-    color: "#666",
-  },
-  // Status banner styles
-  statusBanner: {
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.md,
-    padding: spacing.sm,
-    borderRadius: borderRadius.lg,
-    alignItems: "center",
-  },
-  statusRecovering: {
-    backgroundColor: "#E8F5E9",
-    borderColor: "#4CAF50",
-    borderWidth: 1,
-  },
-  statusAtRisk: {
-    backgroundColor: "#FFEBEE",
-    borderColor: "#f44336",
-    borderWidth: 1,
-  },
-  statusMissedToday: {
-    backgroundColor: "#FFF3E0",
-    borderColor: "#FF9800",
-    borderWidth: 1,
-  },
-  statusBannerText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: "#333",
-  },
-  streakCard: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.md,
-    padding: spacing.lg - 4,
-    borderRadius: borderRadius.xl,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  streakItem: {
-    flex: 1,
-    alignItems: "center",
-  },
-  streakDivider: {
-    width: 1,
-    backgroundColor: "#f0f0f0",
-  },
-  streakNumber: {
-    fontSize: 36,
-    fontWeight: typography.fontWeight.bold,
-    color: "#FF6B6B",
-  },
-  recoveryNumber: {
-    color: "#4CAF50",
-  },
-  streakLabel: {
-    fontSize: typography.fontSize.sm,
-    color: "#666",
-    marginTop: spacing.xs,
-  },
-  todayCard: {
-    backgroundColor: "#fff",
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.md,
-    padding: spacing.lg - 4,
-    borderRadius: borderRadius.xl,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  sectionTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    marginBottom: spacing.md,
-  },
-  todayProgress: {
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  progressCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: borderRadius.full,
-    backgroundColor: "#f0f0f0",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: spacing.sm,
-  },
-  progressCount: {
-    fontSize: typography.fontSize.xxl,
-    fontWeight: typography.fontWeight.bold,
-    color: "#333",
-  },
-  progressComplete: {
-    color: "#4CAF50",
-  },
-  progressLabel: {
-    fontSize: typography.fontSize.sm,
-    color: "#666",
-  },
-  checkInButton: {
-    backgroundColor: "#000",
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.lg,
-    alignItems: "center",
-    marginBottom: spacing.sm,
-  },
-  checkInButtonComplete: {
-    backgroundColor: "#4CAF50",
-  },
-  checkInButtonText: {
-    color: "#fff",
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  addNoteButton: {
-    alignItems: "center",
-    paddingVertical: spacing.sm,
-  },
-  addNoteButtonText: {
-    color: "#007AFF",
-    fontSize: typography.fontSize.sm,
-  },
-  historySection: {
-    backgroundColor: "#fff",
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.xl,
-    padding: spacing.lg - 4,
-    borderRadius: borderRadius.xl,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  noCheckIns: {
-    textAlign: "center",
-    color: "#999",
-    fontSize: typography.fontSize.sm,
-    paddingVertical: 20,
-  },
-  checkInRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f5f5f5",
-  },
-  checkInInfo: {
-    flex: 1,
-  },
-  checkInTime: {
-    fontSize: typography.fontSize.sm,
-    color: "#333",
-  },
-  checkInNote: {
-    fontSize: 13,
-    color: "#666",
-    marginTop: spacing.xs,
-  },
-  checkInSource: {
-    backgroundColor: "#f0f0f0",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-  },
-  checkInSourceText: {
-    fontSize: 11,
-    color: "#666",
-  },
-  // Modal styles
-  modalContainer: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  joinButton: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e5e5",
+    borderRadius: 20,
   },
-  modalCancel: {
+  joinButtonText: {
+    color: "#FFFFFF",
     fontSize: typography.fontSize.base,
-    color: "#666",
-  },
-  modalTitle: {
-    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
   },
-  modalSave: {
-    fontSize: typography.fontSize.base,
-    color: "#007AFF",
-    fontWeight: typography.fontWeight.semibold,
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-  modalContent: {
-    flex: 1,
-    padding: spacing.lg - 4,
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: typography.fontWeight.semibold,
-    marginBottom: spacing.xmd,
-    color: "#333",
-  },
-  noteInput: {
-    fontSize: typography.fontSize.base,
-    borderWidth: 1,
-    borderColor: "#e5e5e5",
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    minHeight: 120,
-  },
-  charCount: {
-    textAlign: "right",
-    fontSize: typography.fontSize.xs,
-    color: "#999",
-    marginTop: spacing.sm,
-  },
-  // Edit Modal Styles
-  textInput: {
-    fontSize: typography.fontSize.base,
-    borderWidth: 1,
-    borderColor: "#e5e5e5",
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.lg - 4,
-    backgroundColor: "#fff",
-  },
-  frequencyOptions: {
+  ownerCard: {
     flexDirection: "row",
-    gap: spacing.sm,
-    marginBottom: spacing.lg - 4,
-  },
-  frequencyOption: {
-    flex: 1,
-    paddingVertical: spacing.smd,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: "#e5e5e5",
     alignItems: "center",
-    backgroundColor: "#fff",
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: 12,
   },
-  frequencyOptionSelected: {
-    borderColor: "#007AFF",
-    backgroundColor: "#F0F7FF",
+  ownerInfo: {
+    flex: 1,
+    marginLeft: spacing.sm,
   },
-  frequencyOptionText: {
+  ownerName: {
     fontSize: typography.fontSize.base,
-    color: "#666",
+    fontWeight: typography.fontWeight.medium,
   },
-  frequencyOptionTextSelected: {
-    color: "#007AFF",
-    fontWeight: typography.fontWeight.semibold,
-  },
-  privacyOptions: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  privacyOption: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: "#e5e5e5",
-    alignItems: "center",
-    backgroundColor: "#fff",
-  },
-  privacyOptionSelected: {
-    borderColor: "#007AFF",
-    backgroundColor: "#F0F7FF",
-  },
-  privacyOptionText: {
+  participantCount: {
     fontSize: typography.fontSize.sm,
-    color: "#666",
+    marginTop: 2,
   },
-  privacyOptionTextSelected: {
-    color: "#007AFF",
-    fontWeight: typography.fontWeight.semibold,
+  joinedBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 12,
   },
-  privacyDescription: {
-    fontSize: 13,
-    color: "#999",
-    marginBottom: spacing.lg - 4,
+  joinedBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+  },
+  participantBanner: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  participantBannerText: {
+    fontSize: typography.fontSize.sm,
   },
 });

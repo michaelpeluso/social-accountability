@@ -1,54 +1,83 @@
-type LogLevel = "debug" | "info" | "warn" | "error";
+/**
+ * Environment Configuration (Cloud-Only)
+ *
+ * All environment variables are managed via EAS:
+ * - Development: EAS env vars (eas env:create)
+ * - Production builds: EAS secrets injected at build time
+ *
+ * NO .env files in this project - all config lives in EAS.
+ *
+ * To add/update variables:
+ *   npx eas-cli env:create --name VAR_NAME --value "value" --type string
+ *   npx eas-cli env:list
+ */
 
-function getRequiredEnv(key: string): string {
-  const value = process.env[key];
+import Constants from "expo-constants";
+
+// Config from app.config.js extra (populated by EAS at build time)
+const extra = Constants.expoConfig?.extra ?? {};
+
+/**
+ * Get environment variable from EAS config
+ */
+function getEnv(key: string, defaultValue: string = ""): string {
+  // Convert EXPO_PUBLIC_SUPABASE_URL -> supabaseUrl
+  const extraKey = key
+    .replace("EXPO_PUBLIC_", "")
+    .toLowerCase()
+    .replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
+
+  return (extra[extraKey] as string) ?? defaultValue;
+}
+
+function getRequired(key: string): string {
+  const value = getEnv(key);
   if (!value) {
+    // In development, provide helpful message
+    if (__DEV__) {
+      console.warn(
+        `Missing env var: ${key}. Run: npx eas-cli env:create --name ${key} --value "your-value" --type string`
+      );
+    }
     throw new Error(`Missing required environment variable: ${key}`);
   }
   return value;
 }
 
-function getOptionalEnv(key: string, defaultValue: string): string {
-  return process.env[key] ?? defaultValue;
-}
-
-function getNumberEnv(key: string, defaultValue: number): number {
-  const value = process.env[key];
-  if (!value) return defaultValue;
-  const parsed = parseInt(value, 10);
-  if (isNaN(parsed)) {
-    throw new Error(`Invalid number for environment variable ${key}: ${value}`);
-  }
-  return parsed;
-}
-
-function getBooleanEnv(key: string, defaultValue: boolean): boolean {
-  const value = process.env[key];
+function getBool(key: string, defaultValue: boolean): boolean {
+  const value = getEnv(key);
   if (!value) return defaultValue;
   return value.toLowerCase() === "true";
 }
 
+function getNumber(key: string, defaultValue: number): number {
+  const value = getEnv(key);
+  if (!value) return defaultValue;
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? defaultValue : parsed;
+}
+
 export const env = {
-  // Node environment
-  NODE_ENV: getOptionalEnv("NODE_ENV", "development"),
+  // App variant (development | production)
+  APP_VARIANT: extra.appVariant ?? "development",
 
-  // API configuration
-  API_URL: getRequiredEnv("API_URL"),
-  API_TIMEOUT_MS: getNumberEnv("API_TIMEOUT_MS", 10000),
+  // API
+  API_URL: getRequired("EXPO_PUBLIC_API_URL"),
+  API_TIMEOUT_MS: getNumber("API_TIMEOUT_MS", 10000),
 
-  // Auth configuration
-  APPLE_CLIENT_ID: getRequiredEnv("APPLE_CLIENT_ID"),
-  JWT_SECRET: getRequiredEnv("JWT_SECRET"),
-
-  // Logging
-  LOG_LEVEL: getOptionalEnv("LOG_LEVEL", "info") as LogLevel,
-
-  // Rate limiting
-  RATE_LIMIT_WINDOW: getNumberEnv("RATE_LIMIT_WINDOW", 86400),
-  RATE_LIMIT_NUDGES_PER_PAIR: getNumberEnv("RATE_LIMIT_NUDGES_PER_PAIR", 3),
-  RATE_LIMIT_NUDGES_PER_USER: getNumberEnv("RATE_LIMIT_NUDGES_PER_USER", 10),
+  // Supabase
+  SUPABASE_URL: getEnv("EXPO_PUBLIC_SUPABASE_URL", ""),
+  SUPABASE_ANON_KEY: getEnv("EXPO_PUBLIC_SUPABASE_ANON_KEY", ""),
 
   // Feature flags
-  ENABLE_APPLE_AUTH: getBooleanEnv("ENABLE_APPLE_AUTH", true),
-  ENABLE_HEALTHKIT: getBooleanEnv("ENABLE_HEALTHKIT", false),
+  ENABLE_APPLE_AUTH: getBool("ENABLE_APPLE_AUTH", true),
+  ENABLE_HEALTHKIT: getBool("ENABLE_HEALTHKIT", false),
+  ENABLE_CLOUD_SYNC: getBool("ENABLE_CLOUD_SYNC", false),
+
+  // Logging
+  LOG_LEVEL: getEnv("LOG_LEVEL", "info") as "debug" | "info" | "warn" | "error",
+
+  // Rate limiting
+  RATE_LIMIT_NUDGES_PER_PAIR: getNumber("RATE_LIMIT_NUDGES_PER_PAIR", 3),
+  RATE_LIMIT_NUDGES_PER_USER: getNumber("RATE_LIMIT_NUDGES_PER_USER", 10),
 };

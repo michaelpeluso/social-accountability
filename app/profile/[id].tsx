@@ -11,7 +11,6 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Image,
   RefreshControl,
   ActivityIndicator,
   Alert,
@@ -23,11 +22,14 @@ import { typography } from "../../src/theme/typography";
 import { getUserById, getFriends } from "../../src/storage/user";
 import { getUserBadges } from "../../src/storage/badges";
 import { getFeedPosts } from "../../src/storage/posts";
+import { getHabitsByUserId } from "../../src/storage/habits";
 import { auth } from "../../src/services/auth";
-import type { User, Badge, FeedPost } from "../../src/types";
+import type { User, Badge, FeedPost, Habit } from "../../src/types";
+import { BADGE_INFO, getTieredBadgeInfo } from "../../src/types";
 import { formatRelativeTime } from "../../src/logic/dates";
 import { useTheme } from "../../src/theme";
-import { PostCard, BadgeCard } from "../../src/components/cards";
+import { PostCard, BadgeCard, HabitCard } from "../../src/components/cards";
+import { Avatar, BadgeEarnedModal } from "../../src/components";
 
 export default function UserProfileScreen() {
   const { theme } = useTheme();
@@ -35,10 +37,13 @@ export default function UserProfileScreen() {
   const [user, setUser] = useState<User | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [badges, setBadges] = useState<Badge[]>([]);
+  const [habits, setHabits] = useState<Habit[]>([]);
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [isFriend, setIsFriend] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedBadge, setSelectedBadge] = useState<Badge | null>(null);
+  const [showBadgeModal, setShowBadgeModal] = useState(false);
 
   const isOwnProfile = currentUserId === id;
 
@@ -58,19 +63,29 @@ export default function UserProfileScreen() {
       setUser(profileUser);
 
       // Check if friend
+      let friendStatus = false;
       if (currentUser?.id && currentUser.id !== id) {
         const friends = await getFriends(currentUser.id);
-        setIsFriend(friends.some((f) => f.id === id));
+        friendStatus = friends.some((f) => f.id === id);
+        setIsFriend(friendStatus);
       }
 
       // Load badges (privacy aware)
       const userBadges = await getUserBadges(id);
       setBadges(userBadges);
 
+      // Load habits (privacy aware)
+      const userHabits = await getHabitsByUserId(
+        id,
+        currentUser?.id || id,
+        friendStatus || currentUser?.id === id
+      );
+      setHabits(userHabits);
+
       // Load posts (privacy aware - only public and friends' posts if friend)
-      const scope = isOwnProfile ? "mine" : isFriend ? "friends" : "discover";
+      const scope = isOwnProfile ? "mine" : friendStatus ? "friends" : "discover";
       const userPosts = await getFeedPosts(currentUser?.id || id, scope, 20);
-      setPosts(userPosts.filter((p) => p.authorUserId === id));
+      setPosts(userPosts.filter((p) => p.userId === id));
     } catch (error) {
       console.error("Failed to load profile:", error);
       Alert.alert("Error", "Failed to load profile");
@@ -78,7 +93,7 @@ export default function UserProfileScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [id, isOwnProfile, isFriend]);
+  }, [id, isOwnProfile]);
 
   useEffect(() => {
     loadProfile();
@@ -88,6 +103,37 @@ export default function UserProfileScreen() {
     setRefreshing(true);
     await loadProfile();
   }, [loadProfile]);
+
+  // Handle badge press - show details or allow sharing
+  const handleBadgePress = useCallback(
+    (badge: Badge) => {
+      if (isOwnProfile) {
+        setSelectedBadge(badge);
+        setShowBadgeModal(true);
+      }
+    },
+    [isOwnProfile]
+  );
+
+  // Handle badge share - navigate to create post with badge pre-filled
+  const handleBadgeShare = useCallback((badge: Badge) => {
+    // getTieredBadgeInfo extracts tier from badgeType (e.g., "posts-bronze")
+    const badgeInfo = badge.tier
+      ? getTieredBadgeInfo(badge.badgeType)
+      : BADGE_INFO[badge.badgeType];
+
+    const tierLabel = badge.tier ? badge.tier.charAt(0).toUpperCase() + badge.tier.slice(1) : "";
+
+    // Navigate to feed create with pre-filled badge content
+    router.push({
+      pathname: "/feed/create",
+      params: {
+        prefillText: `${badgeInfo?.emoji} I just earned the ${tierLabel ? tierLabel + " " : ""}${badgeInfo?.name || badge.badgeType} badge! 🎉`,
+        badgeId: badge.id,
+      },
+    });
+    setShowBadgeModal(false);
+  }, []);
 
   const renderEmptyBadges = () => (
     <View style={styles.emptyBadges}>
@@ -99,6 +145,20 @@ export default function UserProfileScreen() {
           : isFriend
             ? `${user?.displayName} hasn't earned any badges yet`
             : "This user's badges are private"}
+      </Text>
+    </View>
+  );
+
+  const renderEmptyHabits = () => (
+    <View style={styles.emptyBadges}>
+      <Text style={styles.emptyEmoji}>🎯</Text>
+      <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>No habits yet</Text>
+      <Text style={[styles.emptySubtitle, { color: theme.text.secondary }]}>
+        {isOwnProfile
+          ? "Create habits to start tracking your progress!"
+          : isFriend
+            ? `${user?.displayName} hasn't shared any habits yet`
+            : "This user's habits are private"}
       </Text>
     </View>
   );
@@ -140,6 +200,10 @@ export default function UserProfileScreen() {
   // Privacy aware display
   const canSeeBio = isOwnProfile || user.defaultPrivacy !== "SELF";
   const canSeeBadges = isOwnProfile || (isFriend && user.defaultPrivacy !== "SELF");
+  const canSeeHabits =
+    isOwnProfile ||
+    (isFriend && user.defaultPrivacy !== "SELF") ||
+    user.defaultPrivacy === "PUBLIC";
   const canSeePosts =
     isOwnProfile ||
     user.defaultPrivacy === "PUBLIC" ||
@@ -166,15 +230,7 @@ export default function UserProfileScreen() {
       >
         {/* Profile Header */}
         <View style={[styles.profileHeader, { backgroundColor: theme.card.background }]}>
-          <View style={[styles.avatar, { backgroundColor: theme.semantic.primary }]}>
-            {user.photoUrl ? (
-              <Image source={{ uri: user.photoUrl }} style={styles.avatarImage} />
-            ) : (
-              <Text style={[styles.avatarText, { color: theme.button.primary.text }]}>
-                {user.displayName.charAt(0).toUpperCase()}
-              </Text>
-            )}
-          </View>
+          <Avatar imageUrl={user.photoUrl} name={user.displayName} size="xl" />
           <Text style={[styles.displayName, { color: theme.text.primary }]}>
             {user.displayName}
           </Text>
@@ -194,6 +250,11 @@ export default function UserProfileScreen() {
           </View>
           <View style={[styles.statDivider, { backgroundColor: theme.border.light }]} />
           <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: theme.text.primary }]}>{habits.length}</Text>
+            <Text style={[styles.statLabel, { color: theme.text.secondary }]}>Habits</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: theme.border.light }]} />
+          <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: theme.text.primary }]}>{posts.length}</Text>
             <Text style={[styles.statLabel, { color: theme.text.secondary }]}>Posts</Text>
           </View>
@@ -210,7 +271,35 @@ export default function UserProfileScreen() {
             ) : (
               <View style={styles.badgesGrid}>
                 {badges.map((badge) => (
-                  <BadgeCard key={badge.id} badge={badge} />
+                  <BadgeCard
+                    key={badge.id}
+                    badge={badge}
+                    onPress={isOwnProfile ? handleBadgePress : undefined}
+                    onShare={isOwnProfile ? handleBadgeShare : undefined}
+                    showShareButton={isOwnProfile}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Habits Section */}
+        {canSeeHabits && (
+          <View style={[styles.section, { backgroundColor: theme.card.background }]}>
+            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
+              Habits ({habits.length})
+            </Text>
+            {habits.length === 0 ? (
+              renderEmptyHabits()
+            ) : (
+              <View>
+                {habits.map((habit) => (
+                  <HabitCard
+                    key={habit.id}
+                    habit={habit}
+                    onPress={() => router.push(`/habits/${habit.id}`)}
+                  />
                 ))}
               </View>
             )}
@@ -230,7 +319,7 @@ export default function UserProfileScreen() {
                     key={post.id}
                     post={post}
                     onPress={() => router.push(`/feed/${post.id}`)}
-                    onAuthorPress={() => router.push(`/profile/${post.authorUserId}`)}
+                    onAuthorPress={() => router.push(`/profile/${post.userId}`)}
                     currentUserId={currentUserId ?? ""}
                   />
                 ))}
@@ -246,6 +335,14 @@ export default function UserProfileScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Badge Detail Modal (for sharing) */}
+      <BadgeEarnedModal
+        visible={showBadgeModal}
+        badge={selectedBadge}
+        onClose={() => setShowBadgeModal(false)}
+        onShare={handleBadgeShare}
+      />
     </SafeAreaView>
   );
 }

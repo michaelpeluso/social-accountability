@@ -1,15 +1,107 @@
 /**
  * Badge Awarding Logic
  * Checks and awards badges based on user activity (M3)
- * Badges are automatically awarded when criteria are met
+ * Supports tiered badges (bronze, silver, gold, platinum) with quantitative thresholds
  */
 
 import { awardBadge, hasBadge } from "../storage/badges";
 import { queryFirst, query } from "../storage/database";
 import { countUserReactionsGiven } from "../storage/reactions";
 import { countNudgesSent } from "../storage/nudges";
+import { countUserPosts } from "../storage/posts";
+import { countUserComments } from "../storage/comments";
+import { countUserHabits, countUserCheckIns } from "../storage/habits";
+import { countCompletedGoals } from "../storage/goals";
+import { createNotification } from "../storage/notifications";
 import { logger } from "../lib/logger";
-import type { Badge, BadgeType, Pillar } from "../types";
+import type { Badge, BadgeType, BadgeTier, Pillar } from "../types";
+import { TIERED_BADGE_DEFINITIONS, BADGE_INFO } from "../types";
+
+/**
+ * Check and award all applicable tiered badges for a user
+ * Returns newly awarded badges
+ */
+export async function checkAndAwardTieredBadges(userId: string): Promise<Badge[]> {
+  const awardedBadges: Badge[] = [];
+
+  // Get all counts
+  const counts = await getBadgeCounts(userId);
+
+  // Check each tiered category
+  for (const [category, definition] of Object.entries(TIERED_BADGE_DEFINITIONS)) {
+    const count = counts[category] ?? 0;
+    const tiers: BadgeTier[] = ["bronze", "silver", "gold", "platinum"];
+
+    for (const tier of tiers) {
+      const threshold = definition.thresholds[tier];
+      if (count >= threshold) {
+        const badgeType = `${category}-${tier}` as BadgeType;
+        const badge = await awardBadge(userId, badgeType);
+        if (badge) {
+          awardedBadges.push(badge);
+
+          // Create notification for new badge
+          await createBadgeNotification(userId, badge);
+        }
+      }
+    }
+  }
+
+  return awardedBadges;
+}
+
+/**
+ * Get all badge-related counts for a user
+ */
+export async function getBadgeCounts(userId: string): Promise<Record<string, number>> {
+  const [
+    postsCount,
+    habitsCount,
+    goalsCount,
+    checkinsCount,
+    reactionsCount,
+    nudgesCount,
+    commentsCount,
+  ] = await Promise.all([
+    countUserPosts(userId),
+    countUserHabits(userId),
+    countCompletedGoals(userId),
+    countUserCheckIns(userId),
+    countUserReactionsGiven(userId),
+    countNudgesSent(userId),
+    countUserComments(userId),
+  ]);
+
+  return {
+    posts: postsCount,
+    habits: habitsCount,
+    goals: goalsCount,
+    checkins: checkinsCount,
+    reactions: reactionsCount,
+    nudges: nudgesCount,
+    comments: commentsCount,
+  };
+}
+
+/**
+ * Create a notification for a newly earned badge
+ */
+async function createBadgeNotification(userId: string, badge: Badge): Promise<void> {
+  const info = BADGE_INFO[badge.badgeType];
+  if (!info) return;
+
+  await createNotification(
+    userId,
+    "BADGE_EARNED",
+    `${info.emoji} New Badge Earned!`,
+    `Congratulations! You've earned the "${info.name}" badge. ${info.description}`,
+    {
+      badgeId: badge.id,
+      badgeType: badge.badgeType,
+      tier: badge.tier ?? "",
+    }
+  );
+}
 
 /**
  * Check and award all applicable badges for a user
@@ -18,21 +110,21 @@ import type { Badge, BadgeType, Pillar } from "../types";
 export async function checkAndAwardBadges(userId: string): Promise<Badge[]> {
   const awardedBadges: Badge[] = [];
 
+  // Check tiered badges first
+  const tieredBadges = await checkAndAwardTieredBadges(userId);
+  awardedBadges.push(...tieredBadges);
+
   // Check streak badges
   const streakBadges = await checkStreakBadges(userId);
   awardedBadges.push(...streakBadges);
 
-  // Check milestone badges
+  // Check legacy milestone badges (for backwards compatibility)
   const milestoneBadges = await checkMilestoneBadges(userId);
   awardedBadges.push(...milestoneBadges);
 
   // Check recovery badges
   const recoveryBadges = await checkRecoveryBadges(userId);
   awardedBadges.push(...recoveryBadges);
-
-  // Check social badges
-  const socialBadges = await checkSocialBadges(userId);
-  awardedBadges.push(...socialBadges);
 
   // Check pillar badges (monthly)
   const pillarBadges = await checkPillarBadges(userId);
@@ -153,18 +245,22 @@ async function checkRecoveryBadges(userId: string): Promise<Badge[]> {
 
 /**
  * Check social badges (reactions given, nudges sent)
+ * NOTE: These are legacy badges kept for backwards compatibility
+ * New tiered badges (reactions-bronze/silver/gold/platinum) are awarded via checkAndAwardTieredBadges
+ * This function is preserved for potential future use but not currently called in the main flow
+ * @deprecated Use checkAndAwardTieredBadges for new social badge awards
  */
-async function checkSocialBadges(userId: string): Promise<Badge[]> {
+export async function checkSocialBadgesLegacy(userId: string): Promise<Badge[]> {
   const awarded: Badge[] = [];
 
-  // Reactions given
+  // Legacy reactions badge
   const reactionsCount = await countUserReactionsGiven(userId);
   if (reactionsCount >= 50) {
     const badge = await awardBadge(userId, "reactions-50");
     if (badge) awarded.push(badge);
   }
 
-  // Nudges sent
+  // Legacy nudges badge
   const nudgesCount = await countNudgesSent(userId);
   if (nudgesCount >= 10) {
     const badge = await awardBadge(userId, "nudges-10");
@@ -235,6 +331,21 @@ export async function checkSpecificBadge(userId: string, badgeType: BadgeType): 
     return true;
   }
 
+  // Check tiered badges first
+  const tiers: BadgeTier[] = ["bronze", "silver", "gold", "platinum"];
+  for (const tier of tiers) {
+    if (badgeType.endsWith(`-${tier}`)) {
+      const category = badgeType.replace(`-${tier}`, "");
+      const definition = TIERED_BADGE_DEFINITIONS[category];
+      if (definition) {
+        const counts = await getBadgeCounts(userId);
+        const count = counts[category] ?? 0;
+        const threshold = definition.thresholds[tier];
+        return count >= threshold;
+      }
+    }
+  }
+
   // Check specific conditions based on badge type
   switch (badgeType) {
     case "streak-7":
@@ -280,4 +391,61 @@ export async function checkSpecificBadge(userId: string, badgeType: BadgeType): 
     default:
       return false;
   }
+}
+
+/**
+ * Get progress towards next badge in a category
+ */
+export async function getBadgeProgress(
+  userId: string,
+  category: string
+): Promise<{
+  currentCount: number;
+  currentTier: BadgeTier | null;
+  nextTier: BadgeTier | null;
+  nextThreshold: number | null;
+  progressPercent: number;
+} | null> {
+  const definition = TIERED_BADGE_DEFINITIONS[category];
+  if (!definition) return null;
+
+  const counts = await getBadgeCounts(userId);
+  const currentCount = counts[category] ?? 0;
+
+  // Find current tier
+  const tiers: BadgeTier[] = ["platinum", "gold", "silver", "bronze"];
+  let currentTier: BadgeTier | null = null;
+
+  for (const tier of tiers) {
+    if (currentCount >= definition.thresholds[tier]) {
+      currentTier = tier;
+      break;
+    }
+  }
+
+  // Find next tier
+  const tiersAscending: BadgeTier[] = ["bronze", "silver", "gold", "platinum"];
+  let nextTier: BadgeTier | null = null;
+  let nextThreshold: number | null = null;
+
+  for (const tier of tiersAscending) {
+    if (currentCount < definition.thresholds[tier]) {
+      nextTier = tier;
+      nextThreshold = definition.thresholds[tier];
+      break;
+    }
+  }
+
+  // Calculate progress
+  const progressPercent = nextThreshold
+    ? Math.min(100, Math.round((currentCount / nextThreshold) * 100))
+    : 100;
+
+  return {
+    currentCount,
+    currentTier,
+    nextTier,
+    nextThreshold,
+    progressPercent,
+  };
 }

@@ -1,12 +1,44 @@
 /**
  * Badges Storage Module
  * Handles badge awarding and retrieval (M3)
+ * Supports tiered badges (bronze, silver, gold, platinum) with quantitative thresholds
  */
 
 import { execute, query, queryFirst } from "./database";
 import { logger } from "../lib/logger";
-import type { Badge, BadgeType } from "../types";
-import { BADGE_INFO } from "../types";
+import type { Badge, BadgeType, BadgeTier } from "../types";
+import { BADGE_INFO, TIERED_BADGE_DEFINITIONS, BADGE_TIER_COLORS } from "../types";
+
+/**
+ * Parse badge type into category and tier
+ */
+export function parseTieredBadge(
+  badgeType: BadgeType
+): { category: string; tier: BadgeTier } | null {
+  const tiers: BadgeTier[] = ["bronze", "silver", "gold", "platinum"];
+  for (const tier of tiers) {
+    if (badgeType.endsWith(`-${tier}`)) {
+      const category = badgeType.replace(`-${tier}`, "");
+      if (TIERED_BADGE_DEFINITIONS[category]) {
+        return { category, tier };
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Get the next tier badge type for a category
+ */
+export function getNextTierBadge(category: string, currentTier: BadgeTier): BadgeType | null {
+  const tiers: BadgeTier[] = ["bronze", "silver", "gold", "platinum"];
+  const currentIndex = tiers.indexOf(currentTier);
+  if (currentIndex < tiers.length - 1) {
+    const nextTier = tiers[currentIndex + 1];
+    return `${category}-${nextTier}` as BadgeType;
+  }
+  return null; // Already at platinum
+}
 
 /**
  * Award a badge to a user (if not already earned)
@@ -15,7 +47,7 @@ import { BADGE_INFO } from "../types";
 export async function awardBadge(userId: string, badgeType: BadgeType): Promise<Badge | null> {
   // Check if already earned
   const existing = await queryFirst<Badge>(
-    "SELECT * FROM badges WHERE userId = ? AND badgeType = ?",
+    "SELECT * FROM badges WHERE userId = ? AND badgeName = ?",
     [userId, badgeType]
   );
 
@@ -26,27 +58,31 @@ export async function awardBadge(userId: string, badgeType: BadgeType): Promise<
   const id = `badge_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   const now = new Date().toISOString();
 
+  // Determine tier if it's a tiered badge
+  const parsed = parseTieredBadge(badgeType);
+  const tier = parsed?.tier;
+
   const badge: Badge = {
     id,
     userId,
     badgeType,
+    tier,
     earnedAt: now,
   };
 
   try {
-    await execute(`INSERT INTO badges (id, userId, badgeType, earnedAt) VALUES (?, ?, ?, ?)`, [
-      badge.id,
-      badge.userId,
-      badge.badgeType,
-      badge.earnedAt,
-    ]);
+    await execute(
+      `INSERT INTO badges (id, userId, badgeName, tier, earnedAt) VALUES (?, ?, ?, ?, ?)`,
+      [badge.id, badge.userId, badge.badgeType, tier ?? null, badge.earnedAt]
+    );
 
     const badgeInfo = BADGE_INFO[badgeType];
     logger.info("Badge awarded", {
       userId,
       badgeType,
-      badgeName: badgeInfo.name,
-      rarity: badgeInfo.rarity,
+      badgeName: badgeInfo?.name ?? badgeType,
+      tier,
+      rarity: badgeInfo?.rarity,
     });
 
     return badge;
@@ -64,7 +100,25 @@ export async function awardBadge(userId: string, badgeType: BadgeType): Promise<
  * Get all badges for a user
  */
 export async function getUserBadges(userId: string): Promise<Badge[]> {
-  return query<Badge>("SELECT * FROM badges WHERE userId = ? ORDER BY earnedAt DESC", [userId]);
+  const rows = await query<{
+    id: string;
+    userId: string;
+    badgeName: string;
+    tier: string | null;
+    earnedAt: string;
+    sharedAt: string | null;
+    syncedAt: string | null;
+  }>("SELECT * FROM badges WHERE userId = ? ORDER BY earnedAt DESC", [userId]);
+
+  return rows.map((row) => ({
+    id: row.id,
+    userId: row.userId,
+    badgeType: row.badgeName as BadgeType,
+    tier: row.tier as BadgeTier | undefined,
+    earnedAt: row.earnedAt,
+    sharedAt: row.sharedAt ?? undefined,
+    syncedAt: row.syncedAt ?? undefined,
+  }));
 }
 
 /**
@@ -75,6 +129,7 @@ export type BadgeWithInfo = Badge & {
   description: string;
   emoji: string;
   rarity: "common" | "rare" | "epic" | "legendary";
+  tierColor?: string;
 };
 
 export async function getUserBadgesWithInfo(userId: string): Promise<BadgeWithInfo[]> {
@@ -84,10 +139,11 @@ export async function getUserBadgesWithInfo(userId: string): Promise<BadgeWithIn
     const info = BADGE_INFO[badge.badgeType];
     return {
       ...badge,
-      name: info.name,
-      description: info.description,
-      emoji: info.emoji,
-      rarity: info.rarity,
+      name: info?.name ?? badge.badgeType,
+      description: info?.description ?? "",
+      emoji: info?.emoji ?? "🏆",
+      rarity: info?.rarity ?? "common",
+      tierColor: badge.tier ? BADGE_TIER_COLORS[badge.tier] : undefined,
     };
   });
 }
@@ -96,11 +152,38 @@ export async function getUserBadgesWithInfo(userId: string): Promise<BadgeWithIn
  * Check if user has a specific badge
  */
 export async function hasBadge(userId: string, badgeType: BadgeType): Promise<boolean> {
-  const badge = await queryFirst<Badge>(
-    "SELECT id FROM badges WHERE userId = ? AND badgeType = ?",
+  const badge = await queryFirst<{ id: string }>(
+    "SELECT id FROM badges WHERE userId = ? AND badgeName = ?",
     [userId, badgeType]
   );
   return !!badge;
+}
+
+/**
+ * Get badge by ID
+ */
+export async function getBadgeById(badgeId: string): Promise<Badge | null> {
+  const row = await queryFirst<{
+    id: string;
+    userId: string;
+    badgeName: string;
+    tier: string | null;
+    earnedAt: string;
+    sharedAt: string | null;
+    syncedAt: string | null;
+  }>("SELECT * FROM badges WHERE id = ?", [badgeId]);
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    userId: row.userId,
+    badgeType: row.badgeName as BadgeType,
+    tier: row.tier as BadgeTier | undefined,
+    earnedAt: row.earnedAt,
+    sharedAt: row.sharedAt ?? undefined,
+    syncedAt: row.syncedAt ?? undefined,
+  };
 }
 
 /**
@@ -137,7 +220,8 @@ export async function getBadgeCountsByRarity(userId: string): Promise<Record<str
   };
 
   for (const badge of badges) {
-    const rarity = BADGE_INFO[badge.badgeType].rarity;
+    const info = BADGE_INFO[badge.badgeType];
+    const rarity = info?.rarity ?? "common";
     counts[rarity]++;
   }
 
@@ -145,13 +229,73 @@ export async function getBadgeCountsByRarity(userId: string): Promise<Record<str
 }
 
 /**
+ * Get badge counts by tier
+ */
+export async function getBadgeCountsByTier(userId: string): Promise<Record<BadgeTier, number>> {
+  const badges = await getUserBadges(userId);
+
+  const counts: Record<BadgeTier, number> = {
+    bronze: 0,
+    silver: 0,
+    gold: 0,
+    platinum: 0,
+  };
+
+  for (const badge of badges) {
+    if (badge.tier) {
+      counts[badge.tier]++;
+    }
+  }
+
+  return counts;
+}
+
+/**
+ * Get user's highest tier for a badge category
+ */
+export async function getHighestTierForCategory(
+  userId: string,
+  category: string
+): Promise<BadgeTier | null> {
+  const badges = await getUserBadges(userId);
+  const tiers: BadgeTier[] = ["platinum", "gold", "silver", "bronze"];
+
+  for (const tier of tiers) {
+    const badgeType = `${category}-${tier}` as BadgeType;
+    if (badges.some((b) => b.badgeType === badgeType)) {
+      return tier;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Get recently earned badges (for notifications)
  */
 export async function getRecentBadges(userId: string, since: string): Promise<Badge[]> {
-  return query<Badge>(
-    "SELECT * FROM badges WHERE userId = ? AND earnedAt > ? ORDER BY earnedAt DESC",
-    [userId, since]
-  );
+  const rows = await query<{
+    id: string;
+    userId: string;
+    badgeName: string;
+    tier: string | null;
+    earnedAt: string;
+    sharedAt: string | null;
+    syncedAt: string | null;
+  }>("SELECT * FROM badges WHERE userId = ? AND earnedAt > ? ORDER BY earnedAt DESC", [
+    userId,
+    since,
+  ]);
+
+  return rows.map((row) => ({
+    id: row.id,
+    userId: row.userId,
+    badgeType: row.badgeName as BadgeType,
+    tier: row.tier as BadgeTier | undefined,
+    earnedAt: row.earnedAt,
+    sharedAt: row.sharedAt ?? undefined,
+    syncedAt: row.syncedAt ?? undefined,
+  }));
 }
 
 /**
@@ -163,4 +307,34 @@ export async function getUnearnedBadges(userId: string): Promise<BadgeType[]> {
 
   const allBadgeTypes = Object.keys(BADGE_INFO) as BadgeType[];
   return allBadgeTypes.filter((type) => !earnedTypes.has(type));
+}
+
+/**
+ * Get next badge to earn for a category (progress tracking)
+ */
+export async function getNextBadgeProgress(
+  userId: string,
+  category: string,
+  currentCount: number
+): Promise<{ nextBadge: BadgeType; threshold: number; progress: number } | null> {
+  const definition = TIERED_BADGE_DEFINITIONS[category];
+  if (!definition) return null;
+
+  const tiers: BadgeTier[] = ["bronze", "silver", "gold", "platinum"];
+
+  for (const tier of tiers) {
+    const badgeType = `${category}-${tier}` as BadgeType;
+    const hasEarned = await hasBadge(userId, badgeType);
+
+    if (!hasEarned) {
+      const threshold = definition.thresholds[tier];
+      return {
+        nextBadge: badgeType,
+        threshold,
+        progress: Math.min(100, Math.round((currentCount / threshold) * 100)),
+      };
+    }
+  }
+
+  return null; // User has all tiers
 }

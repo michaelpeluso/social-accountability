@@ -44,14 +44,16 @@ describe("Reactions Storage", () => {
       (execute as jest.Mock).mockResolvedValue({ lastInsertRowId: 1 });
       (queryFirst as jest.Mock).mockResolvedValueOnce({
         id: "reaction-1",
-        postId: TEST_POST_ID,
+        targetId: TEST_POST_ID,
+        targetType: "POST",
         userId: TEST_USER,
         emoji: "👏",
         createdAt: new Date().toISOString(),
       });
 
       const result = await toggleReaction(TEST_USER, {
-        postId: TEST_POST_ID,
+        targetId: TEST_POST_ID,
+        targetType: "POST",
         emoji: "👏" as ReactionEmoji,
       });
 
@@ -66,7 +68,8 @@ describe("Reactions Storage", () => {
       // Mock existing reaction with same emoji
       const existingReaction = {
         id: "reaction-1",
-        postId: TEST_POST_ID,
+        targetId: TEST_POST_ID,
+        targetType: "POST",
         userId: TEST_USER,
         emoji: "🔥",
         createdAt: new Date().toISOString(),
@@ -76,7 +79,8 @@ describe("Reactions Storage", () => {
       (execute as jest.Mock).mockResolvedValue({});
 
       const result = await toggleReaction(TEST_USER, {
-        postId: TEST_POST_ID,
+        targetId: TEST_POST_ID,
+        targetType: "POST",
         emoji: "🔥" as ReactionEmoji, // Same emoji
       });
 
@@ -88,7 +92,8 @@ describe("Reactions Storage", () => {
 
     it("should reject invalid emoji", async () => {
       const result = await toggleReaction(TEST_USER, {
-        postId: TEST_POST_ID,
+        targetId: TEST_POST_ID,
+        targetType: "POST",
         emoji: "🤷" as ReactionEmoji,
       });
 
@@ -104,14 +109,16 @@ describe("Reactions Storage", () => {
       const mockReactions = [
         {
           id: "r1",
-          postId: TEST_POST_ID,
+          targetId: TEST_POST_ID,
+          targetType: "POST",
           userId: "user1",
           emoji: "👏",
           createdAt: new Date().toISOString(),
         },
         {
           id: "r2",
-          postId: TEST_POST_ID,
+          targetId: TEST_POST_ID,
+          targetType: "POST",
           userId: "user2",
           emoji: "🔥",
           createdAt: new Date().toISOString(),
@@ -129,7 +136,8 @@ describe("Reactions Storage", () => {
     it("should get user's specific reaction to a post", async () => {
       const mockReaction = {
         id: "r1",
-        postId: TEST_POST_ID,
+        targetId: TEST_POST_ID,
+        targetType: "POST",
         userId: TEST_USER,
         emoji: "👍",
         createdAt: new Date().toISOString(),

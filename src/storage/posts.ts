@@ -5,6 +5,7 @@
  */
 
 import { execute, query, queryFirst } from "./database";
+import { getCommentCount } from "./comments";
 import { logger } from "../lib/logger";
 import type {
   Post,
@@ -39,11 +40,31 @@ function parsePostJsonFields<T extends Partial<Post>>(post: T): T {
 /**
  * Create a new post
  * Enforces rate limit of 20 posts/day
+ *
+ * Media rules:
+ *   - photo/video: requires mediaUrl (user-uploaded media)
+ *   - chart: auto-generated visualization, mediaUrl ignored
  */
 export async function createPost(
   userId: string,
   request: CreatePostRequest
 ): Promise<Post | { error: string }> {
+  // Validate media type rules
+  if (request.mediaType === "chart" && request.mediaUrl) {
+    logger.warn("Chart posts cannot have user-uploaded media", { userId });
+    return { error: "Chart posts cannot include uploaded images/videos" };
+  }
+
+  if ((request.mediaType === "photo" || request.mediaType === "video") && !request.mediaUrl) {
+    logger.warn("Photo/video posts require mediaUrl", { userId });
+    return { error: "Photo or video posts require a media URL" };
+  }
+
+  // Must have either text or media
+  if (!request.text && !request.mediaUrl && request.mediaType !== "chart") {
+    return { error: "Post must have text, media, or be a chart type" };
+  }
+
   // Check rate limit
   const withinLimit = await checkRateLimit(userId, "post", null, RATE_LIMITS.POSTS_PER_DAY);
   if (!withinLimit) {
@@ -56,49 +77,54 @@ export async function createPost(
 
   const post: Post = {
     id,
-    authorUserId: userId,
+    userId,
     circleId: request.circleId,
     pillar: request.pillar,
     privacy: request.privacy,
-    bodyText: request.bodyText,
+    text: request.text,
     mediaUrl: request.mediaUrl,
+    mediaAspectRatio: request.mediaAspectRatio,
     // M3: Advanced options
     mediaType: request.mediaType,
     postTypeTags: request.postTypeTags,
     customTags: request.customTags,
-    linkedCheckInId: request.linkedCheckInId,
-    linkedHabitId: request.linkedHabitId,
+    checkInId: request.checkInId,
+    habitId: request.habitId,
+    goalId: request.goalId,
     linkedObjectId: request.linkedObjectId,
     linkedObjectType: request.linkedObjectType,
     contextTimeOfDay: request.contextTimeOfDay,
-    contextLocation: request.contextLocation,
+    contextLocationId: request.contextLocationId,
     createdAt: now,
   };
 
   try {
     await execute(
-      `INSERT INTO posts (id, authorUserId, circleId, pillar, privacy, bodyText, mediaUrl,
-       mediaType, postTypeTags, customTags, linkedCheckInId, linkedHabitId,
-       linkedObjectId, linkedObjectType, contextTimeOfDay, contextLocation, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO posts (id, userId, circleId, pillar, privacy, text, mediaUrl, mediaAspectRatio,
+       mediaType, postTypeTags, customTags, checkInId, habitId, goalId,
+       linkedObjectId, linkedObjectType, contextTimeOfDay, contextLocationId, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         post.id,
-        post.authorUserId,
+        post.userId,
         post.circleId ?? null,
         post.pillar,
         post.privacy,
-        post.bodyText ?? null,
+        post.text ?? null,
         post.mediaUrl ?? null,
+        post.mediaAspectRatio ?? null,
         post.mediaType ?? null,
         post.postTypeTags ? JSON.stringify(post.postTypeTags) : null,
         post.customTags ? JSON.stringify(post.customTags) : null,
-        post.linkedCheckInId ?? null,
-        post.linkedHabitId ?? null,
+        post.checkInId ?? null,
+        post.habitId ?? null,
+        post.goalId ?? null,
         post.linkedObjectId ?? null,
         post.linkedObjectType ?? null,
         post.contextTimeOfDay ?? null,
-        post.contextLocation ?? null,
+        post.contextLocationId ?? null,
         post.createdAt,
+        post.createdAt, // updatedAt = createdAt on create
       ]
     );
 
@@ -121,12 +147,41 @@ export async function getPostById(postId: string): Promise<Post | null> {
 }
 
 /**
+ * Get a single post by ID with reactions (for detail view)
+ */
+export async function getFeedPostById(postId: string, viewerId: string): Promise<FeedPost | null> {
+  const post = await queryFirst<
+    Post & { userName: string; userPhotoUrl: string | null; linkedHabitTitle?: string }
+  >(
+    `SELECT p.*, u.displayName as userName, u.photoUrl as userPhotoUrl,
+            h.title as linkedHabitTitle
+     FROM posts p
+     LEFT JOIN users u ON p.userId = u.id
+     LEFT JOIN habits h ON p.habitId = h.id
+     WHERE p.id = ?`,
+    [postId]
+  );
+
+  if (!post) return null;
+
+  const reactions = await getPostReactionSummary(postId, viewerId);
+  const commentCount = await getCommentCount(postId);
+  const parsedPost = parsePostJsonFields(post);
+
+  return {
+    ...parsedPost,
+    reactions,
+    commentCount,
+  };
+}
+
+/**
  * Update a post (allowed within 24 hours)
  */
 export async function updatePost(
   postId: string,
   userId: string,
-  updates: { bodyText?: string }
+  updates: { text?: string }
 ): Promise<Post | { error: string }> {
   const post = await getPostById(postId);
 
@@ -134,7 +189,7 @@ export async function updatePost(
     return { error: "Post not found" };
   }
 
-  if (post.authorUserId !== userId) {
+  if (post.userId !== userId) {
     return { error: "Not authorized to edit this post" };
   }
 
@@ -149,15 +204,16 @@ export async function updatePost(
 
   const editedAt = new Date().toISOString();
 
-  await execute(`UPDATE posts SET bodyText = ?, editedAt = ? WHERE id = ?`, [
-    updates.bodyText ?? post.bodyText ?? null,
+  await execute(`UPDATE posts SET text = ?, editedAt = ?, updatedAt = ? WHERE id = ?`, [
+    updates.text ?? post.text ?? null,
+    editedAt,
     editedAt,
     postId,
   ]);
 
   logger.info("Post updated", { postId });
 
-  return { ...post, bodyText: updates.bodyText ?? post.bodyText, editedAt };
+  return { ...post, text: updates.text ?? post.text, editedAt };
 }
 
 /**
@@ -173,7 +229,7 @@ export async function deletePost(
     return { error: "Post not found" };
   }
 
-  if (post.authorUserId !== userId) {
+  if (post.userId !== userId) {
     return { error: "Not authorized to delete this post" };
   }
 
@@ -216,13 +272,13 @@ export async function getFeedPosts(
   switch (scope) {
     case "mine":
       sql = `
-        SELECT p.*, u.displayName as authorName, u.photoUrl as authorAvatarUrl,
+        SELECT p.*, u.displayName as userName, u.photoUrl as userPhotoUrl,
                h.title as linkedHabitTitle, c.occurredAt as linkedCheckInDate
         FROM posts p
-        LEFT JOIN users u ON p.authorUserId = u.id
-        LEFT JOIN habits h ON p.linkedHabitId = h.id
-        LEFT JOIN habit_check_ins c ON p.linkedCheckInId = c.id
-        WHERE p.authorUserId = ? ${cursorClause}
+        LEFT JOIN users u ON p.userId = u.id
+        LEFT JOIN habits h ON p.habitId = h.id
+        LEFT JOIN habit_check_ins c ON p.checkInId = c.id
+        WHERE p.userId = ? ${cursorClause}
         ORDER BY p.createdAt DESC
         LIMIT ?
       `;
@@ -232,17 +288,17 @@ export async function getFeedPosts(
 
     case "friends":
       sql = `
-        SELECT p.*, u.displayName as authorName, u.photoUrl as authorAvatarUrl,
+        SELECT p.*, u.displayName as userName, u.photoUrl as userPhotoUrl,
                h.title as linkedHabitTitle, c.occurredAt as linkedCheckInDate
         FROM posts p
-        LEFT JOIN users u ON p.authorUserId = u.id
-        LEFT JOIN habits h ON p.linkedHabitId = h.id
-        LEFT JOIN habit_check_ins c ON p.linkedCheckInId = c.id
+        LEFT JOIN users u ON p.userId = u.id
+        LEFT JOIN habits h ON p.habitId = h.id
+        LEFT JOIN habit_check_ins c ON p.checkInId = c.id
         WHERE (
-          p.authorUserId = ?
+          p.userId = ?
           OR (
             p.privacy IN ('FRIENDS', 'PUBLIC')
-            AND p.authorUserId IN (
+            AND p.userId IN (
               SELECT friendId FROM friendships 
               WHERE userId = ? AND status = 'ACCEPTED'
             )
@@ -257,12 +313,12 @@ export async function getFeedPosts(
 
     case "discover":
       sql = `
-        SELECT p.*, u.displayName as authorName, u.photoUrl as authorAvatarUrl,
+        SELECT p.*, u.displayName as userName, u.photoUrl as userPhotoUrl,
                h.title as linkedHabitTitle, c.occurredAt as linkedCheckInDate
         FROM posts p
-        LEFT JOIN users u ON p.authorUserId = u.id
-        LEFT JOIN habits h ON p.linkedHabitId = h.id
-        LEFT JOIN habit_check_ins c ON p.linkedCheckInId = c.id
+        LEFT JOIN users u ON p.userId = u.id
+        LEFT JOIN habits h ON p.habitId = h.id
+        LEFT JOIN habit_check_ins c ON p.checkInId = c.id
         WHERE p.privacy = 'PUBLIC' ${cursorClause}
         ORDER BY p.createdAt DESC
         LIMIT ?
@@ -271,19 +327,21 @@ export async function getFeedPosts(
       break;
   }
 
-  const posts = await query<FeedPost & { authorName: string; authorAvatarUrl: string | null }>(
+  const posts = await query<FeedPost & { userName: string; userPhotoUrl: string | null }>(
     sql,
     params
   );
 
-  // Fetch reactions for each post and parse JSON fields
+  // Fetch reactions and comment count for each post and parse JSON fields
   const postsWithReactions: FeedPost[] = await Promise.all(
     posts.map(async (post) => {
       const reactions = await getPostReactionSummary(post.id, userId);
+      const commentCount = await getCommentCount(post.id);
       const parsedPost = parsePostJsonFields(post);
       return {
         ...parsedPost,
         reactions,
+        commentCount,
       };
     })
   );
@@ -328,7 +386,7 @@ export async function getPostsByUser(
   // If viewing own posts, show all
   if (userId === viewerId) {
     posts = await query<Post>(
-      "SELECT * FROM posts WHERE authorUserId = ? ORDER BY createdAt DESC LIMIT ?",
+      "SELECT * FROM posts WHERE userId = ? ORDER BY createdAt DESC LIMIT ?",
       [userId, limit]
     );
   } else {
@@ -342,7 +400,7 @@ export async function getPostsByUser(
     const privacyFilter = isFriend ? "privacy IN ('FRIENDS', 'PUBLIC')" : "privacy = 'PUBLIC'";
 
     posts = await query<Post>(
-      `SELECT * FROM posts WHERE authorUserId = ? AND ${privacyFilter} ORDER BY createdAt DESC LIMIT ?`,
+      `SELECT * FROM posts WHERE userId = ? AND ${privacyFilter} ORDER BY createdAt DESC LIMIT ?`,
       [userId, limit]
     );
   }
@@ -357,8 +415,19 @@ export async function countPostsToday(userId: string): Promise<number> {
   const today = new Date().toISOString().split("T")[0];
   const result = await queryFirst<{ count: number }>(
     `SELECT COUNT(*) as count FROM posts 
-     WHERE authorUserId = ? AND date(createdAt) = ?`,
+     WHERE userId = ? AND date(createdAt) = ?`,
     [userId, today]
+  );
+  return result?.count ?? 0;
+}
+
+/**
+ * Count total posts for a user (for badge tracking)
+ */
+export async function countUserPosts(userId: string): Promise<number> {
+  const result = await queryFirst<{ count: number }>(
+    "SELECT COUNT(*) as count FROM posts WHERE userId = ?",
+    [userId]
   );
   return result?.count ?? 0;
 }

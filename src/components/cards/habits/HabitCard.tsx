@@ -1,18 +1,24 @@
 /**
  * HabitCard Component
- * Displays a habit with title, schedule, streak, and goal link
+ * Displays a habit with title, schedule, streak, goal link, and social info
+ * Supports both owned habits (with participant count) and joined habits (with owner info)
  */
 
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useTheme } from "../../../theme";
 import { spacing, borderRadius } from "../../../theme/spacing";
 import { typography } from "../../../theme/typography";
-import type { Habit, Goal } from "../../../types";
+import type { Habit, HabitWithMeta, Goal } from "../../../types";
 
 interface HabitCardProps {
-  habit: Habit;
+  habit: Habit | HabitWithMeta;
   linkedGoal?: Goal | null;
   onPress?: () => void;
+}
+
+// Type guard for HabitWithMeta
+function isHabitWithMeta(habit: Habit | HabitWithMeta): habit is HabitWithMeta {
+  return "isJoined" in habit || "participantCount" in habit;
 }
 
 export function HabitCard({ habit, linkedGoal, onPress }: HabitCardProps) {
@@ -24,8 +30,16 @@ export function HabitCard({ habit, linkedGoal, onPress }: HabitCardProps) {
         ? "Daily"
         : habit.schedule.frequency === "weekly"
           ? "Weekly"
-          : "Monthly"
+          : habit.schedule.frequency === "monthly"
+            ? "Monthly"
+            : "Custom"
       : `${habit.schedule.targetCount}x / ${habit.schedule.frequency.replace("ly", "")}`;
+
+  // Extract meta info if available
+  const meta = isHabitWithMeta(habit) ? habit : null;
+  const isJoined = meta?.isJoined ?? false;
+  const participantCount = meta?.participantCount ?? 0;
+  const ownerName = meta?.ownerName;
 
   return (
     <Pressable
@@ -38,17 +52,35 @@ export function HabitCard({ habit, linkedGoal, onPress }: HabitCardProps) {
       onPress={onPress}
     >
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text.primary }]} numberOfLines={1}>
-          {habit.icon && `${habit.icon} `}
-          {habit.title}
-        </Text>
-        {habit.currentStreak > 0 && (
-          <View style={[styles.streakBadge, { backgroundColor: theme.text.success + "20" }]}>
-            <Text style={[styles.streakText, { color: theme.text.success }]}>
-              🔥 {habit.currentStreak}
+        <View style={styles.titleContainer}>
+          <Text style={[styles.title, { color: theme.text.primary }]} numberOfLines={1}>
+            {habit.icon && `${habit.icon} `}
+            {habit.title}
+          </Text>
+          {isJoined && ownerName && (
+            <Text style={[styles.ownerText, { color: theme.text.tertiary }]} numberOfLines={1}>
+              by {ownerName}
             </Text>
-          </View>
-        )}
+          )}
+        </View>
+        <View style={styles.badges}>
+          {participantCount > 0 && (
+            <View
+              style={[styles.participantBadge, { backgroundColor: theme.semantic.primary + "20" }]}
+            >
+              <Text style={[styles.participantText, { color: theme.semantic.primary }]}>
+                👥 {participantCount}
+              </Text>
+            </View>
+          )}
+          {habit.currentStreak > 0 && (
+            <View style={[styles.streakBadge, { backgroundColor: theme.text.success + "20" }]}>
+              <Text style={[styles.streakText, { color: theme.text.success }]}>
+                🔥 {habit.currentStreak}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
       <View style={styles.meta}>
         <Text
@@ -59,6 +91,9 @@ export function HabitCard({ habit, linkedGoal, onPress }: HabitCardProps) {
         >
           {scheduleText}
         </Text>
+        {isJoined && (
+          <Text style={[styles.joinedBadge, { color: theme.semantic.primary }]}>Joined</Text>
+        )}
         {linkedGoal && (
           <Text style={[styles.goalLink, { color: theme.semantic.primary }]}>
             → {linkedGoal.title}
@@ -82,14 +117,34 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     marginBottom: spacing.sm,
+  },
+  titleContainer: {
+    flex: 1,
+    marginRight: spacing.sm,
   },
   title: {
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.medium,
-    flex: 1,
+  },
+  ownerText: {
+    fontSize: typography.fontSize.xs,
+    marginTop: 2,
+  },
+  badges: {
+    flexDirection: "row",
+    gap: spacing.xs,
+  },
+  participantBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.lg,
+  },
+  participantText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
   },
   streakBadge: {
     paddingHorizontal: spacing.sm,
@@ -111,6 +166,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.sm,
     overflow: "hidden",
+  },
+  joinedBadge: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
   },
   goalLink: {
     fontSize: typography.fontSize.xs,

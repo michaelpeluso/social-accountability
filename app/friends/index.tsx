@@ -7,7 +7,6 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
-  TextInput,
   RefreshControl,
 } from "react-native";
 import { router } from "expo-router";
@@ -18,6 +17,7 @@ import type { User, FriendRequest } from "../../src/types/user";
 import { useTheme } from "../../src/theme";
 import { spacing, borderRadius } from "../../src/theme/spacing";
 import { typography } from "../../src/theme/typography";
+import { SearchBar, FriendRequestCard } from "../../src/components";
 
 type Tab = "friends" | "requests" | "search" | "blocked";
 
@@ -242,61 +242,32 @@ export default function Friends() {
 
   function renderReceivedRequest({ item }: { item: FriendRequest }) {
     return (
-      <View
-        style={[
-          styles.item,
-          { backgroundColor: theme.card.background, borderBottomColor: theme.border.light },
-        ]}
-      >
-        <View style={styles.itemInfo}>
-          <Text style={[styles.itemName, { color: theme.text.primary }]}>
-            {item.sender.displayName}
-          </Text>
-          <Text style={[styles.itemMeta, { color: theme.text.tertiary }]}>
-            Wants to be your friend
-          </Text>
-        </View>
-        <View style={styles.requestActions}>
-          <Pressable
-            style={[styles.acceptButton, { backgroundColor: theme.semantic.primary }]}
-            onPress={() => handleAcceptRequest(item.id)}
-          >
-            <Text style={[styles.acceptButtonText, { color: theme.button.primary.text }]}>
-              Accept
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.declineButton, { borderColor: theme.border.medium }]}
-            onPress={() => handleDeclineRequest(item.id)}
-          >
-            <Text style={[styles.declineButtonText, { color: theme.text.secondary }]}>Decline</Text>
-          </Pressable>
-        </View>
-      </View>
+      <FriendRequestCard
+        requestId={item.id}
+        userId={item.sender.id}
+        userName={item.sender.displayName}
+        userAvatarUrl={item.sender.photoUrl}
+        userBio={item.sender.bio}
+        type="received"
+        onAccept={() => handleAcceptRequest(item.id)}
+        onDecline={() => handleDeclineRequest(item.id)}
+        onPressUser={() => router.push(`/friends/${item.sender.id}`)}
+      />
     );
   }
 
   function renderSentRequest({ item }: { item: FriendRequest }) {
     return (
-      <View
-        style={[
-          styles.item,
-          { backgroundColor: theme.card.background, borderBottomColor: theme.border.light },
-        ]}
-      >
-        <View style={styles.itemInfo}>
-          <Text style={[styles.itemName, { color: theme.text.primary }]}>
-            {item.recipient.displayName}
-          </Text>
-          <Text style={[styles.itemMeta, { color: theme.text.tertiary }]}>Request pending</Text>
-        </View>
-        <Pressable
-          style={[styles.actionButton, { borderColor: theme.border.medium }]}
-          onPress={() => handleDeclineRequest(item.id)}
-        >
-          <Text style={[styles.actionButtonText, { color: theme.text.secondary }]}>Cancel</Text>
-        </Pressable>
-      </View>
+      <FriendRequestCard
+        requestId={item.id}
+        userId={item.recipient.id}
+        userName={item.recipient.displayName}
+        userAvatarUrl={item.recipient.photoUrl}
+        userBio={item.recipient.bio}
+        type="sent"
+        onDecline={() => handleDeclineRequest(item.id)}
+        onPressUser={() => router.push(`/friends/${item.recipient.id}`)}
+      />
     );
   }
 
@@ -475,38 +446,14 @@ export default function Friends() {
 
         {tab === "search" && (
           <View style={styles.searchContainer}>
-            <View style={[styles.searchBar, { backgroundColor: theme.background.primary }]}>
-              <TextInput
-                style={[
-                  styles.searchInput,
-                  {
-                    borderColor: theme.input.border,
-                    backgroundColor: theme.input.background,
-                    color: theme.text.primary,
-                  },
-                ]}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Search by username or email"
-                placeholderTextColor={theme.text.tertiary}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="search"
-                onSubmitEditing={handleSearch}
-              />
-              <Pressable
-                style={[styles.searchButton, { backgroundColor: theme.button.primary.background }]}
-                onPress={handleSearch}
-              >
-                {searching ? (
-                  <ActivityIndicator size="small" color={theme.button.primary.text} />
-                ) : (
-                  <Text style={[styles.searchButtonText, { color: theme.button.primary.text }]}>
-                    Search
-                  </Text>
-                )}
-              </Pressable>
-            </View>
+            <SearchBar
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onSubmit={handleSearch}
+              placeholder="Search by username or email"
+              loading={searching}
+              autoFocus
+            />
 
             {searchResults.length > 0 ? (
               <FlatList

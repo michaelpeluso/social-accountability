@@ -1,3 +1,16 @@
+// Mock expo-constants for testing (cloud-only config)
+// All env vars come through Constants.expoConfig.extra
+jest.mock("expo-constants", () => ({
+  expoConfig: {
+    extra: {
+      appVariant: "development",
+      apiUrl: "https://test.example.com/api",
+      supabaseUrl: "https://test.supabase.co",
+      supabaseAnonKey: "test-anon-key",
+    },
+  },
+}));
+
 // Mock expo-apple-authentication
 jest.mock("expo-apple-authentication", () => ({
   signInAsync: jest.fn(),

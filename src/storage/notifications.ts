@@ -14,7 +14,7 @@ export async function createNotification(
   userId: string,
   type: NotificationType,
   title: string,
-  body: string,
+  text: string,
   data?: Record<string, string>
 ): Promise<AppNotification> {
   const id = `notif_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
@@ -25,21 +25,21 @@ export async function createNotification(
     userId,
     type,
     title,
-    body,
+    text,
     data,
-    read: false,
+    isRead: false,
     createdAt: now,
   };
 
   await execute(
-    `INSERT INTO notifications (id, userId, type, title, body, data, read, createdAt)
+    `INSERT INTO notifications (id, userId, type, title, text, data, isRead, createdAt)
      VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
     [
       notification.id,
       notification.userId,
       notification.type,
       notification.title,
-      notification.body,
+      notification.text,
       data ? JSON.stringify(data) : null,
       notification.createdAt,
     ]
@@ -57,7 +57,7 @@ export async function getNotifications(
   limit = 50,
   includeRead = true
 ): Promise<AppNotification[]> {
-  const readClause = includeRead ? "" : "AND read = 0";
+  const readClause = includeRead ? "" : "AND isRead = 0";
 
   const rows = await query<AppNotification & { data: string | null }>(
     `SELECT * FROM notifications WHERE userId = ? ${readClause} ORDER BY createdAt DESC LIMIT ?`,
@@ -66,7 +66,7 @@ export async function getNotifications(
 
   return rows.map((row) => ({
     ...row,
-    read: Boolean(row.read),
+    isRead: Boolean(row.isRead),
     data: row.data ? JSON.parse(row.data) : undefined,
   }));
 }
@@ -76,7 +76,7 @@ export async function getNotifications(
  */
 export async function getUnreadCount(userId: string): Promise<number> {
   const result = await queryFirst<{ count: number }>(
-    "SELECT COUNT(*) as count FROM notifications WHERE userId = ? AND read = 0",
+    "SELECT COUNT(*) as count FROM notifications WHERE userId = ? AND isRead = 0",
     [userId]
   );
   return result?.count ?? 0;
@@ -86,7 +86,7 @@ export async function getUnreadCount(userId: string): Promise<number> {
  * Mark a notification as read
  */
 export async function markAsRead(notificationId: string): Promise<void> {
-  await execute("UPDATE notifications SET read = 1 WHERE id = ?", [notificationId]);
+  await execute("UPDATE notifications SET isRead = 1 WHERE id = ?", [notificationId]);
   logger.info("Notification marked as read", { notificationId });
 }
 
@@ -94,7 +94,7 @@ export async function markAsRead(notificationId: string): Promise<void> {
  * Mark all notifications as read
  */
 export async function markAllAsRead(userId: string): Promise<void> {
-  await execute("UPDATE notifications SET read = 1 WHERE userId = ? AND read = 0", [userId]);
+  await execute("UPDATE notifications SET isRead = 1 WHERE userId = ? AND isRead = 0", [userId]);
   logger.info("All notifications marked as read", { userId });
 }
 

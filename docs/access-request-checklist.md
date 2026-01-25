@@ -40,7 +40,7 @@ Tip: keep a single App Store Connect API key for CI signing, and keep the .p8 in
 - `API_URL` (local or hosted) to point your app at during development (example: http://localhost:3000 or https://dev-api.example.org)
 - Create at least one test user or a way to mint short-lived dev JWTs for API testing.
 - If using Supabase, create a dev project and an anon/client key for client usage (do NOT embed service_role keys in the app).
-- For media uploads, create a Cloudinary test account and store credentials in CI/secret manager.
+- For media uploads, create a supabase test account and store credentials in CI/secret manager.
 
 ## Environment variables (what I will place in `.env.local`)
 
@@ -96,5 +96,5 @@ Tip: keep a single App Store Connect API key for CI signing, and keep the .p8 in
 
 ### Optional (can delay indefinitely)
 
-- Cloudinary account (only needed if testing media uploads in M3)
+- supabase account (only needed if testing media uploads in M3)
 - Production keys (only needed before public release)
