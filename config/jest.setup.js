@@ -1,20 +1,12 @@
-// Set environment variables for testing
-process.env.APP_VARIANT = "development";
-process.env.EXPO_PUBLIC_API_URL = "https://test.example.com/api";
-process.env.APPLE_CLIENT_ID = "com.test.app";
-process.env.JWT_SECRET = "test-jwt-secret-for-testing";
-process.env.ENABLE_APPLE_AUTH = "false";
-process.env.ENABLE_HEALTHKIT = "false";
-process.env.ENABLE_CLOUD_SYNC = "false";
-process.env.EXPO_PUBLIC_SUPABASE_URL = "";
-process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY = "";
-
-// Mock expo-constants for testing
+// Mock expo-constants for testing (cloud-only config)
+// All env vars come through Constants.expoConfig.extra
 jest.mock("expo-constants", () => ({
   expoConfig: {
     extra: {
       appVariant: "development",
       apiUrl: "https://test.example.com/api",
+      supabaseUrl: "https://test.supabase.co",
+      supabaseAnonKey: "test-anon-key",
     },
   },
 }));

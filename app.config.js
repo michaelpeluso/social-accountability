@@ -4,14 +4,13 @@
  * This replaces app.json for dynamic configuration based on APP_VARIANT.
  * Environment-specific values are set in eas.json build profiles.
  *
- * Pattern (from Reddit best practice):
+ * Pattern:
  * - .env files: LOCAL DEVELOPMENT ONLY (not committed)
  * - eas.json env: API endpoints per build profile (committed)
  * - EAS Secrets: Sensitive values like SUPABASE keys (never in code)
  *
- * Bundle IDs per variant (so all 3 can be installed on same device):
+ * Bundle IDs (so both can be installed on same device):
  * - development: com.social.accountability.dev
- * - preview:     com.social.accountability.preview
  * - production:  com.social.accountability
  */
 
@@ -24,13 +23,7 @@ const variantConfig = {
     name: "Social (Dev)",
     bundleIdentifier: "com.social.accountability.dev",
     package: "com.social.accountability.dev",
-    icon: "./assets/icon-dev.png", // Optional: different icon per env
-  },
-  preview: {
-    name: "Social (Preview)",
-    bundleIdentifier: "com.social.accountability.preview",
-    package: "com.social.accountability.preview",
-    icon: "./assets/icon-preview.png",
+    icon: "./assets/icon-dev.png",
   },
   production: {
     name: "Social Accountability",

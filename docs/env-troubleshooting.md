@@ -1,136 +1,126 @@
-# Environment Variables Troubleshooting
+# Environment Variables Guide
 
-## Common Issues & Solutions
+## Cloud-Only Configuration
 
-### Error: "Missing required environment variable: APPLE_CLIENT_ID"
+This project uses **EAS environment variables only** - no `.env` files.
 
-**Cause:** Server-side secrets (APPLE_CLIENT_ID, JWT_SECRET) are not accessible in React Native context.
+All configuration lives in:
 
-**Solution:** These variables are now **optional** in client code and only required when actually needed (when ENABLE_APPLE_AUTH=true).
+- **EAS Env Vars** (for builds) - managed via `eas env:*` commands
+- **GitHub Secrets** (for CI/CD) - managed in repo settings
 
-**Files Updated:**
+This approach:
 
-- `src/config/env.ts` - Changed `getRequiredEnv()` to `getOptionalEnv()` for server-side secrets
-- `.env.local` - Added default values for development
+- ✅ Prevents secrets from being exposed to AI tools
+- ✅ Keeps all config in one place (EAS dashboard)
+- ✅ Simplifies deployment
 
-### Why .env.example is NOT loaded
+---
 
-Metro bundler only loads:
+## Managing EAS Environment Variables
 
-1. `.env.local` - Committed file with non-sensitive defaults
-2. `.env` - Gitignored file with your actual secrets
-
-**`.env.example` is just a template** - it's never loaded by the app!
-
-To use:
+### View Current Variables
 
 ```bash
-cp .env.example .env
-# Then edit .env with your actual secrets
+npx eas-cli env:list
 ```
 
-### Server-Side vs Client-Side Variables
+### Add/Update Variables
 
-**Client-Side (bundled in app):**
+```bash
+# String type (most common)
+npx eas-cli env:create --name VARIABLE_NAME --value "value" --type string
 
-- Must use `EXPO_PUBLIC_` prefix
-- Accessible via `Constants.expoConfig.extra`
-- Examples: `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_SUPABASE_URL`
+# For sensitive values
+npx eas-cli env:create --name SECRET_NAME --value "secret" --type secret
 
-**Server-Side (backend only):**
-
-- No `EXPO_PUBLIC_` prefix
-- NOT bundled in client app
-- Only used in Node.js context (app.config.js, backend API)
-- Examples: `JWT_SECRET`, `APPLE_AUTH_PRIVATE_KEY_PATH`
-
-### Variable Priority Order
-
-1. **Constants.expoConfig.extra** (from app.config.js)
-   - Works in React Native + EAS builds
-   - Primary source for client code
-
-2. **process.env** (Metro bundler injected)
-   - Only works in Node.js context
-   - Used in app.config.js at build time
-
-3. **Default values** (fallbacks in env.ts)
-
-### File Structure
-
-```
-.env.local          ✅ Committed - non-sensitive defaults
-.env                ❌ Gitignored - your actual secrets
-.env.example        📄 Template only - never loaded
+# Update existing
+npx eas-cli env:update --name VARIABLE_NAME --value "new-value"
 ```
 
-### TypeScript Version
+### Required Variables
 
-Expo requires specific TypeScript versions for compatibility:
+| Variable                        | Type   | Purpose                  |
+| ------------------------------- | ------ | ------------------------ |
+| `EXPO_PUBLIC_API_URL`           | string | API base URL             |
+| `EXPO_PUBLIC_SUPABASE_URL`      | string | Supabase project URL     |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | string | Supabase public key      |
+| `JWT_SECRET`                    | secret | Token signing (server)   |
+| `EXPO_APPLE_ID`                 | string | Apple ID email           |
+| `EXPO_APPLE_TEAM_ID`            | string | Apple Team ID            |
+| `EXPO_ASC_APP_ID`               | string | App Store Connect app ID |
 
-```json
-{
-  "devDependencies": {
-    "typescript": "~5.9.2" // Match Expo's recommended version
-  }
-}
+---
+
+## GitHub Secrets (for CI/CD)
+
+Set in: **Repo Settings → Secrets and variables → Actions**
+
+| Secret                     | Purpose                                  |
+| -------------------------- | ---------------------------------------- |
+| `EXPO_TOKEN`               | EAS authentication                       |
+| `APPSTORE_ISSUER_ID`       | App Store Connect API                    |
+| `APPSTORE_API_KEY_ID`      | App Store Connect API                    |
+| `APPSTORE_API_PRIVATE_KEY` | App Store Connect API (full .p8 content) |
+
+---
+
+## Troubleshooting
+
+### "Missing required environment variable: X"
+
+1. Check if variable exists:
+
+   ```bash
+   npx eas-cli env:list
+   ```
+
+2. Add if missing:
+
+   ```bash
+   npx eas-cli env:create --name X --value "value" --type string
+   ```
+
+3. Rebuild the app (EAS vars are injected at build time)
+
+### Variables Not Updating
+
+EAS environment variables are injected **at build time**, not runtime.
+
+After changing a variable:
+
+```bash
+# Rebuild to pick up changes
+npx eas-cli build --profile production --platform ios
 ```
 
-Check recommended version: `npx expo install --check`
+### Local Development
+
+For local development with `npm start`:
+
+- Variables come from `app.config.js` defaults
+- Production values only available in EAS builds
 
 ### Testing
 
-Jest tests mock environment variables in `config/jest.setup.js`:
+Jest tests mock env vars in `config/jest.setup.js`:
 
 ```javascript
-process.env.APPLE_CLIENT_ID = "com.test.app";
-process.env.JWT_SECRET = "test-jwt-secret-for-testing";
+jest.mock("expo-constants", () => ({
+  expoConfig: {
+    extra: {
+      appVariant: "development",
+      apiUrl: "https://test.example.com/api",
+      supabaseUrl: "https://test.supabase.co",
+      supabaseAnonKey: "test-anon-key",
+    },
+  },
+}));
 ```
 
-### Metro Bundler Cache
+---
 
-If you see stale values or errors after fixing .env:
+## References
 
-```bash
-npm start -- --clear    # Clear cache and restart
-# or
-npx expo start --clear
-```
-
-### Quick Checklist
-
-When you see environment variable errors:
-
-- [ ] Is the variable in `.env.local` (for defaults)?
-- [ ] Is the variable in `.env` (for secrets)?
-- [ ] Does it need `EXPO_PUBLIC_` prefix (client-side)?
-- [ ] Is `app.config.js` exposing it via `extra`?
-- [ ] Did you restart Metro after changing .env files?
-- [ ] Is TypeScript version matching Expo's recommendation?
-
-### Development vs Production
-
-**Local Development:**
-
-```bash
-# .env.local (committed)
-ENABLE_APPLE_AUTH=false
-APPLE_CLIENT_ID=com.social.accountability.dev
-JWT_SECRET=dev-jwt-secret-replace-in-production
-
-# .env (gitignored) - optional overrides
-# (empty for now, add real secrets when testing Apple auth)
-```
-
-**EAS Production:**
-
-```bash
-# Set via EAS Secrets
-eas secret:create --scope project --name JWT_SECRET --value "$(openssl rand -base64 32)"
-eas secret:create --scope project --name APPLE_CLIENT_ID --value "com.social.accountability"
-```
-
-### References
-
-- [Expo Environment Variables Guide](https://docs.expo.dev/guides/environment-variables/)
-- [docs/env-vars-expo.md](./env-vars-expo.md) - Complete Expo env vars guide
+- [EAS Environment Variables](https://docs.expo.dev/build/environment-variables/)
+- [docs/TESTFLIGHT_SETUP.md](./TESTFLIGHT_SETUP.md) - CI/CD setup

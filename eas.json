@@ -21,21 +21,6 @@
       },
       "channel": "development"
     },
-    "preview": {
-      "distribution": "internal",
-      "ios": {
-        "buildConfiguration": "Release"
-      },
-      "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease"
-      },
-      "env": {
-        "APP_VARIANT": "preview",
-        "EXPO_PUBLIC_API_URL": "https://api-staging.pelsos.com"
-      },
-      "channel": "preview"
-    },
     "production": {
       "distribution": "store",
       "ios": {
@@ -50,6 +35,15 @@
       },
       "channel": "production",
       "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "${EXPO_APPLE_ID}",
+        "ascAppId": "${EXPO_ASC_APP_ID}",
+        "appleTeamId": "${EXPO_APPLE_TEAM_ID}"
+      }
     }
   }
 }
