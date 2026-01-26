@@ -51,6 +51,9 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: config.bundleIdentifier,
+      infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
+      },
     },
 
     android: {

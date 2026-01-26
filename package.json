@@ -16,9 +16,7 @@
     "prepare": "husky",
     "dev": "bash scripts/dev.sh",
     "clean": "bash scripts/clean-install.sh",
-    "workflow": "bash scripts/workflow.sh",
-    "doctor": "bash scripts/doctor.sh",
-    "kill-port": "bash scripts/kill-port.sh"
+    "build": "eas build --platform ios --profile production --non-interactive --wait"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
