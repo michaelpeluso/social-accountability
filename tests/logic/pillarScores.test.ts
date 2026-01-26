@@ -82,20 +82,24 @@ describe("Pillar Score Calculation", () => {
           isArchived: false,
         },
       ];
-      // More check-ins this week than last week = "up" trend
-      // Reference: Monday Jan 15. This week: Sun Jan 14 - Sat Jan 20
-      // Last week: Sun Jan 7 - Sat Jan 13
+
+      // Use fixed UTC dates that will work in any timezone
+      // referenceDate is 2024-01-15T12:00:00.000Z (Monday)
+      // This week (Sun-Sat): Jan 14-20, 2024
+      // Last week (Sun-Sat): Jan 7-13, 2024
       const checkIns = [
-        { habitId: "habit-1", occurredAt: "2024-01-15T08:00:00.000Z" }, // This week (Monday)
-        { habitId: "habit-1", occurredAt: "2024-01-16T08:00:00.000Z" }, // This week (Tuesday)
-        { habitId: "habit-1", occurredAt: "2024-01-17T08:00:00.000Z" }, // This week (Wednesday)
-        // Only 1 last week
-        { habitId: "habit-1", occurredAt: "2024-01-10T08:00:00.000Z" }, // Last week (Wednesday)
+        { habitId: "habit-1", occurredAt: "2024-01-14T12:00:00.000Z" }, // This week (Sunday)
+        { habitId: "habit-1", occurredAt: "2024-01-15T12:00:00.000Z" }, // This week (Monday - reference day)
+        { habitId: "habit-1", occurredAt: "2024-01-16T12:00:00.000Z" }, // This week (Tuesday)
+        { habitId: "habit-1", occurredAt: "2024-01-17T12:00:00.000Z" }, // This week (Wednesday)
+        { habitId: "habit-1", occurredAt: "2024-01-09T12:00:00.000Z" }, // Last week (Tuesday)
       ];
 
       const result = calculatePillarScore("HEART", habits, checkIns, referenceDate);
 
       expect(result.thisWeekCheckIns).toBeGreaterThan(result.lastWeekCheckIns);
+      expect(result.thisWeekCheckIns).toBe(4);
+      expect(result.lastWeekCheckIns).toBe(1);
     });
 
     it("ignores check-ins from other pillars", () => {

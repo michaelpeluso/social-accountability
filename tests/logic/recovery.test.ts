@@ -12,10 +12,10 @@ import {
   RecoveryCheckIn,
 } from "../../src/logic/recovery";
 
-// Helper to create check-ins for testing
+// Helper to create check-ins for testing (using UTC to avoid timezone issues)
 function makeCheckIn(daysAgo: number, baseDate: Date): RecoveryCheckIn {
   const date = new Date(baseDate);
-  date.setDate(date.getDate() - daysAgo);
+  date.setUTCDate(date.getUTCDate() - daysAgo);
   return { occurredAt: date.toISOString() };
 }
 
@@ -25,22 +25,26 @@ describe("findMissedPeriods", () => {
 
     it("finds missed days when check-ins are not consecutive", () => {
       const referenceDate = new Date("2024-01-10T12:00:00Z");
-      // Check-ins on days 10 (today), 9, 7, 5 - missing days 8 and 6
+      // Check-ins on days 10 (today), 9, 7, 5 - missing days 4, 6, and 8
+      // (lookback of 6 days = Jan 4-9, excluding today Jan 10)
       const checkIns = [
         { occurredAt: "2024-01-10T08:00:00Z" }, // Today - excluded
-        { occurredAt: "2024-01-09T08:00:00Z" },
+        { occurredAt: "2024-01-09T08:00:00Z" }, // Day 9
         // Day 8 missed
-        { occurredAt: "2024-01-07T08:00:00Z" },
+        { occurredAt: "2024-01-07T08:00:00Z" }, // Day 7
         // Day 6 missed
-        { occurredAt: "2024-01-05T08:00:00Z" },
+        { occurredAt: "2024-01-05T08:00:00Z" }, // Day 5
+        // Day 4 missed (within 6-day lookback)
       ];
 
       const misses = findMissedPeriods(dailyHabit, checkIns, referenceDate, 6);
 
-      // Should include days 6 and 8 as misses
-      const missedDays = misses.map((m) => m.date.getDate());
+      // Should include days 4, 6, and 8 as misses (using UTC dates)
+      const missedDays = misses.map((m) => m.date.getUTCDate());
+      expect(missedDays).toContain(4);
       expect(missedDays).toContain(6);
       expect(missedDays).toContain(8);
+      expect(misses).toHaveLength(3);
       expect(misses.every((m) => m.type === "day")).toBe(true);
     });
 

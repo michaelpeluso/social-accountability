@@ -12,7 +12,13 @@ module.exports = {
   ],
   coverageReporters: ['text', 'lcov', 'json-summary'],
   transform: {
-    '^.+\\.(ts|tsx)$': 'ts-jest',
+    '^.+\\.(ts|tsx)$': ['ts-jest', {
+      tsconfig: {
+        jsx: 'react',
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+      },
+    }],
     '^.+\\.(js|jsx)$': 'babel-jest',
   },
   transformIgnorePatterns: [
