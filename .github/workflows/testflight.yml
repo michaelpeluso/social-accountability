@@ -52,6 +52,7 @@ jobs:
         run: eas build --platform ios --profile production --non-interactive --wait
         env:
           APP_VARIANT: production
+          HUSKY: 0
           EXPO_APPLE_APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
           EXPO_APPLE_APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
           EXPO_APPLE_APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
@@ -60,6 +61,7 @@ jobs:
         run: eas submit --platform ios --profile production --non-interactive --latest
         env:
           APP_VARIANT: production
+          HUSKY: 0
           EXPO_APPLE_APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
           EXPO_APPLE_APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
           EXPO_APPLE_APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
