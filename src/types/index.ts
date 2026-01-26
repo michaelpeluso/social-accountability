@@ -619,9 +619,7 @@ export const TIER_RARITY: Record<BadgeTier, "common" | "rare" | "epic" | "legend
 };
 
 // Helper to get badge info for tiered badges
-export function getTieredBadgeInfo(
-  badgeType: BadgeType
-): {
+export function getTieredBadgeInfo(badgeType: BadgeType): {
   name: string;
   description: string;
   emoji: string;

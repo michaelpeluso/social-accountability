@@ -17,7 +17,8 @@
       },
       "env": {
         "APP_VARIANT": "development",
-        "EXPO_PUBLIC_API_URL": "http://localhost:3000"
+        "EXPO_PUBLIC_API_URL": "http://localhost:3000",
+        "HUSKY": "0"
       },
       "channel": "development"
     },
@@ -31,7 +32,8 @@
       },
       "env": {
         "APP_VARIANT": "production",
-        "EXPO_PUBLIC_API_URL": "https://api.pelsos.com"
+        "EXPO_PUBLIC_API_URL": "https://api.pelsos.com",
+        "HUSKY": "0"
       },
       "channel": "production",
       "autoIncrement": true
