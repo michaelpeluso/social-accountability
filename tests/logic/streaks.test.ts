@@ -12,10 +12,13 @@ import {
   StreakCheckIn,
 } from "../../src/logic/streaks";
 
-// Helper to create check-ins for testing
-function makeCheckIn(daysAgo: number, baseDate: Date = new Date("2024-01-15")): StreakCheckIn {
+// Helper to create check-ins for testing (using UTC to avoid timezone issues)
+function makeCheckIn(
+  daysAgo: number,
+  baseDate: Date = new Date("2024-01-15T12:00:00Z")
+): StreakCheckIn {
   const date = new Date(baseDate);
-  date.setDate(date.getDate() - daysAgo);
+  date.setUTCDate(date.getUTCDate() - daysAgo);
   return { occurredAt: date.toISOString() };
 }
 

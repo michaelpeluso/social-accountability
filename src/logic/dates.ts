@@ -1,66 +1,70 @@
 /**
  * Date Utilities Module
  * Pure date manipulation functions for streak and recovery calculations
+ *
+ * IMPORTANT: All functions use UTC to ensure consistent behavior across timezones.
+ * This prevents CI/local environment discrepancies where tests pass locally
+ * but fail in GitHub Actions (which runs in UTC).
  */
 
 /**
- * Get start of day (00:00:00) for a given date
+ * Get start of day (00:00:00 UTC) for a given date
  */
 export function startOfDay(date: Date): Date {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
+  d.setUTCHours(0, 0, 0, 0);
   return d;
 }
 
 /**
- * Get start of week (Sunday 00:00:00) for a given date
+ * Get start of week (Sunday 00:00:00 UTC) for a given date
  */
 export function startOfWeek(date: Date): Date {
   const d = startOfDay(date);
-  const day = d.getDay();
+  const day = d.getUTCDay();
   const diff = day; // Sunday is 0, so subtract 0-6 days
-  d.setDate(d.getDate() - diff);
+  d.setUTCDate(d.getUTCDate() - diff);
   return d;
 }
 
 /**
- * Get end of week (Saturday 23:59:59) for a given date
+ * Get end of week (Saturday 23:59:59 UTC) for a given date
  */
 export function endOfWeek(date: Date): Date {
   const d = startOfWeek(date);
-  d.setDate(d.getDate() + 6);
-  d.setHours(23, 59, 59, 999);
+  d.setUTCDate(d.getUTCDate() + 6);
+  d.setUTCHours(23, 59, 59, 999);
   return d;
 }
 
 /**
- * Subtract days from a date
+ * Subtract days from a date (UTC)
  */
 export function subtractDays(date: Date, days: number): Date {
   const d = new Date(date);
-  d.setDate(d.getDate() - days);
+  d.setUTCDate(d.getUTCDate() - days);
   return d;
 }
 
 /**
- * Add days to a date
+ * Add days to a date (UTC)
  */
 export function addDays(date: Date, days: number): Date {
   const d = new Date(date);
-  d.setDate(d.getDate() + days);
+  d.setUTCDate(d.getUTCDate() + days);
   return d;
 }
 
 /**
- * Check if two dates are the same day (ignoring time)
+ * Check if two dates are the same day (ignoring time, using UTC)
  */
 export function isSameDay(date1: Date | string, date2: Date | string): boolean {
   const d1 = typeof date1 === "string" ? new Date(date1) : date1;
   const d2 = typeof date2 === "string" ? new Date(date2) : date2;
   return (
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate()
+    d1.getUTCFullYear() === d2.getUTCFullYear() &&
+    d1.getUTCMonth() === d2.getUTCMonth() &&
+    d1.getUTCDate() === d2.getUTCDate()
   );
 }
 
