@@ -82,20 +82,40 @@ describe("Pillar Score Calculation", () => {
           isArchived: false,
         },
       ];
-      // More check-ins this week than last week = "up" trend
-      // Reference: Monday Jan 15. This week: Sun Jan 14 - Sat Jan 20
-      // Last week: Sun Jan 7 - Sat Jan 13
+
+      // Calculate dates dynamically relative to referenceDate
+      const refDate = new Date(referenceDate);
+      const dayOfWeek = refDate.getDay(); // 0 (Sunday) to 6 (Saturday)
+
+      // Get Sunday of this week (start of week)
+      const thisSunday = new Date(refDate);
+      thisSunday.setDate(refDate.getDate() - dayOfWeek);
+      thisSunday.setHours(8, 0, 0, 0);
+
+      // Get dates for this week (4 check-ins)
+      const thisWeekDates = [0, 1, 2, 3].map((offset) => {
+        const date = new Date(thisSunday);
+        date.setDate(thisSunday.getDate() + offset);
+        return date.toISOString();
+      });
+
+      // Get dates for last week (1 check-in)
+      const lastWeekWednesday = new Date(thisSunday);
+      lastWeekWednesday.setDate(thisSunday.getDate() - 4); // 4 days before Sunday = last week Wednesday
+
       const checkIns = [
-        { habitId: "habit-1", occurredAt: "2024-01-15T08:00:00.000Z" }, // This week (Monday)
-        { habitId: "habit-1", occurredAt: "2024-01-16T08:00:00.000Z" }, // This week (Tuesday)
-        { habitId: "habit-1", occurredAt: "2024-01-17T08:00:00.000Z" }, // This week (Wednesday)
-        // Only 1 last week
-        { habitId: "habit-1", occurredAt: "2024-01-10T08:00:00.000Z" }, // Last week (Wednesday)
+        { habitId: "habit-1", occurredAt: thisWeekDates[0] }, // This week (Sunday)
+        { habitId: "habit-1", occurredAt: thisWeekDates[1] }, // This week (Monday)
+        { habitId: "habit-1", occurredAt: thisWeekDates[2] }, // This week (Tuesday)
+        { habitId: "habit-1", occurredAt: thisWeekDates[3] }, // This week (Wednesday)
+        { habitId: "habit-1", occurredAt: lastWeekWednesday.toISOString() }, // Last week
       ];
 
       const result = calculatePillarScore("HEART", habits, checkIns, referenceDate);
 
       expect(result.thisWeekCheckIns).toBeGreaterThan(result.lastWeekCheckIns);
+      expect(result.thisWeekCheckIns).toBe(4);
+      expect(result.lastWeekCheckIns).toBe(1);
     });
 
     it("ignores check-ins from other pillars", () => {
