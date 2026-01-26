@@ -5,15 +5,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Optimized CI: Pre-push hooks validate locally (type-check + tests + lint)
-# CI runs only on PR (final gate) and main push (safety net)
-
+# Run on all pushes and PRs to catch issues early
 on:
   pull_request:
     branches: [main]
     paths-ignore: ['docs/**', 'design/**']
   push:
-    branches: [main]  # Safety net for main branch only
     paths-ignore: ['docs/**', 'design/**']
 
 jobs:
@@ -30,6 +27,8 @@ jobs:
   type-check:
     name: TypeScript Type Check
     runs-on: ubuntu-latest
+    env:
+      HUSKY: 0
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -42,6 +41,8 @@ jobs:
   code-quality:
     name: Code Quality (ESLint + Prettier)
     runs-on: ubuntu-latest
+    env:
+      HUSKY: 0
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -54,8 +55,10 @@ jobs:
 
   test:
     name: Jest Tests
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    env:
+      HUSKY: 0
+      TZ: UTC
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

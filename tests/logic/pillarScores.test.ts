@@ -83,32 +83,16 @@ describe("Pillar Score Calculation", () => {
         },
       ];
 
-      // Calculate dates dynamically relative to referenceDate
-      const refDate = new Date(referenceDate);
-      const dayOfWeek = refDate.getDay(); // 0 (Sunday) to 6 (Saturday)
-
-      // Get Sunday of this week (start of week)
-      const thisSunday = new Date(refDate);
-      thisSunday.setDate(refDate.getDate() - dayOfWeek);
-      thisSunday.setHours(8, 0, 0, 0);
-
-      // Get dates for this week (4 check-ins)
-      const thisWeekDates = [0, 1, 2, 3].map((offset) => {
-        const date = new Date(thisSunday);
-        date.setDate(thisSunday.getDate() + offset);
-        return date.toISOString();
-      });
-
-      // Get dates for last week (1 check-in)
-      const lastWeekWednesday = new Date(thisSunday);
-      lastWeekWednesday.setDate(thisSunday.getDate() - 4); // 4 days before Sunday = last week Wednesday
-
+      // Use fixed UTC dates that will work in any timezone
+      // referenceDate is 2024-01-15T12:00:00.000Z (Monday)
+      // This week (Sun-Sat): Jan 14-20, 2024
+      // Last week (Sun-Sat): Jan 7-13, 2024
       const checkIns = [
-        { habitId: "habit-1", occurredAt: thisWeekDates[0] }, // This week (Sunday)
-        { habitId: "habit-1", occurredAt: thisWeekDates[1] }, // This week (Monday)
-        { habitId: "habit-1", occurredAt: thisWeekDates[2] }, // This week (Tuesday)
-        { habitId: "habit-1", occurredAt: thisWeekDates[3] }, // This week (Wednesday)
-        { habitId: "habit-1", occurredAt: lastWeekWednesday.toISOString() }, // Last week
+        { habitId: "habit-1", occurredAt: "2024-01-14T12:00:00.000Z" }, // This week (Sunday)
+        { habitId: "habit-1", occurredAt: "2024-01-15T12:00:00.000Z" }, // This week (Monday - reference day)
+        { habitId: "habit-1", occurredAt: "2024-01-16T12:00:00.000Z" }, // This week (Tuesday)
+        { habitId: "habit-1", occurredAt: "2024-01-17T12:00:00.000Z" }, // This week (Wednesday)
+        { habitId: "habit-1", occurredAt: "2024-01-09T12:00:00.000Z" }, // Last week (Tuesday)
       ];
 
       const result = calculatePillarScore("HEART", habits, checkIns, referenceDate);
