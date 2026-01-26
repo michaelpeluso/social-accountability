@@ -69,6 +69,8 @@ jobs:
       - run: npm test -- --coverage
       - name: Upload coverage
         uses: codecov/codecov-action@v3
-        if: always()
+        if: ${{ secrets.CODECOV_TOKEN != '' }}
+        continue-on-error: true
         with:
           files: ./coverage/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
